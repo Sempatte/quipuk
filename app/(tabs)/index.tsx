@@ -11,7 +11,6 @@ export default function HomeScreen() {
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Quipuk !!</ThemedText>
-        <HelloWave />
       </ThemedView>
       
     </ParallaxScrollView>

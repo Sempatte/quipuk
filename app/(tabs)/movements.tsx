@@ -11,7 +11,6 @@ export default function Movements() {
       headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
       <ThemedView>
         <ThemedText type="title">Movements</ThemedText>
-        <HelloWave />
       </ThemedView>
       
     </ParallaxScrollView>

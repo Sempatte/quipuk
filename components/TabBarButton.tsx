@@ -42,13 +42,21 @@ export default function TabBarButton({
     return null; // O un ícono predeterminado
   }
   return (
-    <Pressable onPress={onPress} onLongPress={onLongPress} style={style.tabbarItem}>
-      {icon[routeName]({ color: isFocused ? "#673ab7" : "#222222" })}
-      <Animated.Text style={[{ color: isFocused ? "#673ab7" : "#222" }, animatedTextStyle]}>
-        {label}
-      </Animated.Text>
-    </Pressable>
-  );
+  <Pressable
+    onPress={onPress}
+    onLongPress={onLongPress}
+    style={[
+      style.tabbarItem,
+      routeName === "add" && style2.centralTabItem, // Estilo especial para el botón central
+    ]}
+  >
+    {selectedIcon({
+      color: isFocused ? "#000" : "#FFF",
+      backgroundcolor: isFocused ? "#00DC5A" : "#000",
+    })}
+  </Pressable>
+);
+
 }
 
 const style = StyleSheet.create({
@@ -56,6 +64,17 @@ const style = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 5,
+    gap: 5
   },
 });
+
+const style2 = StyleSheet.create({
+  centralTabItem: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: "#00DC5A",
+    justifyContent: "center",
+    alignItems: "center",
+  }
+})

@@ -1,22 +1,9 @@
-import { View, Platform } from 'react-native';
-import { useLinkBuilder, useTheme } from '@react-navigation/native';
-import { Text, PlatformPressable } from '@react-navigation/elements';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { StyleSheet } from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import HomeIcon from './ui/icons/Home';
-import MovementsIcon from './ui/icons/Movements';
-import GraphicIcon from './ui/icons/Graphics';
-import ProfileIcon from './ui/icons/Profile';
-import TabBarButton from './TabBarButton';
+import { View, StyleSheet, Platform } from "react-native";
+import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
+import TabBarButton from "./TabBarButton";
+import { TouchableOpacity } from "react-native";
 
-export function TabBar({ state, descriptors, navigation } : BottomTabBarProps) {
-  const { colors } = useTheme();
-  const { buildHref } = useLinkBuilder();
-
-  
-
+export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   return (
     <View style={styles.tabbar}>
       {state.routes.map((route, index) => {
@@ -25,41 +12,63 @@ export function TabBar({ state, descriptors, navigation } : BottomTabBarProps) {
           options.tabBarLabel !== undefined
             ? options.tabBarLabel
             : options.title !== undefined
-              ? options.title
-              : route.name;
+            ? options.title
+            : route.name;
 
         const isFocused = state.index === index;
 
         const onPress = () => {
           const event = navigation.emit({
-            type: 'tabPress',
+            type: "tabPress",
             target: route.key,
             canPreventDefault: true,
           });
 
           if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name, route.params);
+            navigation.navigate(route.name);
           }
         };
 
         const onLongPress = () => {
           navigation.emit({
-            type: 'tabLongPress',
+            type: "tabLongPress",
             target: route.key,
           });
         };
 
-        return (
+        // Render regular buttons
+        if (route.name !== "add") {
+          return (
             <TabBarButton
+              key={route.name}
+              onPress={onPress}
+              onLongPress={onLongPress}
+              isFocused={isFocused}
+              routeName={route.name}
+              color={isFocused ? "#00DC5A" : "#FFF"}
+              label={label}
+            />
+          );
+        }
+
+        // Render central button ("add")
+        return (
+          <TouchableOpacity
             key={route.name}
             onPress={onPress}
-            onLongPress={onLongPress}
-            isFocused={isFocused}
-            routeName={route.name}
-            color={isFocused ? colors.primary : colors.text}
-            label={label}
-            />
-          
+            style={styles.centralButtonContainer}
+          >
+            <View style={styles.centralButton}>
+              <TabBarButton
+                onPress={onPress}
+                onLongPress={onLongPress}
+                isFocused={isFocused}
+                routeName={route.name}
+                color="#FFF"
+                label={label}
+              />
+            </View>
+          </TouchableOpacity>
         );
       })}
     </View>
@@ -67,20 +76,32 @@ export function TabBar({ state, descriptors, navigation } : BottomTabBarProps) {
 }
 
 const styles = StyleSheet.create({
-    tabbar: {
-        position: "absolute",
-        bottom: 50,
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        backgroundColor: "#000",
-        marginHorizontal: 80,
-        paddingVertical: 15,
-        borderRadius: 35,
-        shadowColor: "#000",
-        shadowOffset: {width: 0, height: 10},
-        shadowRadius: 10,
-        shadowOpacity: 0.1
-    }
-    
-})
+  tabbar: {
+    position: "absolute",
+    bottom: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#000",
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  centralButtonContainer: {
+    position: "absolute",
+    bottom: 20,
+    alignSelf: "center",
+  },
+  centralButton: {
+    width: 70,
+    height: 70,
+    backgroundColor: "#00DC5A",
+    borderRadius: 35,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 5,
+  },
+});
