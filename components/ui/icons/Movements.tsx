@@ -14,9 +14,9 @@ const MovementsIcon: React.FC<SvgProps_> = ({
   backgroundcolor = "#000",
   ...props
 }) => (
-  <Svg width="38" height="40" viewBox="0 0 38 40" fill={color} style={{ backgroundColor: backgroundcolor }} >
+  <Svg width="38" height="40" viewBox="0 0 38 40" fill="#FFFFFF" style={{ backgroundColor: "#000" }} >
     <G filter="url(#filter0_d_820_4461)">
-      <Path d="M5 9H30.2M24.6 2L31.6 9L24.6 16M33 23H7.8M13.4 16L6.4 23L13.4 30" stroke={color} stroke-width="3" shape-rendering="crispEdges" />
+      <Path d="M5 9H30.2M24.6 2L31.6 9L24.6 16M33 23H7.8M13.4 16L6.4 23L13.4 30" stroke="#FFFFFF" stroke-width="3" shape-rendering="crispEdges" />
     </G>
     <Defs>
       <Filter id="filter0_d_820_4461" x="0.278809" y="0.939453" width="37.4424" height="38.1211" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">

@@ -14,15 +14,15 @@ const HomeIcon: React.FC<SvgProps_> = ({
   ...props
 }) => (
   <Svg
-    style={{ backgroundColor: backgroundcolor }}
+    style={{ backgroundColor: "#000" }}
     width="39"
     height="31"
     viewBox="0 0 39 31"
-    fill={color}
+    fill="#F8F8F8"
   >
     <Path
       d="M16.1765 30V20.1176H22.7647V30H31V16.8235H35.9412L19.4706 2L3 16.8235H7.94118V30H16.1765Z"
-      stroke={color}
+      stroke="#F8F8F8"
       stroke-width="2"
     />
   </Svg>

@@ -1,0 +1,169 @@
+---
+kind: ObjectType
+version: v1
+definition:
+  name: InsertTransaccionesUsuariosAppObject
+  fields:
+    - name: categoria
+      type: Varchar
+    - name: descripcion
+      type: Text
+    - name: estado
+      type: Varchar
+    - name: fecha
+      type: Timestamp!
+    - name: fechaActualizacion
+      type: Timestamp
+    - name: fechaCreacion
+      type: Timestamp
+    - name: id
+      type: Int4
+    - name: metodoPago
+      type: Varchar
+    - name: moneda
+      type: Varchar!
+    - name: monto
+      type: Numeric!
+    - name: referenciaExterna
+      type: Varchar
+    - name: tipoTransaccion
+      type: Varchar
+  graphql:
+    typeName: InsertTransaccionesUsuariosAppObject
+    inputTypeName: InsertTransaccionesUsuariosAppObjectInput
+  dataConnectorTypeMapping:
+    - dataConnectorName: my_pg
+      dataConnectorObjectType: insert_transacciones_usuarios_app_object
+      fieldMapping:
+        categoria:
+          column:
+            name: categoria
+        descripcion:
+          column:
+            name: descripcion
+        estado:
+          column:
+            name: estado
+        fecha:
+          column:
+            name: fecha
+        fechaActualizacion:
+          column:
+            name: fecha_actualizacion
+        fechaCreacion:
+          column:
+            name: fecha_creacion
+        id:
+          column:
+            name: id
+        metodoPago:
+          column:
+            name: metodo_pago
+        moneda:
+          column:
+            name: moneda
+        monto:
+          column:
+            name: monto
+        referenciaExterna:
+          column:
+            name: referencia_externa
+        tipoTransaccion:
+          column:
+            name: tipo_transaccion
+
+---
+kind: TypePermissions
+version: v1
+definition:
+  typeName: InsertTransaccionesUsuariosAppObject
+  permissions:
+    - role: admin
+      output:
+        allowedFields:
+          - categoria
+          - descripcion
+          - estado
+          - fecha
+          - fechaActualizacion
+          - fechaCreacion
+          - id
+          - metodoPago
+          - moneda
+          - monto
+          - referenciaExterna
+          - tipoTransaccion
+
+---
+kind: ObjectType
+version: v1
+definition:
+  name: InsertTransaccionesUsuariosAppResponse
+  description: Responses from the 'insert_transacciones_usuarios_app' procedure
+  fields:
+    - name: affectedRows
+      type: Int4!
+      description: The number of rows affected by the mutation
+    - name: returning
+      type: "[TransaccionesUsuariosApp!]!"
+      description: Data from rows affected by the mutation
+  graphql:
+    typeName: InsertTransaccionesUsuariosAppResponse
+    inputTypeName: InsertTransaccionesUsuariosAppResponseInput
+  dataConnectorTypeMapping:
+    - dataConnectorName: my_pg
+      dataConnectorObjectType: insert_transacciones_usuarios_app_response
+      fieldMapping:
+        affectedRows:
+          column:
+            name: affected_rows
+        returning:
+          column:
+            name: returning
+
+---
+kind: TypePermissions
+version: v1
+definition:
+  typeName: InsertTransaccionesUsuariosAppResponse
+  permissions:
+    - role: admin
+      output:
+        allowedFields:
+          - affectedRows
+          - returning
+
+---
+kind: Command
+version: v1
+definition:
+  name: InsertTransaccionesUsuariosApp
+  outputType: InsertTransaccionesUsuariosAppResponse!
+  arguments:
+    - name: objects
+      type: "[InsertTransaccionesUsuariosAppObject!]!"
+    - name: postCheck
+      type: TransaccionesUsuariosAppBoolExp
+      description: Insert permission predicate over the 'transacciones_usuarios_app'
+        collection
+  source:
+    dataConnectorName: my_pg
+    dataConnectorCommand:
+      procedure: insert_transacciones_usuarios_app
+    argumentMapping:
+      objects: objects
+      postCheck: post_check
+  graphql:
+    rootFieldName: insertTransaccionesUsuariosApp
+    rootFieldKind: Mutation
+  description: Insert into the transacciones_usuarios_app table
+
+---
+kind: CommandPermissions
+version: v1
+definition:
+  commandName: InsertTransaccionesUsuariosApp
+  permissions:
+    - role: admin
+      allowExecution: true
+

@@ -7,44 +7,40 @@ export default function TabLayout() {
   const colorScheme = useColorScheme();
 
   return (
-    <Tabs
-      tabBar={(props) => <TabBar {...props} />} // Usa tu TabBar personalizada
-    >
-      {/* Pantallas regulares */}
+    <Tabs tabBar={(props) => <TabBar {...props} />}>
       <Tabs.Screen
-        key="index"
         name="index"
         options={{
           title: "Inicio",
+          headerShown: false, // Oculta el encabezado en esta pantalla
         }}
       />
       <Tabs.Screen
-        key="movements"
         name="movements"
         options={{
           title: "Movimientos",
+          headerShown: false, // Oculta el encabezado en esta pantalla
         }}
       />
-      {/* Pantalla flotante (botón central) */}
       <Tabs.Screen
-        key="add"
         name="add"
         options={{
-          title: "Agregar" // Oculta la barra en esta pantalla si necesario
+          title: "Agregar",
+          headerShown: false, // Oculta el encabezado en esta pantalla
         }}
       />
       <Tabs.Screen
-        key="graphics"
         name="graphics"
         options={{
           title: "Gráficos",
+          headerShown: false, // Oculta el encabezado en esta pantalla
         }}
       />
       <Tabs.Screen
-        key="profile"
         name="profile"
         options={{
           title: "Perfil",
+          headerShown: false, // Oculta el encabezado en esta pantalla
         }}
       />
     </Tabs>

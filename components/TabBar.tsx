@@ -1,25 +1,23 @@
-import { View, StyleSheet, Platform } from "react-native";
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import TabBarButton from "./TabBarButton";
-import { TouchableOpacity } from "react-native";
+import { TouchableOpacity, View } from "react-native";
+import { useNavigation } from '@react-navigation/native';
+import { StyleSheet } from "react-native";
+import Icon from 'react-native-vector-icons/MaterialIcons'; 
+
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
+
+  
   return (
-    <View style={styles.tabbar}>
+    <View style={styles.tabBar}>
       {state.routes.map((route, index) => {
         const { options } = descriptors[route.key];
-        const label =
-          options.tabBarLabel !== undefined
-            ? options.tabBarLabel
-            : options.title !== undefined
-            ? options.title
-            : route.name;
-
         const isFocused = state.index === index;
 
         const onPress = () => {
           const event = navigation.emit({
-            type: "tabPress",
+            type: 'tabPress',
             target: route.key,
             canPreventDefault: true,
           });
@@ -29,77 +27,80 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
           }
         };
 
-        const onLongPress = () => {
-          navigation.emit({
-            type: "tabLongPress",
-            target: route.key,
-          });
-        };
-
-        // Render regular buttons
-        if (route.name !== "add") {
+        if (route.name === 'add') {
           return (
-            <TabBarButton
+            <TouchableOpacity
               key={route.name}
+              accessibilityRole="button"
+              accessibilityState={isFocused ? { selected: true } : {}}
+              accessibilityLabel={options.tabBarAccessibilityLabel}
               onPress={onPress}
-              onLongPress={onLongPress}
-              isFocused={isFocused}
-              routeName={route.name}
-              color={isFocused ? "#00DC5A" : "#FFF"}
-              label={label}
-            />
+              style={styles.centralButtonContainer}
+            >
+              <View style={styles.centralButton}>
+              <Icon name="add" size={30} color="#FFF" />
+              </View>
+            </TouchableOpacity>
           );
         }
 
-        // Render central button ("add")
         return (
           <TouchableOpacity
             key={route.name}
+            accessibilityRole="button"
             onPress={onPress}
-            style={styles.centralButtonContainer}
+            accessibilityState={isFocused ? { selected: true } : {}}
+            accessibilityLabel={options.tabBarAccessibilityLabel} 
+            style={styles.tabButton}
           >
-            <View style={styles.centralButton}>
-              <TabBarButton
-                onPress={onPress}
-                onLongPress={onLongPress}
-                isFocused={isFocused}
-                routeName={route.name}
-                color="#FFF"
-                label={label}
-              />
-            </View>
+            <TabBarButton
+              key={route.name}
+              onPress={onPress}
+              isFocused={isFocused}
+              routeName={route.name}
+              label="+"
+              color={isFocused ? "#00DC5A" : "#FFF"}
+            />
           </TouchableOpacity>
         );
       })}
     </View>
   );
+
 }
 
 const styles = StyleSheet.create({
-  tabbar: {
-    position: "absolute",
-    bottom: 0,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: "#000",
-    paddingVertical: 10,
-    paddingHorizontal: 20,
+  tabBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    backgroundColor: '#000',
+    height: 60,
+    paddingBottom: 10,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   centralButtonContainer: {
-    position: "absolute",
-    bottom: 20,
-    alignSelf: "center",
+    position: 'relative',
+    bottom: 15, // Ajusta este valor para separar el botón de la barra
+    alignSelf: 'center',
+    zIndex: 5
+
   },
   centralButton: {
     width: 70,
     height: 70,
-    backgroundColor: "#00DC5A",
+    backgroundColor: '#00DC5A',
     borderRadius: 35,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.1,
+    borderWidth: 1,
+    
+    borderColor: '#000', // Borde negro de 1 píxel
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 5,
