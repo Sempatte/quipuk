@@ -1,20 +1,24 @@
+export type TransactionType = "gasto" | "ingreso";
+
 export interface Transaction {
     id: number;
     user_id: number;
     title: string;
     description: string;
     amount: number;
-    type: "gasto" | "ingreso";
+    type: TransactionType;
+    category: string; // Nueva columna añadida
     created_at: string;
-  }
-  
-  // Si necesitas interfaces para las consultas y variables
-  export interface GetTransactionsData {
+}
+
+// ✅ Interfaz para los datos devueltos en la consulta
+export interface GetTransactionsData {
     transactions: Transaction[];
-  }
-  
-  export interface GetTransactionsVariables {
+}
+
+// ✅ Interfaz para los filtros de consulta
+export interface GetTransactionsVariables {
     user_id?: number; // Filtrar por ID del usuario (opcional)
-    type?: "gasto" | "ingreso"; // Filtrar por tipo de transacción
-  }
-  
+    type?: TransactionType; // Filtrar por tipo de transacción (opcional)
+    category?: string; // Filtrar por categoría (opcional)
+}

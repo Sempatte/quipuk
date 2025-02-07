@@ -10,6 +10,7 @@ export const GET_TRANSACTIONS = gql`
       amount
       type
       created_at
+      category
     }
   }
 `;

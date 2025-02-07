@@ -43,8 +43,12 @@ const Carousel: React.FC<CarouselProps> = ({ title, items }) => {
                 {item.icon ? item.icon : null}
               </View>
               <View style={styles.textContainer}>
-                <Text style={styles.cardTitle}>{item.title}</Text>
-                <Text style={styles.cardDescription}>{item.description}</Text>
+                <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+                  {item.title}
+                </Text>
+                <Text style={styles.cardDescription} numberOfLines={1} ellipsizeMode="tail">
+                  {item.description}
+                </Text>
               </View>
             </View>
             {/* Cantidad */}
@@ -60,7 +64,7 @@ const Carousel: React.FC<CarouselProps> = ({ title, items }) => {
 const styles = StyleSheet.create({
   container: {
     marginVertical: 5,
-    paddingHorizontal: 0
+    paddingHorizontal: 0,
   },
   carouselTitle: {
     fontSize: 18,
@@ -83,6 +87,7 @@ const styles = StyleSheet.create({
     flexDirection: "row", // Pone el ícono y el texto en la misma fila
     alignItems: "center",
     marginBottom: 5, // Espaciado entre la fila y la cantidad
+    textRendering: "optimizeLegibility",
   },
   iconContainer: {
     width: 50,
@@ -93,22 +98,20 @@ const styles = StyleSheet.create({
     marginRight: 10, // Espaciado entre el ícono y el texto
   },
   textContainer: {
-    flex: 1 // El texto ocupa el espacio restante
-  },
-  icon: {
-    width: 23,
-    height: 23,
-    resizeMode: "contain",
+    flex: 1, // Permite que el texto use el espacio disponible sin desbordarse
+    overflow: "hidden",
   },
   cardTitle: {
     fontSize: 14,
     fontWeight: "bold",
     color: "#000",
-    marginBottom: 2, // Espaciado entre el título y la descripción
+    marginBottom: 2,
+    maxWidth: "90%", // Evita que el texto se expanda demasiado
   },
   cardDescription: {
     fontSize: 12,
     color: "#777",
+    maxWidth: "90%", // Ajusta el ancho del texto
   },
   cardAmount: {
     fontSize: 14.5,

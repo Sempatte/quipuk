@@ -6,15 +6,16 @@ import Animated, {
   withTiming,
   interpolateColor,
 } from "react-native-reanimated";
-import { SafeAreaView } from "react-native-safe-area-context"; // Importa SafeAreaView
+import { SafeAreaView } from "react-native-safe-area-context";
 import AgregarSlides from "@/components/ui/AddSlider";
 import Carousel from "@/components/ui/Carousel";
 import { useQuery } from "@apollo/client";
 import { GET_TRANSACTIONS } from "../graphql/transaction.graphql";
 import { GetTransactionsData, GetTransactionsVariables } from "../interfaces/transaction.interface";
-import BusIcon from "../../assets/images/bus.svg";
-import FoodIcon from "../../assets/images/food.svg";
-import ReceiptIcon from "../../assets/images/receipt.svg";
+import { getTransactionIcon } from "../contants/iconDictionary";
+
+// 📌 Importar la lógica de iconos
+
 
 export default function Add() {
   const [selectedOption, setSelectedOption] = useState<"Gastos" | "Ingresos" | "Ahorros">("Gastos");
@@ -41,6 +42,7 @@ export default function Add() {
     return { backgroundColor };
   });
 
+  // 📌 Consulta GraphQL para obtener transacciones
   const { data, loading, error } = useQuery<GetTransactionsData, GetTransactionsVariables>(GET_TRANSACTIONS, {
     variables: {
       user_id: 3,
@@ -64,12 +66,14 @@ export default function Add() {
     );
   }
 
+  // 📌 Mapeo de transacciones con asignación de icono según `type` y `category`
   const transactions = data?.transactions.map((transaction) => ({
     id: transaction.id.toString(),
     title: transaction.title,
     description: transaction.description,
+    type: transaction.type,
     amount: `S/ ${transaction.amount.toFixed(2)}`,
-    icon: transaction.type === "gasto" ? <BusIcon width={30} height={30} /> : <FoodIcon width={30} height={30} />,
+    icon: getTransactionIcon(transaction.category, transaction.type), // 🔥 Asigna icono según categoría y tipo
     backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
   }));
 
