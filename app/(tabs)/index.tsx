@@ -19,6 +19,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   titleContainer: {
+    fontFamily: 'Outfit_700Bold',
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,

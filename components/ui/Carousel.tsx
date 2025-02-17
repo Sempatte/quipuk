@@ -99,18 +99,21 @@ const styles = StyleSheet.create({
   },
   textContainer: {
     flex: 1, // Permite que el texto use el espacio disponible sin desbordarse
-    overflow: "hidden",
+    overflow: "hidden"
   },
   cardTitle: {
-    fontSize: 14,
     fontWeight: "bold",
     color: "#000",
     marginBottom: 2,
+    fontFamily: "Outfit_500Medium",
+    fontSize: 14,
     maxWidth: "90%", // Evita que el texto se expanda demasiado
+    
   },
   cardDescription: {
-    fontSize: 12,
     color: "#777",
+    fontFamily: "Outfit_300Light",
+    fontSize: 11,
     maxWidth: "90%", // Ajusta el ancho del texto
   },
   cardAmount: {

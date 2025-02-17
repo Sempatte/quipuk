@@ -112,8 +112,8 @@ const styles = StyleSheet.create({
     height: 50,
   },
   text: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontFamily: "Outfit_500Medium",
+    fontSize: 18,
     zIndex: 2, // Asegura que el texto esté encima del indicador
   },
   activeText: {

@@ -14,9 +14,10 @@ import AirbnbIcon from "@/assets/images/icons/categories/ingresos/airbnb.svg";
 import BolsaIcon from "@/assets/images/icons/categories/ingresos/bolsa.svg";
 import OtrosIngresosIcon from "@/assets/images/icons/categories/ingresos/otrosingresos.svg";
 import SavingMoneyIcon from "@/assets/images/icons/categories/ingresos/savingmoney.svg";
+import AddIcon from "@/assets/images/icons/Add.svg";
 
 // 📌 Mapeo de iconos por categoría y tipo de transacción
-const gastosIcons: Record<string, JSX.Element> = {
+export const gastosIcons: Record<string, JSX.Element> = {
 	"Alquiler": <AlquilerIcon width={30} height={30} />,
 	"Transporte": <BusIcon width={30} height={30} />,
 	"Deducibles": <TijeraIcon width={30} height={30} />,
@@ -28,7 +29,9 @@ const gastosIcons: Record<string, JSX.Element> = {
 	"Teléfono": <TelefonoIcon width={30} height={30} />,
 };
 
-const ingresosIcons: Record<string, JSX.Element> = {
+export const addIcon = <AddIcon width={30} height={30} />;
+
+export const ingresosIcons: Record<string, JSX.Element> = {
 	"Empleo": <EmpleoIcon width={30} height={30} />,
 	"Trabajo Independiente": <TrabajoIndepIcon width={30} height={30} />,
 	"Alquiler": <AlquilerIcon width={30} height={30} />,

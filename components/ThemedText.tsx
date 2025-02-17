@@ -35,15 +35,18 @@ export function ThemedText({
 
 const styles = StyleSheet.create({
   default: {
+    fontFamily: 'Outfit_Regular',
     fontSize: 16,
     lineHeight: 24,
   },
   defaultSemiBold: {
+    fontFamily: 'Outfit_SemiBold',
     fontSize: 16,
     lineHeight: 24,
     fontWeight: '600',
   },
   title: {
+    fontFamily: 'Outfit_SemiBold',
     fontSize: 32,
     fontWeight: 'bold',
     lineHeight: 32,

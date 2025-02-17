@@ -1,74 +1,62 @@
-import { View, Text, Pressable } from "react-native";
+import { View, Text, TouchableOpacity } from "react-native";
 import React, { useEffect } from "react";
 import { icon } from "@/constants/Icon";
 import { StyleSheet } from "react-native";
 import Animated, { interpolate, useAnimatedStyle, useSharedValue, withSpring } from "react-native-reanimated";
 
-type RouteName = "index" | "movements" | "graphics" | "profile";
-
+type RouteName = "index" | "movements" | "graphics" | "profile" | "add";
 
 export default function TabBarButton({
   onPress,
-  onLongPress,
   isFocused,
   routeName,
-  color,
-  label,
 }: {
   onPress: Function;
-  onLongPress: Function;
   isFocused: boolean;
   routeName: RouteName;
-  color: string;
-  label: string;
 }) {
   const scale = useSharedValue(0);
+
   useEffect(() => {
-    scale.value = withSpring(
-      typeof isFocused === "boolean" ? (isFocused ? 1 : 0) : isFocused,
-      { duration: 350 }
-    );
+    scale.value = withSpring(isFocused ? 1 : 0, { damping: 10, stiffness: 100 });
   }, [scale, isFocused]);
 
-  const animatedTextStyle  = useAnimatedStyle(() => {
-    const opacity = interpolate(scale.value, [0,1], [1,0])
-    return {
-        opacity
-    }
-  })
+  const animatedTextStyle = useAnimatedStyle(() => {
+    const opacity = interpolate(scale.value, [0, 1], [1, 0]);
+    return { opacity };
+  });
+
   const selectedIcon = icon[routeName];
   if (!selectedIcon) {
     console.error(`No icon found for routeName: ${routeName}`);
-    return null; // O un ícono predeterminado
+    return null;
   }
-  return (
-  <Pressable
-    onPress={onPress}
-    onLongPress={onLongPress}
-    style={[
-      style.tabbarItem,
-      routeName === "add" && style2.centralTabItem, // Estilo especial para el botón central
-    ]}
-  >
-    {selectedIcon({
-      color: isFocused ? "#000" : "#FFF",
-      backgroundcolor: isFocused ? "#00DC5A" : "#000",
-    })}
-  </Pressable>
-);
 
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={1} // 🔥 Evita la opacidad en iOS
+      style={[
+        styles.tabbarItem,
+        routeName === "add" && styles.centralTabItem, // 🔥 Estilo especial para el botón central
+      ]}
+      android_ripple={{ borderless: true, rippleColor: "transparent" }} // 🔥 Evita el efecto en Android
+    >
+      {selectedIcon({
+        color: isFocused ? "#000" : "#FFF",
+        backgroundcolor: isFocused ? "#00DC5A" : "#000",
+      })}
+    </TouchableOpacity>
+  );
 }
 
-const style = StyleSheet.create({
+const styles = StyleSheet.create({
   tabbarItem: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 5
+    gap: 5,
   },
-});
-
-const style2 = StyleSheet.create({
   centralTabItem: {
     width: 70,
     height: 70,
@@ -76,5 +64,5 @@ const style2 = StyleSheet.create({
     backgroundColor: "#00DC5A",
     justifyContent: "center",
     alignItems: "center",
-  }
-})
+  },
+});
