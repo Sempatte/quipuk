@@ -67,14 +67,13 @@ const CategorySelector = ({ type }: { type: "gasto" | "ingreso" }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 5,
-    paddingHorizontal: 5,
+    paddingHorizontal: 0,
   },
   title: {
-    fontSize: 18,
-    fontWeight: "bold",
-    fontFamily: "Outfit_700Bold",
-    marginBottom: 10,
+    fontSize: 22,
+    fontFamily: "Outfit_600SemiBold",
+    marginBottom: 5,
+    lineHeight: 25,
   },
   subCategoryContainer: {
     flexDirection: "row",

@@ -39,8 +39,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
-    marginTop: 15,
-    paddingHorizontal: 20,
+    marginTop: 5,
+    paddingHorizontal: 40,
   },
   optionContainer: {
     flexDirection: "row",

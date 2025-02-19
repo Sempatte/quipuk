@@ -1,61 +1,81 @@
-import React from "react";
-import { View, Text, StyleSheet, FlatList, Dimensions } from "react-native";
+import React, { useEffect, useState, useMemo } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Dimensions,
+  TouchableOpacity,
+} from "react-native";
+import Icon from "react-native-vector-icons/MaterialIcons";
 
 interface CarouselItem {
   id: string;
-  title: string;
-  description: string;
-  amount: string;
-  icon: any; // Puedes especificar un tipo de imagen si necesitas
-  backgroundColor: string;
+  title?: string;
+  description?: string;
+  amount?: string;
+  icon?: any;
+  backgroundColor?: string;
+  isAddButton?: boolean;
 }
 
 interface CarouselProps {
   title: string;
   items: CarouselItem[];
+  onAddPress?: () => void;
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-const Carousel: React.FC<CarouselProps> = ({ title, items }) => {
+const Carousel: React.FC<CarouselProps> = ({ title, items, onAddPress }) => {
+  const [carouselItems, setCarouselItems] = useState<CarouselItem[]>([]);
+
+  useEffect(() => {
+    // 🔥 Cada vez que los items cambian, actualizamos el estado y re-renderizamos
+    setCarouselItems([...items, { id: "add_button", isAddButton: true }]);
+  }, [items]);
+
   return (
     <View style={styles.container}>
-      {/* Título del carrusel */}
       <Text style={styles.carouselTitle}>{title}</Text>
 
-      {/* Lista horizontal */}
       <FlatList
-        data={items}
+        data={carouselItems}
         horizontal
-        showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id}
-        initialNumToRender={3} // Renderiza solo 3 elementos inicialmente
-        renderItem={({ item }) => (
-          <View style={[styles.card]}>
-            {/* Contenedor del ícono y el texto */}
-            <View style={styles.iconAndTextContainer}>
-              <View
-                style={[
-                  styles.iconContainer,
-                  { backgroundColor: item.backgroundColor },
-                ]}
-              >
-                {item.icon ? item.icon : null}
+        showsHorizontalScrollIndicator={false}
+        extraData={carouselItems} // 🔥 Asegura que FlatList detecte los cambios
+        initialNumToRender={carouselItems.length} 
+        removeClippedSubviews={false} // 🔥 Evita que el FlatList oculte el carrusel al cambiar de categoría
+        renderItem={({ item }) =>
+          item.isAddButton ? (
+            <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
+              <View style={styles.addButtonContent}>
+                <View style={styles.addIconContainer}>
+                  <Icon name="add" size={24} color="#FFFFFF" />
+                </View>
+                <Text style={styles.addButtonText}>Agregar</Text>
               </View>
-              <View style={styles.textContainer}>
-                <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
-                  {item.title}
-                </Text>
-                <Text style={styles.cardDescription} numberOfLines={1} ellipsizeMode="tail">
-                  {item.description}
-                </Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.card}>
+              <View style={styles.iconAndTextContainer}>
+                <View style={[styles.iconContainer, { backgroundColor: item.backgroundColor }]}>
+                  {item.icon ? item.icon : null}
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
+                    {item.title || ""}
+                  </Text>
+                  <Text style={styles.cardDescription} numberOfLines={1} ellipsizeMode="tail">
+                    {item.description || ""}
+                  </Text>
+                </View>
               </View>
+              <Text style={styles.cardAmount}>{item.amount}</Text>
             </View>
-            {/* Cantidad */}
-            <Text style={styles.cardAmount}>{item.amount}</Text>
-          </View>
-        )}
-        contentContainerStyle={styles.listContent}
+          )
+        }
       />
     </View>
   );
@@ -73,8 +93,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   card: {
-    width: SCREEN_WIDTH * 0.45, // Ajusta el ancho de la tarjeta para acomodar el diseño
-    marginHorizontal: 5, // Espaciado entre tarjetas
+    width: SCREEN_WIDTH * 0.45,
+    height: 90,
+    marginHorizontal: 5,
     borderRadius: 10,
     padding: 10,
     backgroundColor: "#fff",
@@ -84,10 +105,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   iconAndTextContainer: {
-    flexDirection: "row", // Pone el ícono y el texto en la misma fila
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 5, // Espaciado entre la fila y la cantidad
-    textRendering: "optimizeLegibility",
+    marginBottom: 5,
   },
   iconContainer: {
     width: 50,
@@ -95,11 +115,11 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10, // Espaciado entre el ícono y el texto
+    marginRight: 10,
   },
   textContainer: {
-    flex: 1, // Permite que el texto use el espacio disponible sin desbordarse
-    overflow: "hidden"
+    flex: 1,
+    overflow: "hidden",
   },
   cardTitle: {
     fontWeight: "bold",
@@ -107,22 +127,53 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     fontFamily: "Outfit_500Medium",
     fontSize: 14,
-    maxWidth: "90%", // Evita que el texto se expanda demasiado
-    
+    maxWidth: "90%",
   },
   cardDescription: {
     color: "#777",
     fontFamily: "Outfit_300Light",
     fontSize: 11,
-    maxWidth: "90%", // Ajusta el ancho del texto
+    maxWidth: "90%",
   },
   cardAmount: {
     fontSize: 14.5,
     fontWeight: "bold",
     color: "#000",
   },
-  listContent: {
-    paddingHorizontal: 10,
+  addButton: {
+    width: SCREEN_WIDTH * 0.45,
+    height: 90,
+    backgroundColor: "#222",
+    borderRadius: 10,
+    marginHorizontal: 5,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 3, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  addButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  addIconContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: "#00DC5A",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  addButtonText: {
+    fontSize: 16,
+    color: "#FFF",
+    fontFamily: "Outfit_400Regular",
+    lineHeight: 22,
+    alignSelf: "center",
   },
 });
 

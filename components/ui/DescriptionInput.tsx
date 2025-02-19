@@ -24,8 +24,8 @@ const styles = StyleSheet.create({
     marginTop: 15,
   },
   label: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontSize: 22,
+    fontFamily: "Outfit_600SemiBold",
     color: "#000",
     marginBottom: 5,
   },

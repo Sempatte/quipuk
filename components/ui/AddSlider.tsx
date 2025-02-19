@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between", // Asegura la distribución uniforme
     alignItems: "center", // Centra verticalmente
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderRadius: 30,
     position: "relative",
     overflow: "hidden",
   },
@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     height: "100%",
     width: SLIDE_WIDTH, // Tamaño dinámico del indicador
-    borderRadius: 20,
+    borderRadius: 30,
     zIndex: 0,
     borderColor: "#000",
     borderWidth: 1,

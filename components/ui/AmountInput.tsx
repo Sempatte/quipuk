@@ -33,8 +33,8 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   label: {
-    fontSize: 16,
-    fontWeight: "bold",
+    fontSize: 22,
+    fontFamily: "Outfit_600SemiBold",
     color: "#000",
     marginBottom: 5,
   },
@@ -49,14 +49,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   currency: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontFamily: "Outfit_500Medium",
+    fontSize: 36,
     color: "#000",
     marginRight: 5, // Pegado a la izquierda del número
   },
   input: {
-    fontSize: 20,
-    fontWeight: "bold",
+    fontFamily: "Outfit_500Medium",
+    fontSize: 36,
     color: "#000",
     flex: 1,
     textAlign: "left", // Alineado a la izquierda para que crezca hacia la derecha
