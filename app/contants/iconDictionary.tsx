@@ -15,36 +15,48 @@ import BolsaIcon from "@/assets/images/icons/categories/ingresos/bolsa.svg";
 import OtrosIngresosIcon from "@/assets/images/icons/categories/ingresos/otrosingresos.svg";
 import SavingMoneyIcon from "@/assets/images/icons/categories/ingresos/savingmoney.svg";
 import AddIcon from "@/assets/images/icons/Add.svg";
+import FluentMoneyIcon from "@/assets/images/icons/payment_methods/fluent_money.svg";
+import CardIcon from "@/assets/images/icons/payment_methods/card.svg";
 
 // 📌 Mapeo de iconos por categoría y tipo de transacción
 export const gastosIcons: Record<string, JSX.Element> = {
-	"Alquiler": <AlquilerIcon width={30} height={30} />,
-	"Transporte": <BusIcon width={30} height={30} />,
-	"Deducibles": <TijeraIcon width={30} height={30} />,
-	"Otros": <GraficaAbajoIcon width={30} height={30} />,
-	"Hogar": <HogarIcon width={30} height={30} />,
-	"Comida": <EnsaladaIcon width={30} height={30} />,
-	"Salud": <SaludIcon width={30} height={30} />,
-	"Super": <SuperIcon width={30} height={30} />,
-	"Teléfono": <TelefonoIcon width={30} height={30} />,
+  Alquiler: <AlquilerIcon width={30} height={30} />,
+  Transporte: <BusIcon width={30} height={30} />,
+  Deducibles: <TijeraIcon width={30} height={30} />,
+  Otros: <GraficaAbajoIcon width={30} height={30} />,
+  Hogar: <HogarIcon width={30} height={30} />,
+  Comida: <EnsaladaIcon width={30} height={30} />,
+  Salud: <SaludIcon width={30} height={30} />,
+  Super: <SuperIcon width={30} height={30} />,
+  Teléfono: <TelefonoIcon width={30} height={30} />,
 };
 
 export const addIcon = <AddIcon width={30} height={30} />;
 
 export const ingresosIcons: Record<string, JSX.Element> = {
-	"Empleo": <EmpleoIcon width={30} height={30} />,
-	"Trabajo Independiente": <TrabajoIndepIcon width={30} height={30} />,
-	"Alquiler": <AlquilerIcon width={30} height={30} />,
-	"Intereses": <SavingMoneyIcon width={30} height={30} />,
-	"Director": <DirectorIcon width={30} height={30} />,
-	"Airbnb": <AirbnbIcon width={30} height={30} />,
-	"Bolsa": <BolsaIcon width={30} height={30} />,
-	"Otros Ingresos": <OtrosIngresosIcon width={30} height={30} />,
+  Empleo: <EmpleoIcon width={30} height={30} />,
+  "Trabajo Independiente": <TrabajoIndepIcon width={30} height={30} />,
+  Alquiler: <AlquilerIcon width={30} height={30} />,
+  Intereses: <SavingMoneyIcon width={30} height={30} />,
+  Director: <DirectorIcon width={30} height={30} />,
+  Airbnb: <AirbnbIcon width={30} height={30} />,
+  Bolsa: <BolsaIcon width={30} height={30} />,
+  "Otros Ingresos": <OtrosIngresosIcon width={30} height={30} />,
+};
+
+export const constPaymentMethodsIcons: Record<string, JSX.Element> = {
+  Efectivo: <FluentMoneyIcon width={30} height={30} />,
+  Tarjeta: <CardIcon width={30} height={30} />,
+  BCP: <CardIcon width={30} height={30} />,
 };
 
 // 📌 Función para obtener el ícono correcto según tipo y categoría
 export const getTransactionIcon = (category: string, type: string) => {
-	if (type === "gasto") return gastosIcons[category] || <GraficaAbajoIcon width={30} height={30} />;
-	if (type === "ingreso") return ingresosIcons[category] || <OtrosIngresosIcon width={30} height={30} />;
-	return <GraficaAbajoIcon width={30} height={30} />; // Default
+  if (type === "gasto")
+    return gastosIcons[category] || <GraficaAbajoIcon width={30} height={30} />;
+  if (type === "ingreso")
+    return (
+      ingresosIcons[category] || <OtrosIngresosIcon width={30} height={30} />
+    );
+  return <GraficaAbajoIcon width={30} height={30} />; // Default
 };

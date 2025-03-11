@@ -1,14 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
 
-const AmountInput = () => {
-  const [amount, setAmount] = useState("");
+interface AmountInputProps {
+  value: string;
+  onChangeText: (text: string) => void;
+}
 
-  const handleAmountChange = (text: string) => {
-    const formattedText = text.replace(/[^0-9.]/g, "");
-    setAmount(formattedText);
-  };
-
+const AmountInput: React.FC<AmountInputProps> = ({ value, onChangeText }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Cantidad</Text>
@@ -17,8 +15,8 @@ const AmountInput = () => {
         <TextInput
           style={styles.input}
           keyboardType="numeric"
-          value={amount}
-          onChangeText={handleAmountChange}
+          value={value}
+          onChangeText={onChangeText}
           placeholder="00.00"
           placeholderTextColor="#999"
           textAlign="left"
@@ -29,15 +27,8 @@ const AmountInput = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-  },
-  label: {
-    fontSize: 22,
-    fontFamily: "Outfit_600SemiBold",
-    color: "#000",
-    marginBottom: 5,
-  },
+  container: { width: "100%" },
+  label: { fontSize: 22, fontFamily: "Outfit_600SemiBold", color: "#000", marginBottom: 5 },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -48,19 +39,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     backgroundColor: "#fff",
   },
-  currency: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 36,
-    color: "#000",
-    marginRight: 5, // Pegado a la izquierda del número
-  },
-  input: {
-    fontFamily: "Outfit_500Medium",
-    fontSize: 36,
-    color: "#000",
-    flex: 1,
-    textAlign: "left", // Alineado a la izquierda para que crezca hacia la derecha
-  },
+  currency: { fontFamily: "Outfit_500Medium", fontSize: 36, color: "#000", marginRight: 5 },
+  input: { fontFamily: "Outfit_500Medium", fontSize: 36, color: "#000", flex: 1, textAlign: "left" },
 });
 
 export default AmountInput;

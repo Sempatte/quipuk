@@ -23,7 +23,7 @@ export default function Profile() {
           <View>
             {data?.users.map((user) => (
               <View key={user.id} style={{ marginBottom: 10 }}>
-                <Text >Nombre: {user.full_name}</Text>
+                <Text >Nombre: {user.fullName}</Text>
                 <Text>Correo: {user.email}</Text>
               </View>
             ))}

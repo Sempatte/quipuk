@@ -8,7 +8,7 @@ export interface Transaction {
     amount: number;
     type: TransactionType;
     category: string; // Nueva columna añadida
-    created_at: string;
+    createdAt: string;
 }
 
 // ✅ Interfaz para los datos devueltos en la consulta

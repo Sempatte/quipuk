@@ -2,16 +2,22 @@ import { gastosIcons, ingresosIcons, addIcon } from "@/app/contants/iconDictiona
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
+// Definir los tipos de propiedades
+interface CategorySelectorProps {
+  type: "gasto" | "ingreso";
+  onSelect: (category: string) => void;
+}
+
 const categoryData = {
   gasto: {
     mainCategories: ["Frecuentes", "Deducibles", "Otros"],
     subCategories: ["Comida", "Transporte", "Hogar", "Alquiler", "Salud", "Teléfono", "Super"],
-    addColor: "#EF674A", // Naranja para gastos
+    addColor: "#EF674A",
   },
   ingreso: {
     mainCategories: [],
     subCategories: ["Empleo", "Trabajo Independiente", "Director", "Alquiler", "Airbnb", "Bolsa", "Intereses", "Otros Ingresos"],
-    addColor: "#65CE13", // Verde para ingresos
+    addColor: "#65CE13",
   },
 };
 
@@ -22,24 +28,28 @@ const truncateText = (text: string, maxLength: number) => {
 
 const MAX_LENGTH_FOR_SUBCATEGORY = 16;
 
-const CategorySelector = ({ type }: { type: "gasto" | "ingreso" }) => {
+const CategorySelector: React.FC<CategorySelectorProps> = ({ type, onSelect }) => {
   const [selectedCategory, setSelectedCategory] = useState(type === "gasto" ? "Frecuentes" : "Agregar");
 
   const mainCategories = categoryData[type].mainCategories;
   const subCategories = categoryData[type].subCategories;
   const iconSet = type === "gasto" ? gastosIcons : ingresosIcons;
-  const addBackgroundColor = categoryData[type].addColor; // Color de fondo de "Agregar"
+  const addBackgroundColor = categoryData[type].addColor;
+
+  const handleSelectCategory = (category: string) => {
+    setSelectedCategory(category);
+    onSelect(category); // 📌 Envía la selección al `add.tsx`
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Categoría</Text>
 
-      {/* Subcategorías */}
       <View style={styles.subCategoryContainer}>
-        {/* 📌 AGREGAR SIEMPRE ESTÁ PRIMERO Y ES IGUAL EN AMBOS */}
         <View style={styles.categoryWrapper}>
           <TouchableOpacity
             style={[styles.subCategoryButton, { backgroundColor: addBackgroundColor }]}
+            onPress={() => handleSelectCategory("Agregar")}
           >
             <View style={styles.icon}>{addIcon}</View>
           </TouchableOpacity>
@@ -53,7 +63,7 @@ const CategorySelector = ({ type }: { type: "gasto" | "ingreso" }) => {
                 styles.subCategoryButton,
                 selectedCategory === category && styles.selectedSubCategory,
               ]}
-              onPress={() => setSelectedCategory(category)}
+              onPress={() => handleSelectCategory(category)}
             >
               {iconSet[category] && <View style={styles.icon}>{iconSet[category]}</View>}
             </TouchableOpacity>
@@ -84,7 +94,7 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   categoryWrapper: {
-    width: "25%", // 📌 Ahora siempre serán 4 por fila
+    width: "25%",
     alignItems: "center",
     marginVertical: 5,
   },

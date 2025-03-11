@@ -1,16 +1,30 @@
 import { gql } from "@apollo/client";
 
 export const GET_TRANSACTIONS = gql`
-  query GetTransactions($user_id: Int, $type: String) {
-    transactions(where: { user_id: { _eq: $user_id }, type: { _eq: $type } }) {
+  query Transactions {
+    transactions {
       id
-      user_id
+      userId
       title
       description
       amount
       type
-      created_at
       category
+      createdAt
+      updatedAt
+    }
+  }
+`;
+export const CREATE_TRANSACTION = gql`
+  mutation CreateTransaction($input: CreateTransactionDto!) {
+    createTransaction(input: $input) {
+      id
+      title
+      description
+      amount
+      type
+      category
+      userId
     }
   }
 `;

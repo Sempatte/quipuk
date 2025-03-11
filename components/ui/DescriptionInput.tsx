@@ -1,9 +1,12 @@
-import React, { useState } from "react";
+import React from "react";
 import { View, Text, TextInput, StyleSheet } from "react-native";
 
-const DescriptionInput = () => {
-  const [description, setDescription] = useState("");
+interface DescriptionInputProps {
+  value: string;
+  onChangeText: (text: string) => void;
+}
 
+const DescriptionInput: React.FC<DescriptionInputProps> = ({ value, onChangeText }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Descripción</Text>
@@ -11,24 +14,16 @@ const DescriptionInput = () => {
         style={styles.input}
         placeholder="Escribe aquí..."
         placeholderTextColor="#999"
-        value={description}
-        onChangeText={setDescription}
+        value={value}
+        onChangeText={onChangeText}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    width: "100%",
-    marginTop: 15,
-  },
-  label: {
-    fontSize: 22,
-    fontFamily: "Outfit_600SemiBold",
-    color: "#000",
-    marginBottom: 5,
-  },
+  container: { width: "100%", marginTop: 15 },
+  label: { fontSize: 22, fontFamily: "Outfit_600SemiBold", color: "#000", marginBottom: 5 },
   input: {
     fontSize: 18,
     color: "#000",

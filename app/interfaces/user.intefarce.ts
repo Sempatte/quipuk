@@ -1,12 +1,12 @@
 export interface User {
     id: number;
-    full_name: string;
+    fullName: string;
     email: string;
-    phone_number?: string; // Opcional
+    phoneNumber?: string; // Opcional
     username: string;
     password: string;
-    created_at: string;
-    updated_at: string;
+    createdAt: string;
+    updatedAt: string;
   }
   
   // Si necesitas otras interfaces relacionadas, como variables para consultas:

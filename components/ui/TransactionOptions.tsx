@@ -4,7 +4,7 @@ import HearthIcon from "@/assets/images/icons/hearth.svg"; // Importar el icono 
 
 const TransactionOptions = () => {
   const [isFrequent, setIsFrequent] = useState(false);
-  const [isPaid, setIsPaid] = useState(false);
+  const [isPaid, setIsPaid] = useState(true);
 
   return (
     <View style={styles.container}>
@@ -27,7 +27,7 @@ const TransactionOptions = () => {
           trackColor={{ false: "#BDBDBD", true: "#BDBDBD" }}
           thumbColor={isPaid ? "#EF674A" : "#FFF"}
         />
-        <Text style={[styles.optionText, isPaid && styles.optionTextActive]}>Pagado</Text>
+        <Text style={[styles.optionText, isPaid && styles.optionTextActive]}>{isPaid ? "Pagado" : "Pendiente"}</Text>
       </View>
     </View>
   );
