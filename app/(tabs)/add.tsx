@@ -36,6 +36,7 @@ import TransactionOptions from "@/components/ui/TransactionOptions";
 import CategorySelector from "@/components/ui/CategorySelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import DateSelector from "@/components/ui/DateSelector";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function AddTransaction() {
   const [selectedOption, setSelectedOption] = useState<
@@ -105,21 +106,31 @@ export default function AddTransaction() {
       Alert.alert("Error", "Por favor completa todos los campos requeridos.");
       return;
     }
-  
+
     try {
+      // 📌 Obtener el ID del usuario autenticado desde AsyncStorage
+      const storedUserId = await AsyncStorage.getItem("userId");
+
+      if (!storedUserId) {
+        Alert.alert("Error", "No se pudo obtener el usuario autenticado.");
+        return;
+      }
+
+      const userId = parseInt(storedUserId, 10);
+
       console.log("Enviando transacción...", {
-        userId: 3, // ⚠ Asegúrate de tener el ID del usuario autenticado
+        userId, // ✅ Ahora usa el ID autenticado
         title: category,
         description,
         amount: parseFloat(amount),
         type: selectedOption === "Gastos" ? "gasto" : "ingreso",
         category,
       });
-  
+
       await createTransaction({
         variables: {
           input: {
-            userId: 3, // ⚠ Si usas autenticación, reemplázalo con el ID real del usuario
+            userId, // ✅ Enviar el userId del usuario autenticado
             title: category,
             description,
             amount: parseFloat(amount),
@@ -128,19 +139,18 @@ export default function AddTransaction() {
           },
         },
       });
-  
+
       Alert.alert("Éxito", "Transacción agregada correctamente");
       setAmount("");
       setDescription("");
       setCategory("");
       setPaymentMethod("");
       setDate(new Date().toISOString());
-    } catch (error : any) {
+    } catch (error: any) {
       console.error("Error al crear transacción:", error);
-      Alert.alert(error);
+      Alert.alert("Error", "Hubo un problema al agregar la transacción.");
     }
   };
-  
 
   if (loading) {
     return (
@@ -334,12 +344,3 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
-
-
-// TO DO:
-/* EL default en  pagado debe estar encendido. Vista agregar mov.
-Si esta apagado, deberia decir pendiente.
-
-Categoria no deberia salir en ahora.
-
-Para que sirve y porque utilizamos PERN Stack en QUIPUK?  */

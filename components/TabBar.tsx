@@ -13,7 +13,9 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const isAddScreenActive = state.routes[state.index].name === "add";
 
   useEffect(() => {
-    rotateValue.value = withTiming(isAddScreenActive ? 45 : 0, { duration: 300 });
+    rotateValue.value = withTiming(isAddScreenActive ? 45 : 0, {
+      duration: 300,
+    });
   }, [isAddScreenActive]);
 
   const animatedIconStyle = useAnimatedStyle(() => {
@@ -49,7 +51,6 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               accessibilityLabel={options.tabBarAccessibilityLabel}
               onPress={onPress}
               activeOpacity={1} // ✅ Evita la opacidad en iOS
-              android_ripple={{ borderless: true, rippleColor: "transparent" }} // ✅ Evita el efecto en Android
               style={styles.centralButtonContainer}
             >
               <Animated.View
@@ -74,7 +75,6 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
             accessibilityState={isFocused ? { selected: true } : {}}
             accessibilityLabel={options.tabBarAccessibilityLabel}
             activeOpacity={1} // ✅ Evita la opacidad en iOS
-            android_ripple={{ borderless: true, rippleColor: "transparent" }} // ✅ Evita el efecto en Android
             style={styles.tabButton}
           >
             <Icon
@@ -83,7 +83,9 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                   ? "swap-horiz"
                   : route.name === "graphics"
                   ? "bar-chart"
-                  : "person"
+                  : route.name === "profile"
+                  ? "person"
+                  : "home"
               }
               size={30}
               color={isFocused ? "#00DC5A" : "#FFF"}

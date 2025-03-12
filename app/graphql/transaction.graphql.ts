@@ -28,3 +28,19 @@ export const CREATE_TRANSACTION = gql`
     }
   }
 `;
+
+export const GET_TRANSACTIONS_BY_USER = gql`
+  query GetTransactions {
+    getTransactions {
+      amount
+      category
+      createdAt
+      description
+      id
+      title
+      type
+      updatedAt
+      userId
+    }
+  }
+`;

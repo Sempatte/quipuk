@@ -1,10 +1,22 @@
-import { Tabs } from "expo-router";
-import React from "react";
+import { Tabs, useRouter } from "expo-router";
+import React, { useEffect } from "react";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { TabBar } from "@/components/TabBar";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const router = useRouter();
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = await AsyncStorage.getItem("token");
+      if (!token) {
+        router.replace("/LoginScreen"); // Redirige al login si no hay token
+      }
+    };
+    checkAuth();
+  }, []);
 
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />}>
