@@ -60,12 +60,13 @@ export default function Profile() {
               <ThemedText>Teléfono: {data.getUserProfile.phone}</ThemedText>
               <ThemedText>Correo: {data.getUserProfile.email}</ThemedText>
 
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Cerrar Sesión</Text>
-              </TouchableOpacity>
+              
             </View>
           )
         )}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <Text style={styles.logoutText}>Cerrar Sesión</Text>
+              </TouchableOpacity>
       </ThemedView>
     </ParallaxScrollView>
   );

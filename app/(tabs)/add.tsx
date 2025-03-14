@@ -344,3 +344,14 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
+
+/* 
+  TODO: Cuando el movimiento se clasifique como "Pendiente", este no ira a las transacciones, sino a pagos pendientes en QuipukBoard
+
+  En Ingresos: el boton no es pagado, sino recibido.
+
+  Se debe añadir el "Frecuente en la Base de Datos", para que se refleje en el carousel superior.
+
+  Termina la vista de movimientos
+  
+  */
