@@ -7,15 +7,17 @@ import {
   StyleSheet,
   Image,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
 } from "react-native";
 import { useMutation } from "@apollo/client";
 import { useNavigation } from "@react-navigation/native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./interfaces/navigation";
-
-
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -36,7 +38,7 @@ export default function LoginScreen() {
         await AsyncStorage.setItem("token", token);
         await AsyncStorage.setItem("userId", data.login.user.id.toString());
         Alert.alert("Éxito", "Inicio de sesión exitoso");
-        navigation.navigate("(tabs)"); // Redirigir al Home después del login
+        navigation.navigate("(tabs)");
       }
     },
     onError: (error) => {
@@ -52,70 +54,78 @@ export default function LoginScreen() {
     }
     login({ variables: { email, password } });
   };
+
   return (
-    <View style={styles.container}>
-      <View style={styles.logoContainer}>
-        <Image
-          source={require("../assets/images/Logo.png")}
-          style={styles.logo}
-        />
-      </View>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.inner}>
+          <View style={styles.logoContainer}>
+            <Image
+              source={require("../assets/images/Logo.png")}
+              style={styles.logo}
+            />
+          </View>
 
-      <View style={styles.formContainer}>
-        <Text style={styles.label}>Correo</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ingrese su correo"
-          placeholderTextColor="#888"
-          value={email}
-          onChangeText={setEmail}
-        />
+          <View style={styles.formContainer}>
+            <Text style={styles.label}>Correo</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ingrese su correo"
+              placeholderTextColor="#888"
+              value={email}
+              onChangeText={setEmail}
+            />
 
-        <Text style={styles.label}>Contraseña</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Ingrese su contraseña"
-          placeholderTextColor="#888"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
+            <Text style={styles.label}>Contraseña</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ingrese su contraseña"
+              placeholderTextColor="#888"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+            />
 
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity onPress={() => setRememberMe(!rememberMe)}>
-            <View style={styles.checkbox}>
-              {rememberMe && <View style={styles.checked} />}
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity onPress={() => setRememberMe(!rememberMe)}>
+                <View style={styles.checkbox}>
+                  {rememberMe && <View style={styles.checked} />}
+                </View>
+              </TouchableOpacity>
+              <Text style={styles.optionText}>Recordarme</Text>
+              <TouchableOpacity>
+                <Text style={[styles.optionText, styles.forgotPassword]}>
+                  ¿Olvidaste tu contraseña?
+                </Text>
+              </TouchableOpacity>
             </View>
-          </TouchableOpacity>
-          <Text style={styles.optionText}>Recordarme</Text>
-          <TouchableOpacity>
-            <Text style={[styles.optionText, styles.forgotPassword]}>
-              ¿Olvidaste tu contraseña?
+
+            <TouchableOpacity
+              style={styles.loginButton}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              <Text style={styles.loginButtonText}>
+                {loading ? "Ingresando..." : "Ingresar"}
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={styles.registerText}>
+              ¿Aún no tienes una cuenta?{" "}
+              <Text
+                style={styles.registerLink}
+                onPress={() => navigation.navigate("LoginScreen")}
+              >
+                Regístrate
+              </Text>
             </Text>
-          </TouchableOpacity>
+          </View>
         </View>
-
-        <TouchableOpacity
-          style={styles.loginButton}
-          onPress={handleLogin}
-          disabled={loading}
-        >
-          <Text style={styles.loginButtonText}>
-            {loading ? "Ingresando..." : "Ingresar"}
-          </Text>
-        </TouchableOpacity>
-
-        <Text style={styles.registerText}>
-          ¿Aún no tienes una cuenta?{" "}
-          <Text
-            style={styles.registerLink}
-            onPress={() => navigation.navigate("LoginScreen")}
-          >
-            Regístrate
-          </Text>
-        </Text>
-      </View>
-    </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -123,18 +133,26 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
+    justifyContent: "flex-start",
+    width: "100%", // Se asegura que no tenga restricciones de ancho
+    maxWidth: "100%", // Evita cualquier restricción de tamaño
+  },
+  inner: {
+    flex: 1,
+    width: "100%", // ✅ Forzar que ocupe el ancho total
+    maxWidth: "100%", // ✅ Evita restricciones
+    alignItems: "center",
     justifyContent: "center",
+    paddingHorizontal: 0, // ❌ Evita márgenes laterale
+    top: 0, // ✅ Asegura que esté en la parte superior
   },
   logoContainer: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
+    alignSelf: "stretch", // ✅ Forzar que la vista ocupe todo el ancho
+    height: 200,
     backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
-    height: 250, // Ajusta según el diseño
-    borderBottomLeftRadius: 80, // 📌 Esquina curva
+    borderBottomLeftRadius: 80,
     overflow: "hidden",
   },
   logo: {
@@ -144,7 +162,7 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     paddingHorizontal: 20,
-    marginTop: 20, // Espacio después del logo
+    marginTop: 20,
   },
   label: {
     fontSize: 18,
@@ -172,7 +190,7 @@ const styles = StyleSheet.create({
     height: 20,
     borderRadius: 5,
     borderWidth: 2,
-    borderColor: "#00AEEF",
+    borderColor: "#00c450",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 10,
@@ -180,7 +198,7 @@ const styles = StyleSheet.create({
   checked: {
     width: 12,
     height: 12,
-    backgroundColor: "#00AEEF",
+    backgroundColor: "#00c450",
     borderRadius: 3,
   },
   optionText: {
@@ -189,10 +207,11 @@ const styles = StyleSheet.create({
   },
   forgotPassword: {
     marginLeft: "auto",
-    color: "#00AEEF",
+    color: "#00c450",
+    paddingLeft: 15,
   },
   loginButton: {
-    backgroundColor: "#00AEEF",
+    backgroundColor: "#00c450",
     height: 50,
     borderRadius: 25,
     justifyContent: "center",
@@ -210,7 +229,7 @@ const styles = StyleSheet.create({
     color: "#666",
   },
   registerLink: {
-    color: "#00AEEF",
+    color: "#00c450",
     fontWeight: "bold",
   },
 });
