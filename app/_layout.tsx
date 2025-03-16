@@ -37,8 +37,8 @@ export default function RootLayout() {
       <FontProvider>
         <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
           <Stack initialRouteName="LoginScreen">
-            {/* ✅ NO USES `component`, solo `name` */}
             <Stack.Screen name="LoginScreen" options={{ headerShown: false }} />
+            <Stack.Screen name="RegisterScreen" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" options={{ headerShown: false }} />
           </Stack>

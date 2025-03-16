@@ -13,6 +13,19 @@ export const LOGIN_MUTATION = gql`
   }
 `;
 
+export const REGISTER_MUTATION = gql`
+  mutation RegisterUser($input: RegisterUserInput!) {
+    registerUser(input: $input) {
+      createdAt
+      email
+      fullName
+      phoneNumber
+      updatedAt
+      username
+    }
+  }
+`;
+
 // 📌 Definir interfaces para el login
 export interface LoginResponse {
   login: {

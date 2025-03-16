@@ -117,7 +117,7 @@ export default function LoginScreen() {
               ¿Aún no tienes una cuenta?{" "}
               <Text
                 style={styles.registerLink}
-                onPress={() => navigation.navigate("LoginScreen")}
+                onPress={() => navigation.push("RegisterScreen")}
               >
                 Regístrate
               </Text>
@@ -138,6 +138,7 @@ const styles = StyleSheet.create({
     maxWidth: "100%", // Evita cualquier restricción de tamaño
   },
   inner: {
+    position: "absolute",
     flex: 1,
     width: "100%", // ✅ Forzar que ocupe el ancho total
     maxWidth: "100%", // ✅ Evita restricciones
@@ -156,13 +157,13 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logo: {
-    width: 200,
-    height: 100,
+    width: 270,
+    height: 120,
     resizeMode: "contain",
   },
   formContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
+    paddingHorizontal: 10,
+    marginTop: 30,
   },
   label: {
     fontSize: 18,
