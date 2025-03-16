@@ -67,15 +67,13 @@ export default function RegisterScreen() {
 
       await registerUser({
         variables: {
-          input: {
-            email,
-            fullName,
-            password,
-            phoneNumber,
-            username,
-          },
+          email,
+          fullName,
+          password,
+          phoneNumber,
+          username,
         },
-      })
+      })      
         .then((response) => console.log("Registro exitoso:", response))
         .catch((error) =>
           console.error(

@@ -14,8 +14,22 @@ export const LOGIN_MUTATION = gql`
 `;
 
 export const REGISTER_MUTATION = gql`
-  mutation RegisterUser($input: RegisterUserInput!) {
-    registerUser(input: $input) {
+  mutation CreateUser(
+    $email: String!
+    $fullName: String!
+    $password: String!
+    $phoneNumber: String!
+    $username: String!
+  ) {
+    createUser(
+      input: {
+        email: $email
+        fullName: $fullName
+        password: $password
+        phoneNumber: $phoneNumber
+        username: $username
+      }
+    ) {
       createdAt
       email
       fullName

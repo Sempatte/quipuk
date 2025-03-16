@@ -22,6 +22,7 @@ interface UserProfile {
   fullName: string;
   phone: string;
   email: string;
+  phoneNumber: string;
 }
 
 export default function Profile() {
@@ -44,10 +45,22 @@ export default function Profile() {
     }
   }, [navigation]);
 
-  if (error) return <Text style={styles.errorText}>Error: {error.message}</Text>;
+  if (error)
+    return (
+      <ParallaxScrollView
+        headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
+      >
+        <Text style={styles.errorText}>Error: {error.message}</Text>;
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
+        </TouchableOpacity>
+      </ParallaxScrollView>
+    );
 
   return (
-    <ParallaxScrollView headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}>
+    <ParallaxScrollView
+      headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
+    >
       <ThemedView>
         <ThemedText type="title">Perfil</ThemedText>
 
@@ -57,16 +70,16 @@ export default function Profile() {
           data?.getUserProfile && (
             <View style={styles.profileContainer}>
               <ThemedText>Nombre: {data.getUserProfile.fullName}</ThemedText>
-              <ThemedText>Teléfono: {data.getUserProfile.phone}</ThemedText>
+              <ThemedText>
+                Teléfono: {data.getUserProfile.phoneNumber}
+              </ThemedText>
               <ThemedText>Correo: {data.getUserProfile.email}</ThemedText>
-
-              
             </View>
           )
         )}
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Cerrar Sesión</Text>
-              </TouchableOpacity>
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
+        </TouchableOpacity>
       </ThemedView>
     </ParallaxScrollView>
   );
