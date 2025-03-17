@@ -8,7 +8,10 @@ interface DateSelectorProps {
 
 const dateOptions = ["Hoy", "Ayer", "Otros..."];
 
-const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate }) => {
+const DateSelector: React.FC<DateSelectorProps> = ({
+  selectedDate,
+  onSelectDate,
+}) => {
   return (
     <View>
       <Text style={styles.label}>Fecha</Text>
@@ -16,10 +19,22 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
         {dateOptions.map((option) => (
           <TouchableOpacity
             key={option}
-            style={[styles.button, selectedDate === option ? styles.selectedButton : styles.unselectedButton]}
+            style={[
+              styles.button,
+              selectedDate === option
+                ? styles.selectedButton
+                : styles.unselectedButton,
+            ]}
             onPress={() => onSelectDate(option)}
           >
-            <Text style={[styles.buttonText, selectedDate === option ? styles.selectedText : styles.unselectedText]}>
+            <Text
+              style={[
+                styles.buttonText,
+                selectedDate === option
+                  ? styles.selectedText
+                  : styles.unselectedText,
+              ]}
+            >
               {option}
             </Text>
           </TouchableOpacity>
@@ -30,9 +45,19 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onSelectDate 
 };
 
 const styles = StyleSheet.create({
-  label: { fontSize: 22, fontFamily: "Outfit_600SemiBold", color: "#000", marginBottom: 5 },
+  label: {
+    fontSize: 22,
+    fontFamily: "Outfit_600SemiBold",
+    color: "#000",
+    marginBottom: 5,
+  },
   buttonContainer: { flexDirection: "row", alignItems: "center" },
-  button: { paddingHorizontal: 15, paddingVertical: 8, borderRadius: 20, marginRight: 10 },
+  button: {
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+  },
   selectedButton: { backgroundColor: "#E86F51" },
   unselectedButton: { backgroundColor: "#E0E0E0" },
   buttonText: { fontSize: 14, fontFamily: "Outfit_400Regular" },

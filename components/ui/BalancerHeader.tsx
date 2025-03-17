@@ -1,28 +1,45 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { MaterialIcons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
-const BalanceHeader = () => {
+interface BalanceHeaderProps {
+  balance: number;
+  income: number;
+  expenses: number;
+  monthYear: string;
+}
+
+const BalanceHeader: React.FC<BalanceHeaderProps> = ({ balance, income, expenses, monthYear }) => {
+  // Función para formatear los números como moneda
+  const formatCurrency = (amount: number) => {
+    return `S/ ${amount.toFixed(2).replace(/\d(?=(\d{3})+\.)/g, '$&,')}`;
+  };
+
   return (
     <View style={styles.container}>
+      {/* Sección de Balance */}
       <View style={styles.balanceContainer}>
-        <Text style={styles.balanceText}>Balance <Text style={styles.dateHighlight}>Oct 2024</Text></Text>
-        <Text style={styles.amount}>S/ 500<Text style={styles.decimal}>.00</Text></Text>
+        <Text style={styles.balanceText}>
+          Balance <Text style={styles.dateHighlight}>{monthYear}</Text>
+        </Text>
+        <Text style={styles.balanceAmount}>{formatCurrency(balance)}</Text>
       </View>
 
+      {/* Sección de Ingresos y Gastos */}
       <View style={styles.summaryContainer}>
         <View style={styles.incomeContainer}>
-          <MaterialIcons name="trending-up" size={20} color="#65CE13" />
+          <MaterialCommunityIcons name="arrow-top-right" size={20} color="#65CE13" />
           <Text style={styles.incomeText}>Ingresos</Text>
-          <Text style={styles.incomeAmount}>S/ 1,500<Text style={styles.decimal}>.00</Text></Text>
+          <Text style={styles.amount}>{formatCurrency(income)}</Text>
         </View>
 
+        {/* Separador entre ingresos y gastos */}
         <View style={styles.separator} />
 
         <View style={styles.expenseContainer}>
-          <MaterialIcons name="trending-down" size={20} color="#E86F51" />
+          <MaterialCommunityIcons name="arrow-bottom-left" size={20} color="#E86F51" />
           <Text style={styles.expenseText}>Gastos</Text>
-          <Text style={styles.expenseAmount}>S/ 1,000<Text style={styles.decimal}>.00</Text></Text>
+          <Text style={styles.amount}>{formatCurrency(expenses)}</Text>
         </View>
       </View>
     </View>
@@ -34,46 +51,50 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
     backgroundColor: '#fff',
   },
   balanceContainer: {
-    flex: 1,
+    flex: 1.2, // Ajusta el tamaño de la sección de balance
   },
   balanceText: {
     fontSize: 16,
     color: '#000',
+    fontWeight: '400',
   },
   dateHighlight: {
     color: '#00c450',
     fontWeight: 'bold',
   },
-  amount: {
+  balanceAmount: {
     fontSize: 26,
     fontWeight: 'bold',
     color: '#000',
   },
-  decimal: {
-    fontSize: 16,
-    fontWeight: 'normal',
-  },
   summaryContainer: {
     flexDirection: 'row',
+    flex: 1,
     justifyContent: 'space-between',
     alignItems: 'center',
-    flex: 1,
   },
   incomeContainer: {
     alignItems: 'center',
+    flex: 1,
+    minWidth: 80, // 📌 Establece un ancho mínimo
+    maxWidth: 100, // 📌 Evita que el texto crezca demasiado
   },
   incomeText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#65CE13',
+    fontWeight: '500',
   },
-  incomeAmount: {
-    fontSize: 16,
+  amount: {
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#000',
+    flexWrap: "wrap", // 📌 Permite que el texto se divida en varias líneas si es necesario
+    textAlign: "center", // 📌 Mantiene el texto centrado
   },
   separator: {
     width: 1,
@@ -83,15 +104,13 @@ const styles = StyleSheet.create({
   },
   expenseContainer: {
     alignItems: 'center',
+    flex: 1,
+    minWidth: 80, // 📌 Evita que el texto desborde
   },
   expenseText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#E86F51',
-  },
-  expenseAmount: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#000',
+    fontWeight: '500',
   },
 });
 

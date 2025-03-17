@@ -37,7 +37,6 @@ export default function LoginScreen() {
       if (token) {
         await AsyncStorage.setItem("token", token);
         await AsyncStorage.setItem("userId", data.login.user.id.toString());
-        Alert.alert("Éxito", "Inicio de sesión exitoso");
         navigation.navigate("(tabs)");
       }
     },
