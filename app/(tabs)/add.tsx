@@ -10,6 +10,7 @@ import {
   Keyboard,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -37,6 +38,7 @@ import CategorySelector from "@/components/ui/CategorySelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import DateSelector from "@/components/ui/DateSelector";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { ThemedView } from "@/components/ThemedView";
 
 export default function AddTransaction() {
   const [selectedOption, setSelectedOption] = useState<
@@ -154,9 +156,9 @@ export default function AddTransaction() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <Text>Cargando...</Text>
-      </SafeAreaView>
+      <ThemedView style={styles.centeredContainer}>
+        <ActivityIndicator size="large" />
+      </ThemedView>
     );
   }
 
@@ -253,6 +255,11 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#F5F5F5",
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   scrollContainer: {
     paddingBottom: 50,

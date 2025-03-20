@@ -10,23 +10,27 @@ import {
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { ThemedView } from "@/components/ThemedView";
-import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Calendar } from "react-native-calendars";
 import { format, subDays } from "date-fns";
 import { es } from "date-fns/locale";
-import TransactionItem from "@/components/ui/TransactionItem";
 import { capitalize } from "lodash";
-import { Calendar } from "react-native-calendars";
-import BalanceHeader from "@/components/ui/BalancerHeader";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../interfaces/navigation";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+
+import { ThemedView } from "@/components/ThemedView";
+import TransactionItem from "@/components/ui/TransactionItem";
+import BalanceHeader from "@/components/ui/BalancerHeader";
+import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
+import { RootStackParamList } from "../interfaces/navigation";
 import { Transaction } from "../interfaces/transaction.interface";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "LoginScreen"
 >;
+
+// Definimos un tipo para nuestro formato de datos agrupados
+type GroupedTransactionItem = [string, Transaction[]];
 
 const Movements = () => {
   const { loading, error, data, refetch } = useQuery(GET_TRANSACTIONS_BY_USER);
@@ -35,9 +39,12 @@ const Movements = () => {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const navigation = useNavigation<LoginScreenNavigationProp>();
 
+  // Array de transacciones
+  const transactions: Transaction[] = data?.getTransactions || [];
+
   useFocusEffect(
     useCallback(() => {
-      if (error && error.message === "Token expired or invalid") {
+      if (error?.message === "Token expired or invalid") {
         AsyncStorage.removeItem("token");
         navigation.navigate("LoginScreen");
       }
@@ -45,19 +52,31 @@ const Movements = () => {
     }, [refetch, error, navigation])
   );
 
-  /** 📌 Obtiene los últimos 6 días basados en la fecha seleccionada */
-  const getLastSixDays = (date: Date) =>
-    Array.from({ length: 6 }, (_, index) => subDays(date, 5 - index));
+  // Obtiene los últimos 6 días basados en la fecha de referencia
+  const getLastSixDays = useCallback(
+    (date: Date) => Array.from({ length: 6 }, (_, index) => subDays(date, 5 - index)),
+    []
+  );
+
+  // Verifica si hay transacciones en un día específico
+  const hasTransactionsOnDay = useCallback(
+    (day: Date) =>
+      transactions.some(
+        (transaction) =>
+          new Date(transaction.createdAt).toDateString() === day.toDateString()
+      ),
+    [transactions]
+  );
 
   // Agrupar las transacciones por día
-  const groupTransactionsByDay = (transactions: Transaction[]) => {
-    const groups = transactions.reduce((groups, transaction) => {
+  const groupTransactionsByDay = useCallback((transactions: Transaction[]) => {
+    const groups = transactions.reduce((acc, transaction) => {
       const date = format(new Date(transaction.createdAt), "dd-MM-yyyy");
-      if (!groups[date]) {
-        groups[date] = [];
+      if (!acc[date]) {
+        acc[date] = [];
       }
-      groups[date].push(transaction);
-      return groups;
+      acc[date].push(transaction);
+      return acc;
     }, {} as { [key: string]: Transaction[] });
 
     // Ordenamos las transacciones dentro de cada grupo por fecha descendente
@@ -69,87 +88,29 @@ const Movements = () => {
     });
 
     return groups;
-  };
+  }, []);
 
-  const transactions = data?.getTransactions || [];
   const groupedTransactions = Array.isArray(transactions)
     ? groupTransactionsByDay(transactions)
     : {};
 
-  /** 📌 Verifica si hay transacciones en un día específico */
-  const hasTransactionsOnDay = (day: Date) =>
-    transactions.some(
-      (transaction: Transaction) =>
-        new Date(transaction.createdAt).toDateString() === day.toDateString()
-    );
-
-  const days = getLastSixDays(referenceDay);
-
-  // Prepara los datos para el FlatList de manera que siempre sean renderizables
-  const getFilteredTransactionsForRender = () => {
-    if (selectedDate) {
-      // Si hay fecha seleccionada, filtramos solo las transacciones de ese día
-      const filteredItems = transactions.filter(
-        (transaction: Transaction) =>
-          new Date(transaction.createdAt).toDateString() ===
-          selectedDate.toDateString()
-      );
-
-      if (filteredItems.length === 0) {
-        // Si no hay transacciones para ese día, devolvemos un formato compatible con el renderItem
-        return [
-          [
-            format(selectedDate, "dd-MM-yyyy"),
-            [], // Array vacío de transacciones
-          ],
-        ];
-      }
-
-      // Si hay transacciones, las agrupamos por día (aunque será solo un día)
-      const dateKey = format(selectedDate, "dd-MM-yyyy");
-      return [[dateKey, filteredItems]];
-    } else {
-      // Si no hay fecha seleccionada, mostramos todas las transacciones agrupadas
-      // Convertimos el objeto de transacciones agrupadas a un array de entradas
-      const entries = Object.entries(groupedTransactions);
-
-      // Ordenamos el array de entradas por fecha (más reciente primero)
-      entries.sort((a, b) => {
-        const [dateA] = a[0].split("-").map(Number);
-        const [dateB] = b[0].split("-").map(Number);
-        const [dayA, monthA, yearA] = a[0].split("-").map(Number);
-        const [dayB, monthB, yearB] = b[0].split("-").map(Number);
-
-        // Comparamos por año, luego por mes, luego por día
-        if (yearA !== yearB) return yearB - yearA;
-        if (monthA !== monthB) return monthB - monthA;
-        return dateB - dateA; // Más reciente primero
-      });
-
-      return entries;
-    }
-  };
-
-  const filteredTransactionsForRender = getFilteredTransactionsForRender();
-
-  /** 📌 Calcula ingresos, gastos y balance dinámico */
+  // Obtiene el mes y año actual o seleccionado
   const selectedMonthYear = selectedDate
     ? format(selectedDate, "yyyy-MM")
     : format(new Date(), "yyyy-MM");
 
+  const monthYear = selectedDate
+    ? capitalize(format(selectedDate, "MMMM yyyy", { locale: es }))
+    : capitalize(format(new Date(), "MMMM yyyy", { locale: es }));
+
+  // Filtra transacciones por mes
   const monthlyTransactions = transactions.filter(
-    (transaction: Transaction) => {
-      return (
-        format(new Date(transaction.createdAt), "yyyy-MM") === selectedMonthYear
-      );
-    }
+    (transaction) => format(new Date(transaction.createdAt), "yyyy-MM") === selectedMonthYear
   );
 
+  // Calcula ingresos, gastos y balance
   const { income, expenses, balance } = monthlyTransactions.reduce(
-    (
-      acc: { income: number; expenses: number; balance: number },
-      transaction: Transaction
-    ) => {
+    (acc, transaction) => {
       if (transaction.type === "gasto") {
         acc.expenses += transaction.amount;
         acc.balance -= transaction.amount;
@@ -162,10 +123,55 @@ const Movements = () => {
     { income: 0, expenses: 0, balance: 0 }
   );
 
-  /** 📌 Obtiene el mes y año para el balance */
-  const monthYear = selectedDate
-    ? capitalize(format(selectedDate, "MMMM yyyy", { locale: es }))
-    : capitalize(format(new Date(), "MMMM yyyy", { locale: es }));
+  // Prepara los datos para el FlatList con el tipo correcto
+  const getFilteredTransactionsForRender = useCallback((): GroupedTransactionItem[] => {
+    if (selectedDate) {
+      // Filtramos transacciones por día seleccionado
+      const filteredItems = transactions.filter(
+        (transaction) =>
+          new Date(transaction.createdAt).toDateString() === selectedDate.toDateString()
+      );
+
+      const dateKey = format(selectedDate, "dd-MM-yyyy");
+      
+      // Siempre devolvemos un formato compatible con renderItem
+      return [[dateKey, filteredItems.length > 0 ? filteredItems : []]];
+    } else {
+      // Convertimos el objeto de transacciones agrupadas a un array
+      const entries = Object.entries(groupedTransactions) as GroupedTransactionItem[];
+
+      // Ordenamos por fecha (más reciente primero)
+      entries.sort(([dateA], [dateB]) => {
+        const [dayA, monthA, yearA] = dateA.split("-").map(Number);
+        const [dayB, monthB, yearB] = dateB.split("-").map(Number);
+
+        // Comparamos por año, mes y día
+        if (yearA !== yearB) return yearB - yearA;
+        if (monthA !== monthB) return monthB - monthA;
+        return dayB - dayA;
+      });
+
+      return entries;
+    }
+  }, [selectedDate, transactions, groupedTransactions]);
+
+  const days = getLastSixDays(referenceDay);
+  const filteredTransactionsForRender = getFilteredTransactionsForRender();
+
+  const toggleDateSelection = (day: Date) => {
+    if (selectedDate && day.toDateString() === selectedDate.toDateString()) {
+      setSelectedDate(null); // Deseleccionamos si es el mismo día
+    } else {
+      setSelectedDate(day); // Seleccionamos el nuevo día
+    }
+  };
+
+  const handleCalendarDayPress = (day: { dateString: string }) => {
+    const newDate = new Date(day.dateString);
+    setReferenceDay(newDate);
+    setSelectedDate(newDate);
+    setIsCalendarVisible(false);
+  };
 
   if (loading) {
     return (
@@ -191,7 +197,7 @@ const Movements = () => {
         <TouchableOpacity
           onPress={() => setIsCalendarVisible(true)}
           style={styles.monthYearButton}
-          activeOpacity={1}
+          activeOpacity={0.8}
         >
           <Text style={styles.arrowText}>{"<"}</Text>
           <Text style={styles.monthYearText}>
@@ -202,9 +208,7 @@ const Movements = () => {
 
         <View style={styles.daysContainer}>
           {days.map((day, index) => {
-            const isActive =
-              selectedDate &&
-              day.toDateString() === selectedDate.toDateString();
+            const isActive = selectedDate && day.toDateString() === selectedDate.toDateString();
             const hasTransactions = hasTransactionsOnDay(day);
 
             return (
@@ -216,31 +220,18 @@ const Movements = () => {
                   !isActive && hasTransactions && styles.hasTransactionsDay,
                   !isActive && !hasTransactions && styles.noTransactionsDay,
                 ]}
-                onPress={() => {
-                  if (
-                    selectedDate &&
-                    day.toDateString() === selectedDate.toDateString()
-                  ) {
-                    // Si es el mismo día, deseleccionamos
-                    setSelectedDate(null);
-                  } else {
-                    // Si es otro día o no hay selección, seleccionamos este día
-                    setSelectedDate(day);
-                  }
-                }}
-                activeOpacity={1}
+                onPress={() => toggleDateSelection(day)}
+                activeOpacity={0.8}
               >
-                <Text style={[styles.dayNumber, styles.dayText]}>
+                <Text style={styles.dayNumber}>
                   {format(day, "dd", { locale: es })}
                 </Text>
-                <Text style={[styles.dayLabel, styles.dayText]}>
+                <Text style={styles.dayLabel}>
                   {format(day, "EEE", { locale: es })}
                 </Text>
 
                 {hasTransactions && (
-                  <View
-                    style={[styles.greenDot, isActive && styles.whiteDot]}
-                  />
+                  <View style={[styles.greenDot, isActive && styles.whiteDot]} />
                 )}
               </TouchableOpacity>
             );
@@ -255,17 +246,11 @@ const Movements = () => {
         monthYear={monthYear}
       />
 
-      {/* FlatList con las transacciones agrupadas */}
       <FlatList
         data={filteredTransactionsForRender}
-        keyExtractor={(item) => item[0]}
-        // En el renderItem del FlatList, modifica esta parte:
-
-        renderItem={({ item }) => {
-          const [dateString, transactions] = item;
-
-          // Parseamos correctamente la fecha
-          // El formato original es "dd-MM-yyyy"
+        keyExtractor={(item: GroupedTransactionItem) => item[0]}
+        renderItem={({ item }: { item: GroupedTransactionItem }) => {
+          const [dateString, transactionList] = item;
           const [day, month, year] = dateString.split("-");
           const dateObject = new Date(
             parseInt(year),
@@ -278,15 +263,17 @@ const Movements = () => {
               <Text style={styles.transactionDate}>
                 {format(dateObject, "dd MMM yyyy", { locale: es })}
               </Text>
-              {transactions.length > 0 ? (
-                transactions.map((transaction: Transaction) => (
+              {transactionList.length > 0 ? (
+                transactionList.map((transaction: Transaction) => (
                   <TransactionItem
                     key={transaction.id}
                     transaction={transaction}
                   />
                 ))
               ) : (
-                <Text>No hay transacciones para este día.</Text>
+                <Text style={styles.noTransactionsText}>
+                  No hay transacciones para este día.
+                </Text>
               )}
             </View>
           );
@@ -294,7 +281,6 @@ const Movements = () => {
         contentContainerStyle={styles.listContent}
       />
 
-      {/* Modal del calendario */}
       <Modal
         transparent={true}
         visible={isCalendarVisible}
@@ -303,14 +289,9 @@ const Movements = () => {
         <View style={styles.modalContainer}>
           <View style={styles.calendarContainer}>
             <Calendar
-              style={{ width: "100%" }}
+              style={styles.calendar}
               maxDate={format(new Date(), "yyyy-MM-dd")}
-              onDayPress={(day: any) => {
-                const newDate = new Date(day.dateString);
-                setReferenceDay(newDate);
-                setSelectedDate(newDate);
-                setIsCalendarVisible(false);
-              }}
+              onDayPress={handleCalendarDayPress}
               markedDates={{
                 [format(selectedDate ?? new Date(), "yyyy-MM-dd")]: {
                   selected: true,
@@ -337,12 +318,11 @@ const Movements = () => {
   );
 };
 
-export default Movements;
-
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#FFF" },
-  loaderContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
-  errorContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  container: { 
+    flex: 1, 
+    backgroundColor: "#FFF" 
+  },
   centeredContainer: {
     flex: 1,
     justifyContent: "center",
@@ -353,6 +333,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#000",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+  },
+  headerTitle: {
+    fontSize: 26,
+    color: "#FFF",
+    fontWeight: "bold",
+    textAlign: "center",
+    fontFamily: "Outfit_500Medium",
   },
   monthYearButton: {
     flexDirection: "row",
@@ -367,87 +354,17 @@ const styles = StyleSheet.create({
     marginVertical: 10,
     width: "80%",
   },
-  transactionGroup: {
-    marginBottom: 20,
-    paddingHorizontal: 15,
-  },
-  transactionDate: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 8,
-  },
   monthYearText: {
     fontSize: 20,
     fontWeight: "bold",
     color: "#FFF",
   },
-
   monthText: {
     color: "#00DC5A",
   },
-
-  yearText: {
-    color: "#FFF",
-  },
-
   arrowText: {
     color: "#FFF",
     fontSize: 24,
-  },
-
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-  },
-  calendarContainer: {
-    width: "90%",
-    backgroundColor: "#fff",
-    padding: 16,
-    borderRadius: 16,
-    elevation: 5,
-  },
-  closeButton: {
-    marginTop: 12,
-    alignSelf: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    backgroundColor: "#00DC5A",
-    borderRadius: 8,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  changeMonthButton: {
-    position: "absolute",
-    right: 20,
-    top: 15,
-    backgroundColor: "#000",
-    padding: 8,
-    borderRadius: 8,
-  },
-  changeMonthButtonText: {
-    color: "#00DC5A",
-    fontSize: 20,
-    fontWeight: "bold",
-  },
-
-  headerTitle: {
-    fontSize: 26,
-    color: "#FFF",
-    fontWeight: "bold",
-    textAlign: "center",
-    fontFamily: "Outfit_500Medium",
-  },
-  monthButton: {
-    color: "#00DC5A",
-    textAlign: "center",
-    fontSize: 18,
-    marginVertical: 8,
-    fontFamily: "Outfit_600SemiBold",
   },
   daysContainer: {
     flexDirection: "row",
@@ -467,22 +384,23 @@ const styles = StyleSheet.create({
     borderColor: "#00DC5A",
     borderWidth: 1,
   },
-
   hasTransactionsDay: {
     borderColor: "#00DC5A",
     borderWidth: 1,
   },
-
   noTransactionsDay: {
     borderColor: "#FFF",
     borderWidth: 1,
   },
-  dayText: {
-    color: "#FFF",
+  dayNumber: { 
+    color: "#FFF", 
+    fontSize: 18,
     fontFamily: "Outfit_500Medium",
   },
-  whiteDot: {
-    backgroundColor: "#FFF",
+  dayLabel: { 
+    color: "#FFF", 
+    fontSize: 14,
+    fontFamily: "Outfit_500Medium",
   },
   greenDot: {
     width: 6,
@@ -491,27 +409,57 @@ const styles = StyleSheet.create({
     backgroundColor: "#00DC5A",
     marginTop: 9,
   },
-  dayNumber: { color: "#FFF", fontSize: 18 },
-  dayLabel: { color: "#FFF", fontSize: 14 },
-  transactionContainer: {
-    flexDirection: "row",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#ddd",
+  whiteDot: {
+    backgroundColor: "#FFF",
   },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#F0F0F0",
-    marginRight: 10,
+  transactionGroup: {
+    marginBottom: 20,
+    paddingHorizontal: 15,
   },
-  detailsContainer: { flex: 1 },
-  title: { fontSize: 16, fontWeight: "bold" },
-  date: { fontSize: 12, color: "#888" },
-  paymentMethod: { fontSize: 12, color: "#666" },
-  amount: { fontSize: 16, fontWeight: "bold" },
-  expense: { color: "#E86F51" },
-  income: { color: "#65CE13" },
-  listContent: { paddingBottom: 20 },
+  transactionDate: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#000",
+    marginBottom: 8,
+  },
+  noTransactionsText: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+    textAlign: "center",
+    paddingVertical: 10,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.6)",
+    alignItems: "center",
+  },
+  calendarContainer: {
+    width: "90%",
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 16,
+    elevation: 5,
+  },
+  calendar: {
+    width: "100%",
+  },
+  closeButton: {
+    marginTop: 12,
+    alignSelf: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    backgroundColor: "#00DC5A",
+    borderRadius: 8,
+  },
+  closeButtonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  listContent: { 
+    paddingBottom: 20 
+  },
 });
+
+export default Movements;

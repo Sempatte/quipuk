@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -18,6 +17,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./interfaces/navigation";
+import { useToast } from "./providers/ToastProvider";
+import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
+
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -31,6 +33,8 @@ export default function LoginScreen() {
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
 
+  const { showToast } = useToast();
+
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
     onCompleted: async (data) => {
       const token = data?.login?.accessToken;
@@ -42,13 +46,13 @@ export default function LoginScreen() {
     },
     onError: (error) => {
       console.log("Error al iniciar sesión:", error);
-      Alert.alert("Error", error.message);
+      showToast("error", "Error en inicio de sesión", error.message);
     },
   });
 
   const handleLogin = () => {
     if (!email || !password) {
-      Alert.alert("Error", "Todos los campos son obligatorios.");
+      showToast("error", "Error", "Todos los campos son obligatorios.");
       return;
     }
     login({ variables: { email, password } });
@@ -62,10 +66,7 @@ export default function LoginScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.inner}>
           <View style={styles.logoContainer}>
-            <Image
-              source={require("../assets/images/Logo.png")}
-              style={styles.logo}
-            />
+          <QuipukLogo width={170} height={90} style={styles.logo} />
           </View>
 
           <View style={styles.formContainer}>
@@ -161,7 +162,8 @@ const styles = StyleSheet.create({
     resizeMode: "contain",
   },
   formContainer: {
-    paddingHorizontal: 10,
+    alignSelf: "stretch",
+    paddingHorizontal: 40,
     marginTop: 30,
   },
   label: {

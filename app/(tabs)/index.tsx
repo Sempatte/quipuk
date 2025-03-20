@@ -1,38 +1,83 @@
-import { Image, StyleSheet, Platform } from 'react-native';
-
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import React from "react";
+import { View, Text, StyleSheet, StatusBar, SafeAreaView, KeyboardAvoidingView } from "react-native";
+import { useQuery } from "@apollo/client";
+import BellIcon from "@/assets/images/icons/mdi_bell.svg";
+import SettingsIcon from "@/assets/images/icons/settings.svg";
+import { GET_USER_PROFILE } from "../graphql/users.graphql";
+import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
 
 export default function HomeScreen() {
+  const { data, loading } = useQuery(GET_USER_PROFILE);
+  
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Quipuk !!</ThemedText>
-      </ThemedView>
+    <KeyboardAvoidingView style={styles.container}>
       
-    </ParallaxScrollView>
+      <View style={styles.header}>
+        <View style={styles.logoContainer}>
+          <QuipukLogo width={140} height={60} />
+        </View>
+        
+        <View style={styles.iconContainer}>
+          <View style={styles.iconButton}>
+            <BellIcon width={24} height={24} fill="#00c450" />
+          </View>
+          <View style={styles.iconButton}>
+            <SettingsIcon width={24} height={24} fill="#00c450" />
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.welcomeContainer}>
+        <Text style={styles.welcome}>
+          Hola, <Text style={styles.username}>{loading ? "..." : data?.getUserProfile.fullName || "ELMER"}</Text>
+        </Text>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    fontFamily: 'Outfit_700Bold',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  container: {
+    flex: 1,
+    backgroundColor: "#000",
+    maxHeight: "30%",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingTop: 50,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  logoContainer: {
+    flex: 1,
+  },
+  iconContainer: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+  },
+  iconButton: {
+    width: 50,
+    height: 50,
+    backgroundColor: "#00DC5A",
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 10,
+  },
+  welcomeContainer: {
+    paddingHorizontal: 20,
+    marginTop: 20
+  },
+  welcome: {
+    fontSize: 32,
+    color: "#FFFFFF",
+    fontFamily: "Outfit_400Regular",
+  },
+  username: {
+    color: "#00c450",
+    fontFamily: "Outfit_700Bold",
+    fontSize: 32,
   },
 });

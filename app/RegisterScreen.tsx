@@ -1,3 +1,4 @@
+// RegisterScreen.tsx
 import React, { useState } from "react";
 import {
   View,
@@ -6,7 +7,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
@@ -18,6 +18,9 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./interfaces/navigation";
 import { REGISTER_MUTATION } from "./graphql/mutations.graphql";
 import { useMutation } from "@apollo/client";
+import { useToast } from "./providers/ToastProvider";
+import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
+
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -26,6 +29,7 @@ type RegisterScreenNavigationProp = NativeStackNavigationProp<
 
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
+  const { showToast } = useToast();
 
   // Estados para cada input
   const [fullName, setFullName] = useState("");
@@ -36,54 +40,33 @@ export default function RegisterScreen() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const [registerUser, { loading }] = useMutation(REGISTER_MUTATION, {
-    onCompleted: (data) => {
-      Alert.alert("Éxito", "Cuenta creada correctamente.");
-      navigation.navigate("LoginScreen"); // Redirige al login después del registro
+    onCompleted: () => {
+      showToast("success", "Registro exitoso", "Cuenta creada correctamente.");
+      navigation.navigate("LoginScreen");
     },
     onError: (error) => {
-      console.log("Error en registro:", error);
-      Alert.alert("Error", error.message);
+      console.error("Error en registro:", error);
+      showToast("error", "Error en registro", error.message);
     },
   });
 
   const handleRegister = async () => {
     if (!fullName || !email || !phoneNumber || !username || !password) {
-      Alert.alert("Error", "Todos los campos son obligatorios.");
+      showToast("error", "Error", "Todos los campos son obligatorios.");
       return;
     }
     if (!acceptedTerms) {
-      Alert.alert("Error", "Debes aceptar los Términos y Condiciones.");
+      showToast("error", "Error", "Debes aceptar los Términos y Condiciones.");
       return;
     }
 
     try {
-      console.log("Datos enviados:", {
-        email,
-        fullName,
-        password,
-        phoneNumber,
-        username,
-      });
-
       await registerUser({
-        variables: {
-          email,
-          fullName,
-          password,
-          phoneNumber,
-          username,
-        },
-      })      
-        .then((response) => console.log("Registro exitoso:", response))
-        .catch((error) =>
-          console.error(
-            "Error en GraphQL:",
-            error.networkError || error.graphQLErrors
-          )
-        );
+        variables: { fullName, email, phoneNumber, username, password },
+      });
     } catch (error: any) {
       console.error("Error en el registro:", error);
-      Alert.alert("Error", error.message);
+      showToast("error", "Error", error.message);
     }
   };
 
@@ -102,10 +85,7 @@ export default function RegisterScreen() {
             >
               <Text style={styles.backText}>{"←"}</Text>
             </TouchableOpacity>
-            <Image
-              source={require("../assets/images/Logo.png")}
-              style={styles.logo}
-            />
+            <QuipukLogo width={140} height={60} style={styles.logo} />
             <Text style={styles.headerText}>
               <Text style={styles.headerHighlight}>Crear</Text> una cuenta
             </Text>
