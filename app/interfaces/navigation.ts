@@ -5,6 +5,8 @@ export type RootStackParamList = {
   LoginScreen: undefined;  // 📌 Asegúrate de que el nombre es "Login" y no "LoginScreen"
   RegisterScreen: undefined;
   "(tabs)": undefined;
+  movements: undefined;
+  index: undefined;
 };
 
 // 📌 Tipo de navegación reutilizable

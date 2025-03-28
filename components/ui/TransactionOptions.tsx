@@ -1,31 +1,96 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { View, Text, StyleSheet, Switch, TouchableOpacity } from "react-native";
-import HearthIcon from "@/assets/images/icons/hearth.svg"; // Importar el icono SVG
+import HearthIcon from "@/assets/images/icons/hearth.svg";
+import { TRANSACTION_COLORS, TransactionType } from "@/app/interfaces/transaction.interface";
 
-interface TransactionProps {
-  type: "gasto" | "ingreso";
+interface TransactionOptionsProps {
+  type: TransactionType;
+  onSelectFrequent: (frequent: boolean) => void;
+  onSelectStatus: (isPaid: boolean) => void;
+  initialFrequent?: boolean;
+  initialStatus?: boolean;
 }
 
 /**
- * Transaction Props
- * @param type
+ * Componente para opciones adicionales de transacción
+ * Permite marcar una transacción como frecuente y como pagada/recibida
+ * 
+ * @param type - Tipo de transacción ("gasto" o "ingreso")
+ * @param onSelectFrequent - Función para actualizar el estado de "frecuente"
+ * @param onSelectStatus - Función para actualizar el estado de "pagado/recibido"
+ * @param initialFrequent - Valor inicial para el estado "frecuente"
+ * @param initialStatus - Valor inicial para el estado "pagado/recibido"
  */
 
-const TransactionOptions: React.FC<TransactionProps> = ({ type }) => {
-  const [isFrequent, setIsFrequent] = useState(false);
-  const [isPaid, setIsPaid] = useState(true);
+const TYPE_TO_OPTION_MAP = {
+  "gasto": "Gastos",
+  "ingreso": "Ingresos",
+} as const;
+
+const TransactionOptions: React.FC<TransactionOptionsProps> = ({ 
+  type, 
+  onSelectFrequent, 
+  onSelectStatus,
+  initialFrequent = false,
+  initialStatus = true
+}) => {
+  const [isFrequent, setIsFrequent] = useState(initialFrequent);
+  const [isPaid, setIsPaid] = useState(initialStatus);
+
+  // Actualizar estado local si cambian las props iniciales
+  useEffect(() => {
+    setIsFrequent(initialFrequent);
+  }, [initialFrequent]);
+
+  useEffect(() => {
+    setIsPaid(initialStatus);
+  }, [initialStatus]);
+
+  // Obtener el color basado en el tipo de transacción
+  const themeColor = useMemo(() => {
+    const option = TYPE_TO_OPTION_MAP[type];
+    return TRANSACTION_COLORS[option];
+  }, [type]);
+
+  // Textos dependientes del tipo de transacción
+  const statusText = useMemo(() => ({
+    active: type === "gasto" ? "Pagado" : "Recibido",
+    inactive: "Pendiente"
+  }), [type]);
+
+  const handleSelectFrequent = (frequent: boolean) => {
+    setIsFrequent(frequent);
+    onSelectFrequent(frequent);
+  };
+
+  const handleSelectStatus = (status: boolean) => {
+    setIsPaid(status);
+    onSelectStatus(status);
+  };
+
+  // Estilos dinámicos basados en el tipo de transacción
+  const dynamicStyles = useMemo(() => ({
+    activeIcon: {
+      fill: themeColor
+    },
+    activeThumb: {
+      thumbColor: themeColor
+    }
+  }), [themeColor]);
 
   return (
     <View style={styles.container}>
       {/* Botón Frecuente */}
       <TouchableOpacity
         style={[styles.optionContainer, isFrequent && styles.optionActive]}
-        onPress={() => setIsFrequent(!isFrequent)}
+        onPress={() => handleSelectFrequent(!isFrequent)}
+        accessibilityLabel={isFrequent ? "Desmarcar como frecuente" : "Marcar como frecuente"}
+        accessibilityRole="button"
       >
         <HearthIcon
           width={24}
           height={24}
-          fill={isFrequent ? "#EF674A" : "#BDBDBD"}
+          fill={isFrequent ? themeColor : "#BDBDBD"}
         />
         <Text
           style={[styles.optionText, isFrequent && styles.optionTextActive]}
@@ -34,17 +99,18 @@ const TransactionOptions: React.FC<TransactionProps> = ({ type }) => {
         </Text>
       </TouchableOpacity>
 
-      {/* Botón Pagado con Switch */}
+      {/* Botón Pagado/Recibido con Switch */}
       <View style={styles.switchContainer}>
         <Switch
           value={isPaid}
-          onValueChange={setIsPaid}
+          onValueChange={handleSelectStatus}
           trackColor={{ false: "#BDBDBD", true: "#BDBDBD" }}
-          thumbColor={isPaid ? "#EF674A" : "#FFF"}
+          thumbColor={isPaid ? themeColor : "#FFF"}
+          accessibilityLabel={isPaid ? statusText.active : statusText.inactive}
+          testID="payment-status-switch"
         />
-        {}{" "}
         <Text style={[styles.optionText, isPaid && styles.optionTextActive]}>
-          {isPaid ? (type === "gasto" ? "Pagado" : "Recibido") : "Pendiente"}
+          {isPaid ? statusText.active : statusText.inactive}
         </Text>
       </View>
     </View>

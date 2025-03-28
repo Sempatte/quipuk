@@ -9,7 +9,9 @@ export const GET_TRANSACTIONS = gql`
       description
       amount
       type
+      frequent
       category
+      dueDate
       createdAt
       updatedAt
     }
@@ -23,8 +25,10 @@ export const CREATE_TRANSACTION = gql`
       description
       amount
       type
+      frequent
       category
       userId
+      dueDate
     }
   }
 `;
@@ -41,6 +45,23 @@ export const GET_TRANSACTIONS_BY_USER = gql`
       type
       updatedAt
       userId
+    }
+  }
+`;
+
+// Consulta GraphQL para obtener los pagos pendientes
+export const GET_PENDING_TRANSACTIONS = gql`
+  query GetPendingTransactions {
+    getTransactions(status: "pending", type: "gasto") {
+      id
+      title
+      description
+      amount
+      type
+      category
+      status
+      dueDate
+      createdAt
     }
   }
 `;

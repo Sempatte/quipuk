@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Crear el enlace HTTP
 const httpLink = createHttpLink({
-  uri: "http://192.168.0.27:3000/graphql", // 🔹 Reemplaza con tu endpoint
+  uri: "http://192.168.1.47:3000/graphql",
 });
 
 // Interceptor para agregar el token en las cabeceras

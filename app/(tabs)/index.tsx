@@ -1,63 +1,104 @@
-import React from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
   KeyboardAvoidingView,
-  ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import BellIcon from "@/assets/images/icons/mdi_bell.svg";
 import SettingsIcon from "@/assets/images/icons/settings.svg";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
-import { ThemedView } from "@/components/ThemedView";
+import QuipukLogo from "@/assets/images/Logo.svg";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "../interfaces/navigation";
 import Loader from "@/components/ui/Loader";
+import RecentTransactions from "@/components/ui/RecentTransactions"; // Importamos el nuevo componente
+import UpcomingPayments from "@/components/ui/UpcomingPayments";
+
+type LoginScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "LoginScreen",
+  "movements"
+>;
 
 export default function HomeScreen() {
-  const { data, loading } = useQuery(GET_USER_PROFILE);
+  const { data, loading, error } = useQuery(GET_USER_PROFILE);
+  const navigation = useNavigation<LoginScreenNavigationProp>();
+
+  useFocusEffect(
+    useCallback(() => {
+      if (error?.message === "Token expired or invalid") {
+        AsyncStorage.removeItem("token");
+        navigation.navigate("LoginScreen");
+      }
+    }, [error, navigation])
+  );
+
   if (loading) {
     return <Loader visible={true} fullScreen text="Cargando datos del usuario..." />;
   }
+
   return (
-    <KeyboardAvoidingView style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <QuipukLogo width={140} height={60} />
+    <ScrollView style={styles.scrollView}>
+      <KeyboardAvoidingView style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.logoContainer}>
+            <QuipukLogo width={140} height={60} />
+          </View>
+
+          <View style={styles.iconContainer}>
+            <View style={styles.iconButton}>
+              <BellIcon width={24} height={24} fill="#00c450" />
+            </View>
+            <View style={styles.iconButton}>
+              <SettingsIcon width={24} height={24} fill="#00c450" />
+            </View>
+          </View>
         </View>
 
-        <View style={styles.iconContainer}>
-          <View style={styles.iconButton}>
-            <BellIcon width={24} height={24} fill="#00c450" />
-          </View>
-          <View style={styles.iconButton}>
-            <SettingsIcon width={24} height={24} fill="#00c450" />
-          </View>
-        </View>
-      </View>
-
-      <View style={styles.welcomeContainer}>
-        <Text style={styles.welcome}>
-          Hola,{" "}
-          <Text style={styles.username}>
-            {loading ? "..." : data?.getUserProfile.fullName || "ELMER"}
+        {/* Welcome Message */}
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.welcome}>
+            Hola,{" "}
+            <Text style={styles.username}>
+              {loading ? "..." : data?.getUserProfile.fullName || "ELMER"}
+            </Text>
           </Text>
-        </Text>
+        </View>
+      </KeyboardAvoidingView>
+
+      {/* Contenido fuera del KeyboardAvoidingView negro */}
+      <View style={styles.contentContainer}>
+        {/* Componente de Últimos Movimientos */}
+        <RecentTransactions />
+        <UpcomingPayments />
+
+        {/* Aquí puedes añadir más componentes */}
       </View>
-    </KeyboardAvoidingView>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  scrollView: {
     flex: 1,
-    backgroundColor: "#000",
-    maxHeight: "30%",
+    backgroundColor: "#F5F5F5",
   },
-  centeredContainer: {
+  container: {
+    backgroundColor: "#000",
+    paddingBottom: 30,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  contentContainer: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+    paddingTop: 15,
+    paddingBottom: 30,
   },
   header: {
     flexDirection: "row",
@@ -98,10 +139,3 @@ const styles = StyleSheet.create({
     fontSize: 32,
   },
 });
-
-/* 
-TO DO: 
-- Ultimos movimientos
-- Proximos pagos
-- #QuipuTIP del dia.
-*/

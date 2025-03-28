@@ -1,16 +1,12 @@
-import React, { useState } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   StyleSheet,
   View,
   Text,
   ScrollView,
-  KeyboardAvoidingView,
-  Platform,
   TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
-  Alert,
-  ActivityIndicator,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -19,163 +15,215 @@ import Animated, {
   interpolateColor,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMutation, useQuery } from "@apollo/client";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+// Importaciones de componentes
 import AgregarSlides from "@/components/ui/AddSlider";
 import Carousel from "@/components/ui/Carousel";
-import { useMutation, useQuery } from "@apollo/client";
-import {
-  GET_TRANSACTIONS,
-  CREATE_TRANSACTION,
-} from "../graphql/transaction.graphql";
-import {
-  GetTransactionsData,
-  GetTransactionsVariables,
-} from "../interfaces/transaction.interface";
-import { getTransactionIcon } from "../contants/iconDictionary";
 import AmountInput from "@/components/ui/AmountInput";
 import DescriptionInput from "@/components/ui/DescriptionInput";
 import TransactionOptions from "@/components/ui/TransactionOptions";
 import CategorySelector from "@/components/ui/CategorySelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import DateSelector from "@/components/ui/DateSelector";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { ThemedView } from "@/components/ThemedView";
 import Loader from "@/components/ui/Loader";
 
-export default function AddTransaction() {
-  const [selectedOption, setSelectedOption] = useState<
-    "Gastos" | "Ingresos" | "Ahorros"
-  >("Gastos");
-  const [amount, setAmount] = useState("");
-  const [description, setDescription] = useState("");
-  const [category, setCategory] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("");
-  const [date, setDate] = useState(new Date().toISOString()); // Fecha actual por defecto
+// Importaciones de GraphQL
+import {
+  GET_TRANSACTIONS,
+  CREATE_TRANSACTION,
+} from "../graphql/transaction.graphql";
 
+// Importaciones de Interfaces
+import {
+  TransactionOption,
+  GetTransactionsData,
+  GetTransactionsVariables,
+  CreateTransactionInput,
+  TRANSACTION_MAPPING,
+  TRANSACTION_COLORS,
+} from "../interfaces/transaction.interface";
+
+// Utilidades
+import { getTransactionIcon } from "../contants/iconDictionary";
+import { useToast } from "@/app/providers/ToastProvider";
+
+export default function AddTransaction() {
+  const { showToast } = useToast();
   const colorValue = useSharedValue(0);
 
-  const colors = {
-    Gastos: "#EF674A",
-    Ingresos: "#65CE13",
-    Ahorros: "#00C1D5",
-  };
+  // Estado del formulario
+  const [formState, setFormState] = useState({
+    selectedOption: "Gastos" as TransactionOption,
+    amount: "",
+    description: "",
+    category: "",
+    paymentMethod: "Efectivo",
+    date: new Date().toISOString(), // Fecha de creación
+    dueDate: new Date().toISOString(), // Fecha de vencimiento (misma por defecto)
+    frequent: false,
+    isPaid: true // Estado de pago (true = pagado/recibido, false = pendiente)
+  });
 
-  const handleSliderChange = (value: "Gastos" | "Ingresos" | "Ahorros") => {
-    setSelectedOption(value);
-    const colorIndex = value === "Gastos" ? 0 : value === "Ingresos" ? 1 : 2;
-    colorValue.value = withTiming(colorIndex, { duration: 300 });
-  };
+  // Actualización del estado
+  const updateFormState = useCallback((updates: Partial<typeof formState>) => {
+    setFormState((prev) => ({ ...prev, ...updates }));
+  }, []);
 
+  // Cambio de slider
+  const handleSliderChange = useCallback(
+    (value: TransactionOption) => {
+      updateFormState({ selectedOption: value });
+      const colorIndex = {
+        Gastos: 0,
+        Ingresos: 1,
+        Ahorros: 2,
+      }[value];
+      colorValue.value = withTiming(colorIndex, { duration: 300 });
+    },
+    [updateFormState, colorValue]
+  );
+
+  // Estilo animado de color
   const animatedStyle = useAnimatedStyle(() => {
     const backgroundColor = interpolateColor(
       colorValue.value,
       [0, 1, 2],
-      [colors.Gastos, colors.Ingresos, colors.Ahorros]
+      Object.values(TRANSACTION_COLORS)
     );
     return { backgroundColor };
   });
 
+  // Consulta de transacciones
   const { data, loading, error } = useQuery<
     GetTransactionsData,
     GetTransactionsVariables
   >(GET_TRANSACTIONS, {
     variables: {
       user_id: 3,
-      type: selectedOption === "Gastos" ? "gasto" : "ingreso",
+      type: TRANSACTION_MAPPING[formState.selectedOption],
     },
   });
 
+  // Mutación de creación de transacción
   const [createTransaction, { loading: creating }] = useMutation(
     CREATE_TRANSACTION,
     {
-      refetchQueries: [{ query: GET_TRANSACTIONS }], // Refresca la lista de transacciones
+      refetchQueries: [{ query: GET_TRANSACTIONS }],
       onCompleted: () => {
-        Alert.alert("Éxito", "Transacción agregada correctamente");
         // Resetear formulario
-        setAmount("");
-        setDescription("");
-        setCategory("");
-        setPaymentMethod("");
-        setDate(new Date().toISOString());
+        updateFormState({
+          amount: "",
+          description: "",
+          category: "",
+          paymentMethod: "Efectivo",
+          date: new Date().toISOString(),
+          dueDate: new Date().toISOString(),
+          frequent: false,
+          isPaid: true,
+        });
+        showToast("success", "Éxito", "Transacción agregada correctamente");
       },
       onError: (error) => {
-        console.log("Error al crear transacción:", error);
-        Alert.alert("Error", error.message);
+        showToast("error", "Error", error.message);
       },
     }
   );
 
-  const handleCreateTransaction = async () => {
-    if (!amount || !category || !paymentMethod) {
-      Alert.alert("Error", "Por favor completa todos los campos requeridos.");
+  // Validación de formulario
+  const isFormValid = useMemo(
+    () => formState.amount && formState.category && formState.paymentMethod,
+    [formState]
+  );
+
+  // Creación de transacción
+  const handleCreateTransaction = useCallback(async () => {
+    if (!isFormValid) {
+      showToast(
+        "error",
+        "Error",
+        "Por favor completa todos los campos requeridos."
+      );
       return;
     }
 
     try {
-      // 📌 Obtener el ID del usuario autenticado desde AsyncStorage
       const storedUserId = await AsyncStorage.getItem("userId");
-
       if (!storedUserId) {
-        Alert.alert("Error", "No se pudo obtener el usuario autenticado.");
+        showToast("error", "Error", "No se pudo obtener el ID del usuario.");
         return;
       }
 
       const userId = parseInt(storedUserId, 10);
 
-      console.log("Enviando transacción...", {
-        userId, // ✅ Ahora usa el ID autenticado
-        title: category,
-        description,
-        amount: parseFloat(amount),
-        type: selectedOption === "Gastos" ? "gasto" : "ingreso",
-        category,
-      });
+      // Crear objeto para la transacción
+      const transactionInput: CreateTransactionInput = {
+        userId,
+        title: formState.category,
+        description: formState.description,
+        amount: parseFloat(formState.amount),
+        type: TRANSACTION_MAPPING[formState.selectedOption],
+        frequent: formState.frequent,
+        category: formState.category,
+        status: formState.isPaid ? "completed" : "pending",
+        // Para pagos pendientes, usar la fecha seleccionada como dueDate
+        // Para pagos completados, usar la fecha actual
+        dueDate: formState.isPaid ? new Date() : new Date(formState.date)
+      };
 
       await createTransaction({
-        variables: {
-          input: {
-            userId, // ✅ Enviar el userId del usuario autenticado
-            title: category,
-            description,
-            amount: parseFloat(amount),
-            type: selectedOption === "Gastos" ? "gasto" : "ingreso",
-            category,
-          },
-        },
+        variables: { input: transactionInput },
       });
-
-      Alert.alert("Éxito", "Transacción agregada correctamente");
-      setAmount("");
-      setDescription("");
-      setCategory("");
-      setPaymentMethod("");
-      setDate(new Date().toISOString());
     } catch (error: any) {
       console.error("Error al crear transacción:", error);
-      Alert.alert("Error", "Hubo un problema al agregar la transacción.");
+      showToast(
+        "error",
+        "Error",
+        "Hubo un problema al agregar la transacción."
+      );
     }
-  };
+  }, [formState, isFormValid, createTransaction, showToast]);
 
-  if (loading) {
+  // Transformación de transacciones
+  const transactions = useMemo(
+    () =>
+      data?.transactions.map((transaction) => ({
+        id: transaction.id.toString(),
+        title: transaction.title,
+        description: transaction.description,
+        type: transaction.type,
+        amount: `S/ ${transaction.amount.toFixed(2)}`,
+        icon: getTransactionIcon(transaction.category, transaction.type),
+        backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
+      })) || [],
+    [data]
+  );
+
+  // Manejo de cambio de estado de pago
+  const handleStatusChange = useCallback((isPaid: boolean) => {
+    updateFormState({ isPaid });
+    
+    // Si cambia a pendiente, asegurarse de que haya una fecha de vencimiento seleccionada
+    if (!isPaid && formState.date === new Date().toISOString()) {
+      // Establecer fecha de vencimiento predeterminada (por ejemplo, 7 días después)
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+      updateFormState({ dueDate: defaultDueDate.toISOString() });
+    }
+  }, [formState.date, updateFormState]);
+
+  // Renderizado de estado de carga
+  if (loading)
     return <Loader visible={true} fullScreen text="Cargando elementos..." />;
-  }
 
-  if (error) {
+  // Renderizado de error
+  if (error)
     return (
       <SafeAreaView style={styles.container}>
         <Text>Error al cargar los datos: {error.message}</Text>
       </SafeAreaView>
     );
-  }
-
-  const transactions = data?.transactions.map((transaction) => ({
-    id: transaction.id.toString(),
-    title: transaction.title,
-    description: transaction.description,
-    type: transaction.type,
-    amount: `S/ ${transaction.amount.toFixed(2)}`,
-    icon: getTransactionIcon(transaction.category, transaction.type),
-    backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
-  }));
 
   return (
     <SafeAreaView style={styles.container}>
@@ -188,51 +236,81 @@ export default function AddTransaction() {
             <Text style={styles.title}>Agregar</Text>
 
             <View style={styles.sliderContainer}>
-              <AgregarSlides colors={colors} onChange={handleSliderChange} />
+              <AgregarSlides
+                colors={TRANSACTION_COLORS}
+                onChange={handleSliderChange}
+              />
             </View>
             <View style={styles.containerCarousel}>
               <Carousel
-                title={`${selectedOption || "Gastos"} Frecuentes`}
-                items={transactions || []}
+                title={`${formState.selectedOption} Frecuentes`}
+                items={transactions}
               />
             </View>
           </Animated.View>
 
           <View style={styles.amountContainer}>
-            <AmountInput value={amount} onChangeText={setAmount} />
+            <AmountInput
+              value={formState.amount}
+              onChangeText={(value) => updateFormState({ amount: value })}
+            />
           </View>
 
           <View style={styles.descriptionContainer}>
             <DescriptionInput
-              value={description}
-              onChangeText={setDescription}
+              value={formState.description}
+              onChangeText={(value) => updateFormState({ description: value })}
             />
           </View>
 
           <TransactionOptions
-            type={selectedOption === "Gastos" ? "gasto" : "ingreso"}
+            type={TRANSACTION_MAPPING[formState.selectedOption]}
+            onSelectFrequent={(frequent) => updateFormState({ frequent })}
+            onSelectStatus={handleStatusChange}
+            initialFrequent={formState.frequent}
+            initialStatus={formState.isPaid}
           />
 
           <View style={styles.categoryContainer}>
             <CategorySelector
-              type={selectedOption === "Gastos" ? "gasto" : "ingreso"}
-              onSelect={setCategory}
+              type={TRANSACTION_MAPPING[formState.selectedOption]}
+              onSelect={(category) => updateFormState({ category })}
             />
           </View>
 
           <View style={styles.paymentContainer}>
-            <PaymentMethodSelector onSelect={setPaymentMethod} />
+            <PaymentMethodSelector
+              type={TRANSACTION_MAPPING[formState.selectedOption]}
+              onSelect={(paymentMethod) => updateFormState({ paymentMethod })}
+            />
           </View>
 
+          {/* Selector de fecha - ahora con título condicional según estado */}
           <View style={styles.dateSelectorContainer}>
-            <DateSelector selectedDate={date} onSelectDate={setDate} />
+            <DateSelector
+              type={TRANSACTION_MAPPING[formState.selectedOption]}
+              selectedDate={formState.date}
+              onSelectDate={(date) => {
+                updateFormState({ 
+                  date,
+                  // Si está pendiente, también actualizar la fecha de vencimiento
+                  ...(formState.isPaid ? {} : { dueDate: date })
+                });
+              }}
+              title={formState.isPaid ? "Fecha" : "Fecha de vencimiento"}
+            />
           </View>
 
           <View style={styles.addButtonContainer}>
             <TouchableOpacity
-              style={styles.addButton}
+              style={[
+                styles.addButton,
+                {
+                  backgroundColor: TRANSACTION_COLORS[formState.selectedOption],
+                },
+              ]}
               onPress={handleCreateTransaction}
-              disabled={creating}
+              disabled={creating || !isFormValid}
             >
               <View style={styles.addButtonContent}>
                 <View style={styles.addIconContainer}>
@@ -312,7 +390,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   addButton: {
-    backgroundColor: "#E86F51",
     width: "80%",
     height: 60,
     borderRadius: 40,
@@ -350,25 +427,3 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
-
-/* 
-  TODO: 
-  
-  Se debe añadir el "Frecuente en la Base de Datos", para que se refleje en el carousel superior.
-
-  Ajustar el color para la vista de Ingresos y ahorros.
-
-  Vistas y funciones para el MVP:
-  
-  Board:
-    - Resumen
-      - Situacion financiera
-      - Circulo (en veremos)
-
-  Gastos:
-    - Tabla general
-    - Proximos pagos (pendientes)
-    - Gastos x categoria
-    - Mapa de calor (Cuando gastas mas?)
-  
-  */
