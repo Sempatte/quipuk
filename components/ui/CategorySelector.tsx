@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 // Definir los tipos de propiedades
 interface CategorySelectorProps {
-  type: "gasto" | "ingreso";
+  type: "gasto" | "ingreso" | "ahorro";
   onSelect: (category: string) => void;
 }
 
@@ -19,6 +19,11 @@ const categoryData = {
     subCategories: ["Empleo", "Trabajo Independiente", "Director", "Alquiler", "Airbnb", "Bolsa", "Intereses", "Otros Ingresos"],
     addColor: "#65CE13",
   },
+  ahorro: {
+    mainCategories: [],
+    subCategories: ["Cuenta de Ahorro", "Fondo de Inversión", "Cuenta de Retiro", "Cuenta de Inversión", "Cuenta de Emergencia"],
+    addColor: "#2196F3",
+  }
 };
 
 // 📌 Función para truncar texto si es demasiado largo

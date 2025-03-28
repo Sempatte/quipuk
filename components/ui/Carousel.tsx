@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, memo } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ interface CarouselItem {
   title?: string;
   description?: string;
   amount?: string;
-  icon?: any;
+  icon?: React.ReactNode;
   backgroundColor?: string;
   isAddButton?: boolean;
 }
@@ -23,18 +23,104 @@ interface CarouselProps {
   title: string;
   items: CarouselItem[];
   onAddPress?: () => void;
+  emptyMessage?: string;
+  hideIfEmpty?: boolean; // Nueva prop para controlar si se oculta completamente cuando está vacío
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
-const Carousel: React.FC<CarouselProps> = ({ title, items, onAddPress }) => {
-  const [carouselItems, setCarouselItems] = useState<CarouselItem[]>([]);
+// Componente de tarjeta del carrusel (memoizado para mejorar rendimiento)
+const CarouselCard = memo(
+  ({ item, onAddPress }: { item: CarouselItem; onAddPress?: () => void }) => {
+    if (item.isAddButton) {
+      return (
+        <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
+          <View style={styles.addButtonContent}>
+            <View style={styles.addIconContainer}>
+              <Icon name="add" size={24} color="#FFFFFF" />
+            </View>
+            <Text style={styles.addButtonText}>Agregar</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    }
 
-  useEffect(() => {
-    // 🔥 Cada vez que los items cambian, actualizamos el estado y re-renderizamos
-    setCarouselItems([...items, { id: "add_button", isAddButton: true }]);
-  }, [items]);
+    return (
+      <View style={styles.card}>
+        <View style={styles.iconAndTextContainer}>
+          <View
+            style={[
+              styles.iconContainer,
+              { backgroundColor: item.backgroundColor },
+            ]}
+          >
+            {item.icon}
+          </View>
+          <View style={styles.textContainer}>
+            <Text
+              style={styles.cardTitle}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.title || ""}
+            </Text>
+            <Text
+              style={styles.cardDescription}
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {item.description || ""}
+            </Text>
+          </View>
+        </View>
+        <Text style={styles.cardAmount}>{item.amount}</Text>
+      </View>
+    );
+  }
+);
 
+const Carousel: React.FC<CarouselProps> = ({
+  title,
+  items,
+  onAddPress,
+  emptyMessage = "No hay elementos disponibles",
+  hideIfEmpty = false, // Valor predeterminado: false (mostrar mensaje vacío)
+}) => {
+  // Si no hay elementos y se debe ocultar, no renderizar nada
+  if (items.length === 0 && hideIfEmpty) {
+    return null;
+  }
+
+  // Computar los elementos del carrusel (con botón agregar al final)
+  const carouselItems =
+    items.length > 0
+      ? [...items, { id: "add_button", isAddButton: true }]
+      : [{ id: "add_button", isAddButton: true }];
+
+  // Renderizar mensaje vacío si no hay elementos (y no está configurado para ocultarse)
+  if (items.length === 0) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.carouselTitle}>{title}</Text>
+        <View style={styles.emptyContainer}>
+          <Text style={styles.emptyText}>{emptyMessage}</Text>
+          <TouchableOpacity
+            style={[styles.addButton, styles.smallAddButton]}
+            onPress={onAddPress}
+          >
+            <View style={styles.addButtonContent}>
+              <View style={styles.addIconContainer}>
+                <Icon name="add" size={20} color="#FFFFFF" />
+              </View>
+              <Text style={styles.addButtonText}>Agregar</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  // Renderizar carrusel
   return (
     <View style={styles.container}>
       <Text style={styles.carouselTitle}>{title}</Text>
@@ -44,38 +130,11 @@ const Carousel: React.FC<CarouselProps> = ({ title, items, onAddPress }) => {
         horizontal
         keyExtractor={(item) => item.id}
         showsHorizontalScrollIndicator={false}
-        extraData={carouselItems} // 🔥 Asegura que FlatList detecte los cambios
-        initialNumToRender={carouselItems.length} 
-        removeClippedSubviews={false} // 🔥 Evita que el FlatList oculte el carrusel al cambiar de categoría
-        renderItem={({ item }) =>
-          item.isAddButton ? (
-            <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
-              <View style={styles.addButtonContent}>
-                <View style={styles.addIconContainer}>
-                  <Icon name="add" size={24} color="#FFFFFF" />
-                </View>
-                <Text style={styles.addButtonText}>Agregar</Text>
-              </View>
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.card}>
-              <View style={styles.iconAndTextContainer}>
-                <View style={[styles.iconContainer, { backgroundColor: item.backgroundColor }]}>
-                  {item.icon ? item.icon : null}
-                </View>
-                <View style={styles.textContainer}>
-                  <Text style={styles.cardTitle} numberOfLines={1} ellipsizeMode="tail">
-                    {item.title || ""}
-                  </Text>
-                  <Text style={styles.cardDescription} numberOfLines={1} ellipsizeMode="tail">
-                    {item.description || ""}
-                  </Text>
-                </View>
-              </View>
-              <Text style={styles.cardAmount}>{item.amount}</Text>
-            </View>
-          )
-        }
+        initialNumToRender={carouselItems.length}
+        removeClippedSubviews={false}
+        renderItem={({ item }) => (
+          <CarouselCard item={item} onAddPress={onAddPress} />
+        )}
       />
     </View>
   );
@@ -83,7 +142,7 @@ const Carousel: React.FC<CarouselProps> = ({ title, items, onAddPress }) => {
 
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 5,
+    marginVertical: 10,
     paddingHorizontal: 0,
   },
   carouselTitle: {
@@ -91,6 +150,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFF",
     marginBottom: 10,
+    fontFamily: "Outfit_600SemiBold",
   },
   card: {
     width: SCREEN_WIDTH * 0.45,
@@ -139,6 +199,7 @@ const styles = StyleSheet.create({
     fontSize: 14.5,
     fontWeight: "bold",
     color: "#000",
+    fontFamily: "Outfit_500Medium",
   },
   addButton: {
     width: SCREEN_WIDTH * 0.45,
@@ -153,6 +214,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
+  },
+  smallAddButton: {
+    width: SCREEN_WIDTH * 0.4,
+    height: 70,
+    marginTop: 10,
   },
   addButtonContent: {
     flexDirection: "row",
@@ -175,6 +241,17 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     alignSelf: "center",
   },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 15,
+  },
+  emptyText: {
+    color: "#FFF",
+    fontFamily: "Outfit_400Regular",
+    fontSize: 14,
+    marginBottom: 15,
+  },
 });
 
-export default Carousel;
+export default memo(Carousel);

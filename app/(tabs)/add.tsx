@@ -33,6 +33,7 @@ import Loader from "@/components/ui/Loader";
 import {
   GET_TRANSACTIONS,
   CREATE_TRANSACTION,
+  GET_FREQUENT_TRANSACTIONS,
 } from "../graphql/transaction.graphql";
 
 // Importaciones de Interfaces
@@ -43,6 +44,7 @@ import {
   CreateTransactionInput,
   TRANSACTION_MAPPING,
   TRANSACTION_COLORS,
+  FrequentTransactionsData,
 } from "../interfaces/transaction.interface";
 
 // Utilidades
@@ -95,22 +97,34 @@ export default function AddTransaction() {
     return { backgroundColor };
   });
 
-  // Consulta de transacciones
-  const { data, loading, error } = useQuery<
-    GetTransactionsData,
-    GetTransactionsVariables
-  >(GET_TRANSACTIONS, {
-    variables: {
-      user_id: 3,
-      type: TRANSACTION_MAPPING[formState.selectedOption],
-    },
-  });
+  // Consulta para transacciones frecuentes
+  const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
+    GET_FREQUENT_TRANSACTIONS,
+    {
+      variables: {
+        type: TRANSACTION_MAPPING[formState.selectedOption],
+        frequent: true
+      },
+      fetchPolicy: 'network-only', // Forzar que siempre busque del servidor
+    }
+  );
 
   // Mutación de creación de transacción
   const [createTransaction, { loading: creating }] = useMutation(
     CREATE_TRANSACTION,
     {
-      refetchQueries: [{ query: GET_TRANSACTIONS }],
+      refetchQueries: [
+        { 
+          query: GET_TRANSACTIONS 
+        },
+        { 
+          query: GET_FREQUENT_TRANSACTIONS,
+          variables: {
+            type: TRANSACTION_MAPPING[formState.selectedOption],
+            frequent: true
+          }
+        }
+      ],
       onCompleted: () => {
         // Resetear formulario
         updateFormState({
@@ -136,6 +150,21 @@ export default function AddTransaction() {
     () => formState.amount && formState.category && formState.paymentMethod,
     [formState]
   );
+
+  // Transformación de transacciones frecuentes
+  const frequentTransactions = useMemo(() => {
+    if (!frequentData?.frequentTransactions) return [];
+    
+    return frequentData.frequentTransactions.map((transaction) => ({
+      id: transaction.id.toString(),
+      title: transaction.title,
+      description: transaction.description || '',
+      type: transaction.type,
+      amount: `S/ ${transaction.amount.toFixed(2)}`,
+      icon: getTransactionIcon(transaction.category, transaction.type),
+      backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
+    }));
+  }, [frequentData]);
 
   // Creación de transacción
   const handleCreateTransaction = useCallback(async () => {
@@ -185,21 +214,6 @@ export default function AddTransaction() {
     }
   }, [formState, isFormValid, createTransaction, showToast]);
 
-  // Transformación de transacciones
-  const transactions = useMemo(
-    () =>
-      data?.transactions.map((transaction) => ({
-        id: transaction.id.toString(),
-        title: transaction.title,
-        description: transaction.description,
-        type: transaction.type,
-        amount: `S/ ${transaction.amount.toFixed(2)}`,
-        icon: getTransactionIcon(transaction.category, transaction.type),
-        backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
-      })) || [],
-    [data]
-  );
-
   // Manejo de cambio de estado de pago
   const handleStatusChange = useCallback((isPaid: boolean) => {
     updateFormState({ isPaid });
@@ -213,17 +227,16 @@ export default function AddTransaction() {
     }
   }, [formState.date, updateFormState]);
 
-  // Renderizado de estado de carga
-  if (loading)
-    return <Loader visible={true} fullScreen text="Cargando elementos..." />;
-
-  // Renderizado de error
-  if (error)
-    return (
-      <SafeAreaView style={styles.container}>
-        <Text>Error al cargar los datos: {error.message}</Text>
-      </SafeAreaView>
-    );
+  // Manejar selección de transacción frecuente
+  const handleSelectFrequent = useCallback((item: any) => {
+    // Autollenar el formulario con los datos de la transacción seleccionada
+    updateFormState({
+      amount: item.amount.replace('S/ ', ''),
+      description: item.description || '',
+      category: item.title,
+      frequent: true,
+    });
+  }, [updateFormState]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -241,10 +254,15 @@ export default function AddTransaction() {
                 onChange={handleSliderChange}
               />
             </View>
+            
+            {/* Carrusel que ahora se oculta cuando está vacío */}
             <View style={styles.containerCarousel}>
               <Carousel
                 title={`${formState.selectedOption} Frecuentes`}
-                items={transactions}
+                items={frequentTransactions}
+                onAddPress={handleCreateTransaction}
+                emptyMessage={`No hay ${formState.selectedOption.toLowerCase()} frecuentes`}
+                hideIfEmpty={true} // Clave para ocultar completamente si no hay elementos
               />
             </View>
           </Animated.View>

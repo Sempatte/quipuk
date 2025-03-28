@@ -1,54 +1,68 @@
-// transaction.interface.ts
-export type TransactionType = "gasto" | "ingreso";
+// Asumiendo que este archivo ya existe, aquí se muestra una ampliación
+// Agregando la interfaz para las transacciones frecuentes
 
 export type TransactionOption = "Gastos" | "Ingresos" | "Ahorros";
+export type TransactionType = "gasto" | "ingreso" | "ahorro";
+export type TransactionStatus = "pending" | "completed";
 
 export const TRANSACTION_MAPPING: Record<TransactionOption, TransactionType> = {
-  "Gastos": "gasto",
-  "Ingresos": "ingreso",
-  "Ahorros": "ingreso" // Considerar lógica específica si es necesario
+  Gastos: "gasto",
+  Ingresos: "ingreso",
+  Ahorros: "ahorro",
 };
 
 export const TRANSACTION_COLORS: Record<TransactionOption, string> = {
-  "Gastos": "#EF674A",
-  "Ingresos": "#65CE13", 
-  "Ahorros": "#00C1D5"
+  Gastos: "#FF5252",
+  Ingresos: "#00DC5A",
+  Ahorros: "#2196F3",
 };
 
 export interface Transaction {
-    id: number;
-    user_id: number;
-    title: string;
-    description: string;
-    amount: number;
-    type: TransactionType;
-    frequent: boolean;
-    status?: string;
-    paymentMethod?: string;
-    category: string;
-    dueDate: Date;
-    createdAt: string;
+  id: number;
+  userId: number;
+  title: string;
+  description: string;
+  amount: number;
+  type: TransactionType;
+  frequent: boolean;
+  category: string;
+  status?: TransactionStatus;
+  dueDate?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface GetTransactionsData {
-    transactions: Transaction[];
+  transactions: Transaction[];
 }
 
 export interface GetTransactionsVariables {
-    user_id?: number;
-    type?: TransactionType;
-    category?: string;
+  user_id?: number;
+  type?: TransactionType;
 }
 
-// Input para crear transacción
+// Interfaz para las transacciones frecuentes
+export interface FrequentTransactionsData {
+  frequentTransactions: Transaction[];
+}
+
+export interface FrequentTransactionsVariables {
+  type: TransactionType;
+  frequent: boolean;
+}
+
 export interface CreateTransactionInput {
-    userId: number;
-    title: string;
-    description: string;
-    amount: number;
-    type: TransactionType;
-    frequent: boolean;
-    status: string;
-    category: string;
-    dueDate: Date;
+  userId: number;
+  title: string;
+  description: string;
+  amount: number;
+  type: TransactionType;
+  frequent: boolean;
+  category: string;
+  status?: TransactionStatus;
+  dueDate?: Date;
+}
+
+export interface CreateTransactionResponse {
+  createTransaction: Transaction;
 }

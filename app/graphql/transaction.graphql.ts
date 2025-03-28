@@ -17,6 +17,7 @@ export const GET_TRANSACTIONS = gql`
     }
   }
 `;
+
 export const CREATE_TRANSACTION = gql`
   mutation CreateTransaction($input: CreateTransactionDto!) {
     createTransaction(input: $input) {
@@ -62,6 +63,52 @@ export const GET_PENDING_TRANSACTIONS = gql`
       status
       dueDate
       createdAt
+    }
+  }
+`;
+
+// Consulta GraphQL para obtener transacciones frecuentes
+export const GET_FREQUENT_TRANSACTIONS = gql`
+  query FrequentTransactions($type: String!, $frequent: Boolean!) {
+    frequentTransactions(type: $type, frequent: $frequent) {
+      id
+      title
+      description
+      amount
+      type
+      frequent
+      category
+      status
+      dueDate
+      createdAt
+    }
+  }
+`;
+
+// Consulta para obtener transacciones por tipo
+export const GET_TRANSACTIONS_BY_TYPE = gql`
+  query TransactionsByType($type: String!) {
+    getTransactionsByType(type: $type) {
+      id
+      title
+      description
+      amount
+      type
+      frequent
+      category
+      status
+      dueDate
+      createdAt
+    }
+  }
+`;
+
+// Mutation para actualizar el estado de una transacción
+export const UPDATE_TRANSACTION_STATUS = gql`
+  mutation UpdateTransactionStatus($id: Float!, $status: String!) {
+    updateTransactionStatus(id: $id, status: $status) {
+      id
+      status
     }
   }
 `;
