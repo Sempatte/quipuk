@@ -95,7 +95,7 @@ const styles = StyleSheet.create({
     color: "#E86F51",
   },
   income: {
-    color: "#65CE13",
+    color: "#000",
   },
 });
 

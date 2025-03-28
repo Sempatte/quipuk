@@ -1,8 +1,9 @@
 import { Tabs, useRouter } from "expo-router";
 import React, { useEffect } from "react";
+import { StatusBar, Platform } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { TabBar } from "@/components/TabBar";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -19,42 +20,44 @@ export default function TabLayout() {
   }, []);
 
   return (
-    <Tabs tabBar={(props) => <TabBar {...props} />}>
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Inicio",
-          headerShown: false, // Oculta el encabezado en esta pantalla
-        }}
-      />
-      <Tabs.Screen
-        name="movements"
-        options={{
-          title: "Movimientos",
-          headerShown: false, // Oculta el encabezado en esta pantalla
-        }}
-      />
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: "Agregar",
-          headerShown: false, // Oculta el encabezado en esta pantalla
-        }}
-      />
-      <Tabs.Screen
-        name="graphics"
-        options={{
-          title: "Gráficos",
-          headerShown: false, // Oculta el encabezado en esta pantalla
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: "Perfil",
-          headerShown: false, // Oculta el encabezado en esta pantalla
-        }}
-      />
-    </Tabs>
+    <>
+      <Tabs tabBar={(props) => <TabBar {...props} />}>
+        <Tabs.Screen
+          name="index"
+          options={{
+            title: "Inicio",
+            headerShown: false, // Oculta el encabezado en esta pantalla
+          }}
+        />
+        <Tabs.Screen
+          name="movements"
+          options={{
+            title: "Movimientos",
+            headerShown: false, // Oculta el encabezado en esta pantalla
+          }}
+        />
+        <Tabs.Screen
+          name="add"
+          options={{
+            title: "Agregar",
+            headerShown: false, // Oculta el encabezado en esta pantalla
+          }}
+        />
+        <Tabs.Screen
+          name="graphics"
+          options={{
+            title: "Gráficos",
+            headerShown: false, // Oculta el encabezado en esta pantalla
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          options={{
+            title: "Perfil",
+            headerShown: false, // Oculta el encabezado en esta pantalla
+          }}
+        />
+      </Tabs>
+    </>
   );
 }

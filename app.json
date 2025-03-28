@@ -12,6 +12,11 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.anonymous.quipuk-app"
     },
+    "androidStatusBar": {
+      "backgroundColor": "#000000",
+      "barStyle": "light-content",
+      "translucent": false
+    },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/Logo.png",

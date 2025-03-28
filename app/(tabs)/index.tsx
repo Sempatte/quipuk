@@ -1,22 +1,31 @@
 import React from "react";
-import { View, Text, StyleSheet, StatusBar, SafeAreaView, KeyboardAvoidingView } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  KeyboardAvoidingView,
+  ActivityIndicator,
+} from "react-native";
 import { useQuery } from "@apollo/client";
 import BellIcon from "@/assets/images/icons/mdi_bell.svg";
 import SettingsIcon from "@/assets/images/icons/settings.svg";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
 import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
+import { ThemedView } from "@/components/ThemedView";
+import Loader from "@/components/ui/Loader";
 
 export default function HomeScreen() {
   const { data, loading } = useQuery(GET_USER_PROFILE);
-  
+  if (loading) {
+    return <Loader visible={true} fullScreen text="Cargando datos del usuario..." />;
+  }
   return (
     <KeyboardAvoidingView style={styles.container}>
-      
       <View style={styles.header}>
         <View style={styles.logoContainer}>
           <QuipukLogo width={140} height={60} />
         </View>
-        
+
         <View style={styles.iconContainer}>
           <View style={styles.iconButton}>
             <BellIcon width={24} height={24} fill="#00c450" />
@@ -29,7 +38,10 @@ export default function HomeScreen() {
 
       <View style={styles.welcomeContainer}>
         <Text style={styles.welcome}>
-          Hola, <Text style={styles.username}>{loading ? "..." : data?.getUserProfile.fullName || "ELMER"}</Text>
+          Hola,{" "}
+          <Text style={styles.username}>
+            {loading ? "..." : data?.getUserProfile.fullName || "ELMER"}
+          </Text>
         </Text>
       </View>
     </KeyboardAvoidingView>
@@ -41,6 +53,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#000",
     maxHeight: "30%",
+  },
+  centeredContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   header: {
     flexDirection: "row",
@@ -68,7 +85,7 @@ const styles = StyleSheet.create({
   },
   welcomeContainer: {
     paddingHorizontal: 20,
-    marginTop: 20
+    marginTop: 20,
   },
   welcome: {
     fontSize: 32,
@@ -76,8 +93,15 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
   username: {
-    color: "#00c450",
+    color: "#00DC5A",
     fontFamily: "Outfit_700Bold",
     fontSize: 32,
   },
 });
+
+/* 
+TO DO: 
+- Ultimos movimientos
+- Proximos pagos
+- #QuipuTIP del dia.
+*/

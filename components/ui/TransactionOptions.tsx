@@ -2,7 +2,16 @@ import React, { useState } from "react";
 import { View, Text, StyleSheet, Switch, TouchableOpacity } from "react-native";
 import HearthIcon from "@/assets/images/icons/hearth.svg"; // Importar el icono SVG
 
-const TransactionOptions = () => {
+interface TransactionProps {
+  type: "gasto" | "ingreso";
+}
+
+/**
+ * Transaction Props
+ * @param type
+ */
+
+const TransactionOptions: React.FC<TransactionProps> = ({ type }) => {
   const [isFrequent, setIsFrequent] = useState(false);
   const [isPaid, setIsPaid] = useState(true);
 
@@ -13,8 +22,14 @@ const TransactionOptions = () => {
         style={[styles.optionContainer, isFrequent && styles.optionActive]}
         onPress={() => setIsFrequent(!isFrequent)}
       >
-        <HearthIcon width={24} height={24} fill={isFrequent ? "#EF674A" : "#BDBDBD"} />
-        <Text style={[styles.optionText, isFrequent && styles.optionTextActive]}>
+        <HearthIcon
+          width={24}
+          height={24}
+          fill={isFrequent ? "#EF674A" : "#BDBDBD"}
+        />
+        <Text
+          style={[styles.optionText, isFrequent && styles.optionTextActive]}
+        >
           Frecuente
         </Text>
       </TouchableOpacity>
@@ -27,7 +42,10 @@ const TransactionOptions = () => {
           trackColor={{ false: "#BDBDBD", true: "#BDBDBD" }}
           thumbColor={isPaid ? "#EF674A" : "#FFF"}
         />
-        <Text style={[styles.optionText, isPaid && styles.optionTextActive]}>{isPaid ? "Pagado" : "Pendiente"}</Text>
+        {}{" "}
+        <Text style={[styles.optionText, isPaid && styles.optionTextActive]}>
+          {isPaid ? (type === "gasto" ? "Pagado" : "Recibido") : "Pendiente"}
+        </Text>
       </View>
     </View>
   );
@@ -64,4 +82,3 @@ const styles = StyleSheet.create({
 });
 
 export default TransactionOptions;
-    

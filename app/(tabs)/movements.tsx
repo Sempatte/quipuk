@@ -23,6 +23,7 @@ import BalanceHeader from "@/components/ui/BalancerHeader";
 import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
 import { RootStackParamList } from "../interfaces/navigation";
 import { Transaction } from "../interfaces/transaction.interface";
+import Loader from "@/components/ui/Loader";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -175,9 +176,7 @@ const Movements = () => {
 
   if (loading) {
     return (
-      <ThemedView style={styles.centeredContainer}>
-        <ActivityIndicator size="large" />
-      </ThemedView>
+      <Loader visible={true} fullScreen text="Cargando movimientos..." />
     );
   }
 
@@ -385,7 +384,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   hasTransactionsDay: {
-    borderColor: "#00DC5A",
+    borderColor: "#000",
     borderWidth: 1,
   },
   noTransactionsDay: {
@@ -463,3 +462,13 @@ const styles = StyleSheet.create({
 });
 
 export default Movements;
+
+/* 
+  TO DO: Scroll en los botones de dias
+
+  FORMATO DEL MOVIMIENTO
+
+                   DESCRIPCION 
+  ICONO_CATEGORIA  HORA   FECHA        +- S/MONTO
+                   METODO DE PAGO
+*/

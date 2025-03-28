@@ -39,6 +39,7 @@ import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import DateSelector from "@/components/ui/DateSelector";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ThemedView } from "@/components/ThemedView";
+import Loader from "@/components/ui/Loader";
 
 export default function AddTransaction() {
   const [selectedOption, setSelectedOption] = useState<
@@ -155,11 +156,7 @@ export default function AddTransaction() {
   };
 
   if (loading) {
-    return (
-      <ThemedView style={styles.centeredContainer}>
-        <ActivityIndicator size="large" />
-      </ThemedView>
-    );
+    return <Loader visible={true} fullScreen text="Cargando elementos..." />;
   }
 
   if (error) {
@@ -212,7 +209,9 @@ export default function AddTransaction() {
             />
           </View>
 
-          <TransactionOptions />
+          <TransactionOptions
+            type={selectedOption === "Gastos" ? "gasto" : "ingreso"}
+          />
 
           <View style={styles.categoryContainer}>
             <CategorySelector
@@ -353,12 +352,23 @@ const styles = StyleSheet.create({
 });
 
 /* 
-  TODO: Cuando el movimiento se clasifique como "Pendiente", este no ira a las transacciones, sino a pagos pendientes en QuipukBoard
-
-  En Ingresos: el boton no es pagado, sino recibido.
-
+  TODO: 
+  
   Se debe añadir el "Frecuente en la Base de Datos", para que se refleje en el carousel superior.
 
-  Termina la vista de movimientos
+  Ajustar el color para la vista de Ingresos y ahorros.
+
+  Vistas y funciones para el MVP:
+  
+  Board:
+    - Resumen
+      - Situacion financiera
+      - Circulo (en veremos)
+
+  Gastos:
+    - Tabla general
+    - Proximos pagos (pendientes)
+    - Gastos x categoria
+    - Mapa de calor (Cuando gastas mas?)
   
   */
