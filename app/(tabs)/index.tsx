@@ -18,6 +18,7 @@ import { RootStackParamList } from "../interfaces/navigation";
 import Loader from "@/components/ui/Loader";
 import RecentTransactions from "@/components/ui/RecentTransactions"; // Importamos el nuevo componente
 import UpcomingPayments from "@/components/ui/UpcomingPayments";
+import QuipuTip from "@/components/ui/QuipuTip";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -77,7 +78,7 @@ export default function HomeScreen() {
         {/* Componente de Últimos Movimientos */}
         <RecentTransactions />
         <UpcomingPayments />
-
+        <QuipuTip/>
         {/* Aquí puedes añadir más componentes */}
       </View>
     </ScrollView>

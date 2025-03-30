@@ -27,7 +27,6 @@ import TransactionOptions from "@/components/ui/TransactionOptions";
 import CategorySelector from "@/components/ui/CategorySelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import DateSelector from "@/components/ui/DateSelector";
-import Loader from "@/components/ui/Loader";
 
 // Importaciones de GraphQL
 import {
@@ -39,8 +38,6 @@ import {
 // Importaciones de Interfaces
 import {
   TransactionOption,
-  GetTransactionsData,
-  GetTransactionsVariables,
   CreateTransactionInput,
   TRANSACTION_MAPPING,
   TRANSACTION_COLORS,

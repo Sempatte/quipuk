@@ -5,7 +5,6 @@ import {
   StyleSheet, 
   TouchableOpacity, 
   FlatList,
-  ActivityIndicator,
   Dimensions,
   ListRenderItemInfo,
   NativeSyntheticEvent,
@@ -17,6 +16,7 @@ import { es } from 'date-fns/locale';
 import { GET_PENDING_TRANSACTIONS } from '@/app/graphql/transaction.graphql';
 import { getTransactionIcon } from '@/app/contants/iconDictionary';
 import { useFocusEffect } from '@react-navigation/native';
+import UpcomingPaymentsSkeleton from './UpcomingPaymentsSkeleton';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width - 80;
@@ -212,14 +212,6 @@ const UpcomingPayments = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="small" color="#00C1D5" />
-      </View>
-    );
-  }
-
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -229,7 +221,7 @@ const UpcomingPayments = () => {
     );
   }
 
-  if (!data?.getTransactions || data.getTransactions.length === 0) {
+  if (!data?.getTransactions && !loading) {
     return (
       <View style={styles.container}>
         <Text style={styles.sectionTitle}>Próximos pagos</Text>
@@ -244,28 +236,38 @@ const UpcomingPayments = () => {
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Próximos pagos</Text>
       
-      <FlatList
-        ref={flatListRef}
-        data={data.getTransactions}
-        renderItem={renderPayment}
-        keyExtractor={(item) => item.id.toString()}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        snapToInterval={ITEM_WIDTH + ITEM_SPACING}
-        snapToAlignment="center"
-        decelerationRate="fast"
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={() => <View style={{ width: ITEM_SPACING }} />}
-        getItemLayout={(data, index) => ({
-          length: ITEM_WIDTH + ITEM_SPACING,
-          offset: (ITEM_WIDTH + ITEM_SPACING) * index,
-          index,
-        })}
-      />
-      
-      {renderDots()}
+      {loading ? (
+        // Mostrar skeleton mientras se cargan los datos
+        <View style={styles.skeletonContainer}>
+          <UpcomingPaymentsSkeleton count={1} />
+        </View>
+      ) : (
+        // Mostrar los datos reales cuando estén disponibles
+        <>
+          <FlatList
+            ref={flatListRef}
+            data={data?.getTransactions || []}
+            renderItem={renderPayment}
+            keyExtractor={(item) => item.id.toString()}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            snapToInterval={ITEM_WIDTH + ITEM_SPACING}
+            snapToAlignment="center"
+            decelerationRate="fast"
+            contentContainerStyle={styles.listContent}
+            ItemSeparatorComponent={() => <View style={{ width: ITEM_SPACING }} />}
+            getItemLayout={(data, index) => ({
+              length: ITEM_WIDTH + ITEM_SPACING,
+              offset: (ITEM_WIDTH + ITEM_SPACING) * index,
+              index,
+            })}
+          />
+          
+          {renderDots()}
+        </>
+      )}
     </View>
   );
 };
@@ -398,9 +400,8 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 15,
   },
-  loadingContainer: {
-    padding: 20,
-    alignItems: 'center',
+  skeletonContainer: {
+    paddingVertical: 5,
   },
   errorContainer: {
     padding: 20,

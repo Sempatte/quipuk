@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
-  ActivityIndicator,
   Animated,
   Easing,
 } from "react-native";
@@ -22,6 +21,7 @@ import EyeIcon from "@/assets/images/icons/eye.svg";
 import EyeOffIcon from "@/assets/images/icons/eye-off.svg";
 import ChevronDownIcon from "@/assets/images/icons/chevron-down.svg";
 import ChevronUpIcon from "@/assets/images/icons/chevron-up.svg";
+import TransactionSkeleton from "@/components/ui/TransactionSkeleton";
 
 type MovementsNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -163,13 +163,7 @@ const RecentTransactions = () => {
   // Renderizar el contenido interno
   const renderContent = () => {
     if (loading) {
-      return (
-        <ActivityIndicator
-          size="small"
-          color="#00DC5A"
-          style={styles.loader}
-        />
-      );
+      return <TransactionSkeleton count={3} />;
     }
 
     if (error) {
@@ -423,9 +417,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: "Outfit_600SemiBold",
     color: "#000",
-  },
-  loader: {
-    paddingVertical: 20,
   },
   errorText: {
     textAlign: "center",

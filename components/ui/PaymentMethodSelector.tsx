@@ -1,8 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { constPaymentMethodsIcons } from "@/app/contants/iconDictionary";
-import { TransactionType, TRANSACTION_COLORS } from "@/app/interfaces/transaction.interface";
-import { Calendar } from "react-native-calendars";
+import { TransactionType, TRANSACTION_COLORS, TransactionOption } from "@/app/interfaces/transaction.interface";
 
 interface PaymentMethodSelectorProps {
   type: TransactionType;
@@ -16,24 +15,35 @@ const paymentMethods = [
 ];
 
 // Mapeo de tipos de transacción a opciones de UI
-const TYPE_TO_OPTION_MAP = {
+const TYPE_TO_OPTION_MAP: Record<TransactionType, TransactionOption> = {
   "gasto": "Gastos",
   "ingreso": "Ingresos",
-} as const;
+  "ahorro": "Ahorros" // Agregado para manejar el tipo "ahorro"
+};
+
+// Mapeo de tipos de transacción a textos de título
+const TYPE_TO_TITLE_MAP: Record<TransactionType, string> = {
+  "gasto": "¿Con qué pagaste?",
+  "ingreso": "¿Cómo recibiste el pago?",
+  "ahorro": "¿Cómo guardaste el dinero?"
+};
 
 /**
  * Componente para seleccionar el método de pago
- * @param type - Tipo de transacción (gasto/ingreso)
+ * @param type - Tipo de transacción (gasto/ingreso/ahorro)
  * @param onSelect - Función para manejar la selección del método
  */
 const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ type, onSelect }) => {
   const [selectedMethod, setSelectedMethod] = useState("Efectivo");
   const [showMoreOptions, setShowMoreOptions] = useState(false);
 
+  // Obtener el título según el tipo de transacción
+  const selectorTitle = TYPE_TO_TITLE_MAP[type] || "¿Qué método usaste?";
+
   // Obtener el color basado en el tipo de transacción
   const themeColor = useMemo(() => {
-    const option = TYPE_TO_OPTION_MAP[type];
-    return TRANSACTION_COLORS[option];
+    const option = TYPE_TO_OPTION_MAP[type] || "Gastos"; // Valor por defecto si el tipo no está en el mapeo
+    return TRANSACTION_COLORS[option] || "#00C1D5"; // Color por defecto si la opción no tiene color
   }, [type]);
 
   // Estilos dinámicos basados en el tipo
@@ -57,7 +67,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ type, onS
 
   return (
     <View>
-      <Text style={styles.title}>¿Con qué pagaste?</Text>
+      <Text style={styles.title}>{selectorTitle}</Text>
       <View style={styles.methodContainer}>
         {paymentMethods.map((method) => (
           <TouchableOpacity

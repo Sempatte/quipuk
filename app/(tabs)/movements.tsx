@@ -1,18 +1,20 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ActivityIndicator,
   FlatList,
   TouchableOpacity,
   Modal,
+  ScrollView,
+  Dimensions,
+  Platform,
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Calendar } from "react-native-calendars";
-import { format, subDays } from "date-fns";
+import { format, startOfMonth, endOfMonth, isSameMonth, addDays } from "date-fns";
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -24,6 +26,12 @@ import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
 import { RootStackParamList } from "../interfaces/navigation";
 import { Transaction } from "../interfaces/transaction.interface";
 import Loader from "@/components/ui/Loader";
+
+const { width } = Dimensions.get('window');
+// Ancho del botón de día
+const DAY_BUTTON_WIDTH = width * 0.15;
+// Espacio entre botones
+const DAY_BUTTON_MARGIN = 8;
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -38,11 +46,43 @@ const Movements = () => {
   const [referenceDay, setReferenceDay] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
+  const [days, setDays] = useState<Date[]>([]);
+  const scrollViewRef = useRef<ScrollView>(null);
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const [didInitialScroll, setDidInitialScroll] = useState(false);
 
   // Array de transacciones
   const transactions: Transaction[] = data?.getTransactions || [];
 
+  // Función para obtener los días del mes en orden ascendente (del más antiguo al más reciente)
+  const getDaysOfMonth = useCallback((referenceDate: Date) => {
+    const start = startOfMonth(referenceDate);
+    const end = endOfMonth(referenceDate);
+    const today = new Date();
+    
+    // Limitar el final al día actual si estamos en el mes actual
+    const actualEnd = isSameMonth(today, referenceDate) && today < end ? today : end;
+    
+    const daysArray: Date[] = [];
+    let currentDay = start;
+    
+    // Crear array con todos los días del mes hasta hoy o final del mes
+    while (currentDay <= actualEnd) {
+      daysArray.push(new Date(currentDay));
+      currentDay = addDays(currentDay, 1);
+    }
+    
+    return daysArray;
+  }, []);
+
+  // Actualizar los días cuando cambie la fecha de referencia
+  useEffect(() => {
+    const allDaysOfMonth = getDaysOfMonth(referenceDay);
+    setDays(allDaysOfMonth);
+    setDidInitialScroll(false);
+  }, [referenceDay, getDaysOfMonth]);
+
+  // Inicializar y verificar errores
   useFocusEffect(
     useCallback(() => {
       if (error?.message === "Token expired or invalid") {
@@ -53,11 +93,82 @@ const Movements = () => {
     }, [refetch, error, navigation])
   );
 
-  // Obtiene los últimos 6 días basados en la fecha de referencia
-  const getLastSixDays = useCallback(
-    (date: Date) => Array.from({ length: 6 }, (_, index) => subDays(date, 5 - index)),
-    []
-  );
+  // Calcular la posición máxima de scroll
+  const calculateMaxScrollPosition = useCallback(() => {
+    if (days.length === 0) return 0;
+    return Math.max(0, days.length * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2) - width);
+  }, [days]);
+
+  // Desplazar a un día específico, con más opciones para Android
+  const scrollToDay = useCallback((index: number) => {
+    if (scrollViewRef.current && index >= 0 && index < days.length) {
+      const position = index * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
+      
+      // En Android usamos un pequeño delay para asegurar que el scroll funcione
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({
+            x: position,
+            animated: true,
+          });
+        }, 100);
+      } else {
+        scrollViewRef.current.scrollTo({
+          x: position,
+          animated: true,
+        });
+      }
+    }
+  }, [days]);
+
+  // Desplazar al final para mostrar los días más recientes primero
+  const scrollToEnd = useCallback(() => {
+    if (scrollViewRef.current && days.length > 0) {
+      const maxPosition = calculateMaxScrollPosition();
+      
+      // En Android usamos un pequeño delay para asegurar que el scroll funcione
+      if (Platform.OS === 'android') {
+        setTimeout(() => {
+          scrollViewRef.current?.scrollTo({
+            x: maxPosition,
+            animated: false, // Sin animación para el scroll inicial
+          });
+        }, 100);
+      } else {
+        scrollViewRef.current.scrollTo({
+          x: maxPosition,
+          animated: false, // Sin animación para el scroll inicial
+        });
+      }
+    }
+  }, [days, calculateMaxScrollPosition]);
+
+  // Efecto para desplazar al final (días más recientes) al iniciar
+  useEffect(() => {
+    if (days.length > 0 && !didInitialScroll) {
+      // Esperar un poco para asegurar que el ScrollView esté renderizado
+      setTimeout(() => {
+        if (selectedDate) {
+          // Buscar el índice del día seleccionado
+          const selectedIndex = days.findIndex(
+            day => day.toDateString() === selectedDate.toDateString()
+          );
+          
+          if (selectedIndex >= 0) {
+            scrollToDay(selectedIndex);
+          } else {
+            // Si no encontramos el día seleccionado, ir al final (días más recientes)
+            scrollToEnd();
+          }
+        } else {
+          // Si no hay día seleccionado, ir al final (días más recientes)
+          scrollToEnd();
+        }
+        
+        setDidInitialScroll(true);
+      }, 300);
+    }
+  }, [days, selectedDate, scrollToDay, scrollToEnd, didInitialScroll]);
 
   // Verifica si hay transacciones en un día específico
   const hasTransactionsOnDay = useCallback(
@@ -98,11 +209,11 @@ const Movements = () => {
   // Obtiene el mes y año actual o seleccionado
   const selectedMonthYear = selectedDate
     ? format(selectedDate, "yyyy-MM")
-    : format(new Date(), "yyyy-MM");
+    : format(referenceDay, "yyyy-MM");
 
   const monthYear = selectedDate
     ? capitalize(format(selectedDate, "MMMM yyyy", { locale: es }))
-    : capitalize(format(new Date(), "MMMM yyyy", { locale: es }));
+    : capitalize(format(referenceDay, "MMMM yyyy", { locale: es }));
 
   // Filtra transacciones por mes
   const monthlyTransactions = transactions.filter(
@@ -156,22 +267,54 @@ const Movements = () => {
     }
   }, [selectedDate, transactions, groupedTransactions]);
 
-  const days = getLastSixDays(referenceDay);
   const filteredTransactionsForRender = getFilteredTransactionsForRender();
 
+  // Maneja la selección de un día
   const toggleDateSelection = (day: Date) => {
     if (selectedDate && day.toDateString() === selectedDate.toDateString()) {
       setSelectedDate(null); // Deseleccionamos si es el mismo día
     } else {
       setSelectedDate(day); // Seleccionamos el nuevo día
+      
+      // Si el día seleccionado no es del mes actual, actualizar referenceDay
+      if (!isSameMonth(day, referenceDay)) {
+        setReferenceDay(day);
+      }
     }
   };
 
+  // Maneja la selección de día en el calendario
   const handleCalendarDayPress = (day: { dateString: string }) => {
     const newDate = new Date(day.dateString);
     setReferenceDay(newDate);
     setSelectedDate(newDate);
     setIsCalendarVisible(false);
+    setDidInitialScroll(false); // Resetear el scroll inicial
+  };
+
+  // Navegación al mes anterior
+  const goToPreviousMonth = () => {
+    const newReference = new Date(referenceDay);
+    newReference.setMonth(newReference.getMonth() - 1);
+    setReferenceDay(newReference);
+    setSelectedDate(null);
+    setDidInitialScroll(false); // Resetear el scroll inicial
+  };
+
+  // Navegación al mes siguiente (hasta el mes actual)
+  const goToNextMonth = () => {
+    const newReference = new Date(referenceDay);
+    newReference.setMonth(newReference.getMonth() + 1);
+    
+    // No permitir avanzar más allá del mes actual
+    const today = new Date();
+    if (newReference <= today || 
+        (newReference.getMonth() === today.getMonth() && 
+         newReference.getFullYear() === today.getFullYear())) {
+      setReferenceDay(newReference);
+      setSelectedDate(null);
+      setDidInitialScroll(false); // Resetear el scroll inicial
+    }
   };
 
   if (loading) {
@@ -188,53 +331,91 @@ const Movements = () => {
     );
   }
 
+  // Determinar si podemos avanzar al siguiente mes
+  const today = new Date();
+  const canGoNext = referenceDay.getMonth() < today.getMonth() || 
+                    referenceDay.getFullYear() < today.getFullYear();
+
   return (
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Transacciones</Text>
 
-        <TouchableOpacity
-          onPress={() => setIsCalendarVisible(true)}
-          style={styles.monthYearButton}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.arrowText}>{"<"}</Text>
-          <Text style={styles.monthYearText}>
-            <Text style={styles.monthText}>{monthYear}</Text>
-          </Text>
-          <Text style={styles.arrowText}>{">"}</Text>
-        </TouchableOpacity>
+        <View style={styles.monthYearContainer}>
+          <TouchableOpacity 
+            onPress={goToPreviousMonth}
+            style={styles.monthArrowButton}
+          >
+            <Text style={styles.arrowText}>{"<"}</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity
+            onPress={() => setIsCalendarVisible(true)}
+            style={styles.monthTextButton}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.monthYearText}>
+              <Text style={styles.monthText}>{monthYear}</Text>
+            </Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            onPress={goToNextMonth}
+            disabled={!canGoNext}
+            style={styles.monthArrowButton}
+          >
+            <Text style={[styles.arrowText, !canGoNext && styles.disabledArrow]}>{">"}</Text>
+          </TouchableOpacity>
+        </View>
 
-        <View style={styles.daysContainer}>
-          {days.map((day, index) => {
-            const isActive = selectedDate && day.toDateString() === selectedDate.toDateString();
-            const hasTransactions = hasTransactionsOnDay(day);
+        <View style={styles.daysScrollWrapper}>
+          <ScrollView
+            ref={scrollViewRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.daysScrollContainer}
+            decelerationRate="normal"
+            snapToInterval={DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2}
+            snapToAlignment="start"
+          >
+            {days.map((day, index) => {
+              const isActive = selectedDate && day.toDateString() === selectedDate.toDateString();
+              const hasTransactions = hasTransactionsOnDay(day);
+              const isToday = day.toDateString() === new Date().toDateString();
 
-            return (
-              <TouchableOpacity
-                key={index}
-                style={[
-                  styles.dayButton,
-                  isActive && styles.activeDaySelected,
-                  !isActive && hasTransactions && styles.hasTransactionsDay,
-                  !isActive && !hasTransactions && styles.noTransactionsDay,
-                ]}
-                onPress={() => toggleDateSelection(day)}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.dayNumber}>
-                  {format(day, "dd", { locale: es })}
-                </Text>
-                <Text style={styles.dayLabel}>
-                  {format(day, "EEE", { locale: es })}
-                </Text>
+              return (
+                <View 
+                  key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`} 
+                  style={styles.dayButtonContainer}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.dayButton,
+                      isActive && styles.activeDaySelected,
+                      !isActive && hasTransactions && styles.hasTransactionsDay,
+                      !isActive && !hasTransactions && styles.noTransactionsDay,
+                    ]}
+                    onPress={() => toggleDateSelection(day)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.dayNumber}>
+                      {format(day, "dd", { locale: es })}
+                    </Text>
+                    <Text style={styles.dayLabel}>
+                      {format(day, "EEE", { locale: es })}
+                    </Text>
 
-                {hasTransactions && (
-                  <View style={[styles.greenDot, isActive && styles.whiteDot]} />
-                )}
-              </TouchableOpacity>
-            );
-          })}
+                    {hasTransactions && (
+                      <View style={[styles.greenDot, isActive && styles.whiteDot]} />
+                    )}
+                  </TouchableOpacity>
+                  {isToday && (
+                    <View style={styles.todayIndicator}></View>
+                  )}
+                </View>
+              );
+            })}
+          </ScrollView>
         </View>
       </View>
 
@@ -340,18 +521,28 @@ const styles = StyleSheet.create({
     textAlign: "center",
     fontFamily: "Outfit_500Medium",
   },
-  monthYearButton: {
+  monthYearContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    marginVertical: 10,
+    width: "90%",
+    alignSelf: "center",
+  },
+  monthTextButton: {
+    flex: 1,
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: 1,
     borderColor: "#FFF",
-    alignSelf: "center",
-    marginVertical: 10,
-    width: "80%",
+    alignItems: "center",
+  },
+  monthArrowButton: {
+    padding: 10,
+    width: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   monthYearText: {
     fontSize: 20,
@@ -365,17 +556,31 @@ const styles = StyleSheet.create({
     color: "#FFF",
     fontSize: 24,
   },
-  daysContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginVertical: 8,
+  disabledArrow: {
+    color: "#555", // Color más oscuro para indicar deshabilitado
+  },
+  daysScrollWrapper: {
+    // Esto asegura que el ScrollView tenga un tamaño definido
+    height: 90,
+    marginTop: 8,
+  },
+  daysScrollContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    // Fijar un ancho mínimo para evitar problemas de scroll
+    minWidth: width,
+  },
+  dayButtonContainer: {
+    alignItems: 'center',
+    marginHorizontal: DAY_BUTTON_MARGIN,
+    width: DAY_BUTTON_WIDTH,
   },
   dayButton: {
     alignItems: "center",
     padding: 8,
     borderRadius: 10,
     fontFamily: "Outfit_500Medium",
-    width: "15%",
+    width: DAY_BUTTON_WIDTH,
     height: 70,
   },
   activeDaySelected: {
@@ -384,7 +589,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   hasTransactionsDay: {
-    borderColor: "#000",
+    borderColor: "#00DC5A",
     borderWidth: 1,
   },
   noTransactionsDay: {
@@ -410,6 +615,13 @@ const styles = StyleSheet.create({
   },
   whiteDot: {
     backgroundColor: "#FFF",
+  },
+  todayIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FFF",
+    marginTop: 5,
   },
   transactionGroup: {
     marginBottom: 20,
@@ -462,13 +674,3 @@ const styles = StyleSheet.create({
 });
 
 export default Movements;
-
-/* 
-  TO DO: Scroll en los botones de dias
-
-  FORMATO DEL MOVIMIENTO
-
-                   DESCRIPCION 
-  ICONO_CATEGORIA  HORA   FECHA        +- S/MONTO
-                   METODO DE PAGO
-*/
