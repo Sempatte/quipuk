@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -17,6 +17,11 @@ import { GET_PENDING_TRANSACTIONS } from '@/app/graphql/transaction.graphql';
 import { getTransactionIcon } from '@/app/contants/iconDictionary';
 import { useFocusEffect } from '@react-navigation/native';
 import UpcomingPaymentsSkeleton from './UpcomingPaymentsSkeleton';
+import PaymentConfirmationModal from './PaymentConfirmationModal';
+import NewPaymentCard from './NewPaymentCard';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { RootStackParamList } from '@/app/interfaces/navigation';
 
 const { width } = Dimensions.get('window');
 const ITEM_WIDTH = width - 80;
@@ -38,9 +43,19 @@ interface GetPendingTransactionsData {
   getTransactions: PendingTransaction[];
 }
 
+type AddTrxScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "add"
+>;
+
 const UpcomingPayments = () => {
+  const navigation = useNavigation<AddTrxScreenNavigationProp>();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  
+  // Estado para el modal de confirmación
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<PendingTransaction | null>(null);
   
   const { data, loading, error, refetch } = useQuery<GetPendingTransactionsData>(GET_PENDING_TRANSACTIONS, {
     fetchPolicy: 'network-only' // Forzar que siempre busque del servidor
@@ -82,6 +97,85 @@ const UpcomingPayments = () => {
     }
   };
 
+  // Calcular días restantes para ordenamiento
+  const calculateDaysLeft = (date: string): number => {
+    if (!date) return Infinity; // Si no hay fecha, ponerlo al final
+    
+    try {
+      const dueDate = new Date(date);
+      return differenceInDays(dueDate, new Date());
+    } catch {
+      return Infinity; // En caso de error, ponerlo al final
+    }
+  };
+
+  
+  // Modificación de la función handleNavigateToNewPayment en UpcomingPayments.tsx
+
+  // Función para navegar a la pantalla de programar nuevo pago
+  // Función modificada para la navegación desde UpcomingPayments.tsx
+  const handleNavigateToNewPayment = () => {
+    // Navegamos a la pantalla de añadir transacción con parámetros específicos
+    navigation.navigate('add', { 
+      forcePaymentStatus: 'pending',
+      statusReadOnly: true,  // Indica que el estado no se puede cambiar
+      preselectedTab: 'Gastos' // Preseleccionar la pestaña de gastos
+    });
+  };
+
+  // Ordenar transacciones por fecha de vencimiento (más cercanas primero)
+  const sortedTransactions = useMemo(() => {
+    if (!data?.getTransactions) return [];
+    
+    // Hacer una copia para no mutar los datos originales
+    return [...data.getTransactions].sort((a, b) => {
+      // Primero los vencidos (días negativos)
+      const daysLeftA = calculateDaysLeft(a.dueDate);
+      const daysLeftB = calculateDaysLeft(b.dueDate);
+      
+      // Si uno está vencido y el otro no
+      const aIsOverdue = daysLeftA < 0;
+      const bIsOverdue = daysLeftB < 0;
+      
+      if (aIsOverdue && !bIsOverdue) return -1; // A vencido va primero
+      if (!aIsOverdue && bIsOverdue) return 1; // B vencido va primero
+      
+      // Si ambos están vencidos, el más vencido (número más negativo) va primero
+      if (aIsOverdue && bIsOverdue) return daysLeftA - daysLeftB;
+      
+      // Si ninguno está vencido, el más cercano a vencer va primero
+      return daysLeftA - daysLeftB;
+    });
+  }, [data?.getTransactions]);
+
+  // Función para determinar el color del punto indicador según los días restantes
+  const getDotColor = (daysLeft: number) => {
+    if (daysLeft < 0) return '#FF0000'; // Rojo para pagos vencidos
+    if (daysLeft <= 3) return '#FF5252'; // Rojo claro para pagos próximos a vencer (3 días o menos)
+    if (daysLeft <= 15) return '#FF7700'; // Naranja para pagos con vencimiento intermedio (entre 4 y 15 días)
+    return '#4CAF50'; // Verde para pagos con más de 15 días hasta vencimiento
+  };
+  
+  // Función para marcar un pago como completado
+  const handleMarkAsPaid = (payment: PendingTransaction) => {
+    // Guardar el pago seleccionado y mostrar el modal
+    setSelectedPayment(payment);
+    setConfirmModalVisible(true);
+  };
+  
+  // Función para procesar la confirmación de pago
+  const handleConfirmPayment = () => {
+    if (selectedPayment) {
+      // Aquí iría la lógica para marcar el pago como completado en el backend
+      console.log('Pago confirmado:', selectedPayment.id);
+      
+      // Cerrar el modal y refrescar datos
+      setConfirmModalVisible(false);
+      setSelectedPayment(null);
+      refetch();
+    }
+  };
+
   // Renderizar cada pago pendiente
   const renderPayment = ({ item }: ListRenderItemInfo<PendingTransaction>) => {
     // Validar que dueDate existe antes de usarlo
@@ -98,6 +192,16 @@ const UpcomingPayments = () => {
     const dueText = getDueDateText(item.dueDate);
     const dueDateText = `Vence: ${formattedDate}`;
     
+    // Determinar color según si está vencido o próximo a vencer
+    const daysLeft = calculateDaysLeft(item.dueDate);
+    const isOverdue = daysLeft < 0;
+    const isCloseToExpire = daysLeft >= 0 && daysLeft <= 3;
+    
+    const dueDateColor = isOverdue ? '#FF0000' : isCloseToExpire ? '#FF7700' : '#000000';
+    
+    // Obtener color del punto indicador basado en los días restantes
+    const dotColor = getDotColor(daysLeft);
+    
     return (
       <View style={styles.paymentCard}>
         <View style={styles.paymentHeader}>
@@ -113,18 +217,15 @@ const UpcomingPayments = () => {
         <Text style={styles.amountText}>S/ {item.amount.toFixed(0)}</Text>
         
         <View style={styles.dueDateContainer}>
-          <View style={styles.dueDateDot} />
-          <Text style={styles.dueDateText}>{dueDateText}</Text>
+          <View style={[styles.dueDateDot, { backgroundColor: dotColor }]} />
+          <Text style={[styles.dueDateText, { color: dueDateColor }]}>{dueDateText}</Text>
         </View>
-        <Text style={styles.dueSubtext}>{dueText}</Text>
+        <Text style={[styles.dueSubtext, isOverdue && styles.overdueText]}>{dueText}</Text>
         
         <View style={styles.buttonsContainer}>
           <TouchableOpacity 
             style={styles.buttonPaid}
-            onPress={() => {
-              // Aquí iría la lógica para marcar como pagado
-              console.log('Marcar como pagado:', item.id);
-            }}
+            onPress={() => handleMarkAsPaid(item)}
           >
             <Text style={styles.buttonPaidText}>Pagado</Text>
           </TouchableOpacity>
@@ -163,10 +264,15 @@ const UpcomingPayments = () => {
 
   // Indicadores de página
   const renderDots = () => {
-    if (!data?.getTransactions || data.getTransactions.length <= 1) return null;
+    // Si no hay transacciones, no mostrar puntos
+    if (!sortedTransactions || sortedTransactions.length === 0) return null;
+    
+    // +1 para incluir el card de nuevo pago
+    const totalItems = sortedTransactions.length + 1;
+    if (totalItems <= 1) return null;
     
     const dots = [];
-    for (let i = 0; i < data.getTransactions.length; i++) {
+    for (let i = 0; i < totalItems; i++) {
       dots.push(
         <View 
           key={i} 
@@ -188,29 +294,32 @@ const UpcomingPayments = () => {
     setActiveIndex(index);
   };
 
-  // Navegar a un índice específico
-  const goToIndex = (index: number) => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToIndex({
-        index,
-        animated: true,
-        viewPosition: 0.5
-      });
+  // Crear la lista completa de elementos para el FlatList
+  const getCarouselItems = useCallback(() => {
+    // Si no hay transacciones, mostrar solo el card de nuevo pago
+    if (!sortedTransactions || sortedTransactions.length === 0) {
+      return [{ id: 'new-payment', type: 'new-payment' }];
     }
-  };
+    
+    // Combinar las transacciones con el card de nuevo pago
+    return [
+      ...sortedTransactions,
+      { id: 'new-payment', type: 'new-payment' }
+    ];
+  }, [sortedTransactions]);
 
-  // Navegar al siguiente o anterior
-  const goToNext = () => {
-    if (data?.getTransactions && activeIndex < data.getTransactions.length - 1) {
-      goToIndex(activeIndex + 1);
+  // Renderizar cada elemento del carousel (pagos o nuevo pago)
+  const renderCarouselItem = useCallback(({ item }: any) => {
+    // Si es el card de nuevo pago
+    if (item.type === 'new-payment') {
+      return (
+        <NewPaymentCard onPress={handleNavigateToNewPayment} />
+      );
     }
-  };
-
-  const goToPrevious = () => {
-    if (activeIndex > 0) {
-      goToIndex(activeIndex - 1);
-    }
-  };
+    
+    // Si es un pago pendiente normal
+    return renderPayment({ item } as ListRenderItemInfo<PendingTransaction>);
+  }, [renderPayment, handleNavigateToNewPayment]);
 
   if (error) {
     return (
@@ -221,52 +330,60 @@ const UpcomingPayments = () => {
     );
   }
 
-  if (!data?.getTransactions && !loading) {
+  // Si no hay datos pero está cargando, mostrar skeleton
+  if (loading) {
     return (
       <View style={styles.container}>
         <Text style={styles.sectionTitle}>Próximos pagos</Text>
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No hay pagos pendientes</Text>
+        <View style={styles.skeletonContainer}>
+          <UpcomingPaymentsSkeleton count={1} />
         </View>
       </View>
     );
   }
 
+  // Obtenemos los elementos del carousel (pagos + nuevo pago)
+  const carouselItems = getCarouselItems();
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionTitle}>Próximos pagos</Text>
       
-      {loading ? (
-        // Mostrar skeleton mientras se cargan los datos
-        <View style={styles.skeletonContainer}>
-          <UpcomingPaymentsSkeleton count={1} />
-        </View>
-      ) : (
-        // Mostrar los datos reales cuando estén disponibles
-        <>
-          <FlatList
-            ref={flatListRef}
-            data={data?.getTransactions || []}
-            renderItem={renderPayment}
-            keyExtractor={(item) => item.id.toString()}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onScroll={handleScroll}
-            snapToInterval={ITEM_WIDTH + ITEM_SPACING}
-            snapToAlignment="center"
-            decelerationRate="fast"
-            contentContainerStyle={styles.listContent}
-            ItemSeparatorComponent={() => <View style={{ width: ITEM_SPACING }} />}
-            getItemLayout={(data, index) => ({
-              length: ITEM_WIDTH + ITEM_SPACING,
-              offset: (ITEM_WIDTH + ITEM_SPACING) * index,
-              index,
-            })}
-          />
-          
-          {renderDots()}
-        </>
+      <FlatList
+        ref={flatListRef}
+        data={carouselItems}
+        renderItem={renderCarouselItem}
+        keyExtractor={(item) => item.id.toString()}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
+        snapToInterval={ITEM_WIDTH + ITEM_SPACING}
+        snapToAlignment="center"
+        decelerationRate="fast"
+        contentContainerStyle={styles.listContent}
+        ItemSeparatorComponent={() => <View style={{ width: ITEM_SPACING }} />}
+        getItemLayout={(data, index) => ({
+          length: ITEM_WIDTH + ITEM_SPACING,
+          offset: (ITEM_WIDTH + ITEM_SPACING) * index,
+          index,
+        })}
+      />
+      
+      {renderDots()}
+      
+      {/* Modal de confirmación de pago */}
+      {selectedPayment && (
+        <PaymentConfirmationModal
+          visible={confirmModalVisible}
+          onClose={() => {
+            setConfirmModalVisible(false);
+            setSelectedPayment(null);
+          }}
+          onConfirm={handleConfirmPayment}
+          amount={selectedPayment.amount}
+          title={selectedPayment.title}
+        />
       )}
     </View>
   );
@@ -348,6 +465,10 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 15,
     fontFamily: 'Outfit_400Regular',
+  },
+  overdueText: {
+    color: '#FF0000',
+    fontWeight: 'bold',
   },
   buttonsContainer: {
     flexDirection: 'row',

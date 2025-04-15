@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const httpLink = createHttpLink({
   uri: "http://192.168.1.36:3000/graphql",
 });
-
+  
 // Interceptor para agregar el token en las cabeceras
 const authLink = setContext(async (_, { headers }) => {
   const token = await AsyncStorage.getItem("token");
