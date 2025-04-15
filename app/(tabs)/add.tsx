@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -17,6 +17,7 @@ import Animated, {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 
 // Importaciones de componentes
 import AgregarSlides from "@/components/ui/AddSlider";
@@ -47,14 +48,42 @@ import {
 // Utilidades
 import { getTransactionIcon } from "../contants/iconDictionary";
 import { useToast } from "@/app/providers/ToastProvider";
+import { RootStackParamList } from "../interfaces/navigation";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+
+// Definir la interfaz para los parámetros de la ruta
+interface AddTransactionRouteParams {
+  forcePaymentStatus?: 'pending' | 'completed';
+  statusReadOnly?: boolean;
+  preselectedTab?: TransactionOption;
+}
+
+
+type LoginScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "movements"
+>;
+
+// Definir un tipo para los indexadores del colorIndex
+type ColorIndexMap = {
+  [key in TransactionOption]: number;
+};
 
 export default function AddTransaction() {
   const { showToast } = useToast();
   const colorValue = useSharedValue(0);
+  const navigation = useNavigation<LoginScreenNavigationProp>();
+  
+  // Utilizar RouteProp tipado correctamente
+  const route = useRoute<RouteProp<Record<string, AddTransactionRouteParams>, string>>();
+  
+  // Obtener parámetros de la ruta de navegación con tipos seguros
+  const params = route.params || {};
+  const { forcePaymentStatus, statusReadOnly, preselectedTab } = params;
 
   // Estado del formulario
   const [formState, setFormState] = useState({
-    selectedOption: "Gastos" as TransactionOption,
+    selectedOption: (preselectedTab || "Gastos") as TransactionOption,
     amount: "",
     description: "",
     category: "",
@@ -62,8 +91,33 @@ export default function AddTransaction() {
     date: new Date().toISOString(), // Fecha de creación
     dueDate: new Date().toISOString(), // Fecha de vencimiento (misma por defecto)
     frequent: false,
-    isPaid: true // Estado de pago (true = pagado/recibido, false = pendiente)
+    isPaid: forcePaymentStatus === 'pending' ? false : true // Usar el parámetro si existe
   });
+  
+  // Configurar el slider si viene preseleccionado
+  useEffect(() => {
+    if (preselectedTab) {
+      const colorIndex: ColorIndexMap = {
+        Gastos: 0,
+        Ingresos: 1,
+        Ahorros: 2,
+      };
+      colorValue.value = withTiming(colorIndex[preselectedTab], { duration: 300 });
+    }
+  }, [preselectedTab, colorValue]);
+
+  useEffect(() => {
+    if (forcePaymentStatus === 'pending') {
+      // Establecer fecha de vencimiento predeterminada (7 días después)
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+      
+      updateFormState({ 
+        isPaid: false,
+        dueDate: defaultDueDate.toISOString() 
+      });
+    }
+  }, [forcePaymentStatus]);
 
   // Actualización del estado
   const updateFormState = useCallback((updates: Partial<typeof formState>) => {
@@ -74,12 +128,12 @@ export default function AddTransaction() {
   const handleSliderChange = useCallback(
     (value: TransactionOption) => {
       updateFormState({ selectedOption: value });
-      const colorIndex = {
+      const colorIndex: ColorIndexMap = {
         Gastos: 0,
         Ingresos: 1,
         Ahorros: 2,
-      }[value];
-      colorValue.value = withTiming(colorIndex, { duration: 300 });
+      };
+      colorValue.value = withTiming(colorIndex[value], { duration: 300 });
     },
     [updateFormState, colorValue]
   );
@@ -134,6 +188,7 @@ export default function AddTransaction() {
           frequent: false,
           isPaid: true,
         });
+        navigation.navigate("movements");
         showToast("success", "Éxito", "Transacción agregada correctamente");
       },
       onError: (error) => {
@@ -213,6 +268,10 @@ export default function AddTransaction() {
 
   // Manejo de cambio de estado de pago
   const handleStatusChange = useCallback((isPaid: boolean) => {
+    // Si el estado de pago es de solo lectura, no permitir cambios
+    if (statusReadOnly) {
+      return;
+    }
     updateFormState({ isPaid });
     
     // Si cambia a pendiente, asegurarse de que haya una fecha de vencimiento seleccionada
@@ -222,7 +281,7 @@ export default function AddTransaction() {
       defaultDueDate.setDate(defaultDueDate.getDate() + 7);
       updateFormState({ dueDate: defaultDueDate.toISOString() });
     }
-  }, [formState.date, updateFormState]);
+  }, [formState.date, updateFormState, statusReadOnly]);
 
   // Manejar selección de transacción frecuente
   const handleSelectFrequent = useCallback((item: any) => {
@@ -284,6 +343,7 @@ export default function AddTransaction() {
             onSelectStatus={handleStatusChange}
             initialFrequent={formState.frequent}
             initialStatus={formState.isPaid}
+            statusReadOnly={statusReadOnly}
           />
 
           <View style={styles.categoryContainer}>
@@ -300,19 +360,20 @@ export default function AddTransaction() {
             />
           </View>
 
-          {/* Selector de fecha - ahora con título condicional según estado */}
+          {/* Selector de fecha - ahora con título condicional según estado y limitación de fechas */}
           <View style={styles.dateSelectorContainer}>
             <DateSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
-              selectedDate={formState.date}
+              selectedDate={formState.isPaid ? formState.date : formState.dueDate}
               onSelectDate={(date) => {
-                updateFormState({ 
-                  date,
-                  // Si está pendiente, también actualizar la fecha de vencimiento
-                  ...(formState.isPaid ? {} : { dueDate: date })
-                });
+                if (formState.isPaid) {
+                  updateFormState({ date });
+                } else {
+                  updateFormState({ dueDate: date });
+                }
               }}
               title={formState.isPaid ? "Fecha" : "Fecha de vencimiento"}
+              isPaid={formState.isPaid} // Pasamos el estado de pago al selector de fecha
             />
           </View>
 

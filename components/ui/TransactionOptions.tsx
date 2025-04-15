@@ -9,30 +9,35 @@ interface TransactionOptionsProps {
   onSelectStatus: (isPaid: boolean) => void;
   initialFrequent?: boolean;
   initialStatus?: boolean;
+  statusReadOnly?: boolean; // Prop para indicar si el estado es de solo lectura
 }
 
 /**
  * Componente para opciones adicionales de transacción
  * Permite marcar una transacción como frecuente y como pagada/recibida
  * 
- * @param type - Tipo de transacción ("gasto" o "ingreso")
+ * @param type - Tipo de transacción ("gasto", "ingreso" o "ahorro")
  * @param onSelectFrequent - Función para actualizar el estado de "frecuente"
  * @param onSelectStatus - Función para actualizar el estado de "pagado/recibido"
  * @param initialFrequent - Valor inicial para el estado "frecuente"
  * @param initialStatus - Valor inicial para el estado "pagado/recibido"
+ * @param statusReadOnly - Indica si el estado de pago es de solo lectura
  */
 
-const TYPE_TO_OPTION_MAP = {
+// Corregido para incluir "ahorro"
+const TYPE_TO_OPTION_MAP: Record<TransactionType, "Gastos" | "Ingresos" | "Ahorros"> = {
   "gasto": "Gastos",
   "ingreso": "Ingresos",
-} as const;
+  "ahorro": "Ahorros"
+};
 
 const TransactionOptions: React.FC<TransactionOptionsProps> = ({ 
   type, 
   onSelectFrequent, 
   onSelectStatus,
   initialFrequent = false,
-  initialStatus = true
+  initialStatus = true,
+  statusReadOnly = false,
 }) => {
   const [isFrequent, setIsFrequent] = useState(initialFrequent);
   const [isPaid, setIsPaid] = useState(initialStatus);
@@ -54,7 +59,7 @@ const TransactionOptions: React.FC<TransactionOptionsProps> = ({
 
   // Textos dependientes del tipo de transacción
   const statusText = useMemo(() => ({
-    active: type === "gasto" ? "Pagado" : "Recibido",
+    active: type === "gasto" ? "Pagado" : type === "ingreso" ? "Recibido" : "Completado",
     inactive: "Pendiente"
   }), [type]);
 
@@ -64,19 +69,12 @@ const TransactionOptions: React.FC<TransactionOptionsProps> = ({
   };
 
   const handleSelectStatus = (status: boolean) => {
+    // Si es de solo lectura, no permitir cambios
+    if (statusReadOnly) return;
+    
     setIsPaid(status);
     onSelectStatus(status);
   };
-
-  // Estilos dinámicos basados en el tipo de transacción
-  const dynamicStyles = useMemo(() => ({
-    activeIcon: {
-      fill: themeColor
-    },
-    activeThumb: {
-      thumbColor: themeColor
-    }
-  }), [themeColor]);
 
   return (
     <View style={styles.container}>
@@ -106,10 +104,18 @@ const TransactionOptions: React.FC<TransactionOptionsProps> = ({
           onValueChange={handleSelectStatus}
           trackColor={{ false: "#BDBDBD", true: "#BDBDBD" }}
           thumbColor={isPaid ? themeColor : "#FFF"}
+          disabled={statusReadOnly} // Deshabilitar el switch si es de solo lectura
+          style={statusReadOnly ? styles.switchDisabled : null}
           accessibilityLabel={isPaid ? statusText.active : statusText.inactive}
           testID="payment-status-switch"
         />
-        <Text style={[styles.optionText, isPaid && styles.optionTextActive]}>
+        <Text 
+          style={[
+            styles.optionText, 
+            isPaid && styles.optionTextActive,
+            statusReadOnly && styles.textReadOnly
+          ]}
+        >
           {isPaid ? statusText.active : statusText.inactive}
         </Text>
       </View>
@@ -145,6 +151,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  switchDisabled: {
+    opacity: 0.7,
+  },
+  textReadOnly: {
+    fontWeight: "600", // Mayor peso visual para estado solo lectura
+  }
 });
 
 export default TransactionOptions;
