@@ -53,11 +53,10 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 // Definir la interfaz para los parámetros de la ruta
 interface AddTransactionRouteParams {
-  forcePaymentStatus?: 'pending' | 'completed';
+  forcePaymentStatus?: "pending" | "completed";
   statusReadOnly?: boolean;
   preselectedTab?: TransactionOption;
 }
-
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -73,10 +72,11 @@ export default function AddTransaction() {
   const { showToast } = useToast();
   const colorValue = useSharedValue(0);
   const navigation = useNavigation<LoginScreenNavigationProp>();
-  
+
   // Utilizar RouteProp tipado correctamente
-  const route = useRoute<RouteProp<Record<string, AddTransactionRouteParams>, string>>();
-  
+  const route =
+    useRoute<RouteProp<Record<string, AddTransactionRouteParams>, string>>();
+
   // Obtener parámetros de la ruta de navegación con tipos seguros
   const params = route.params || {};
   const { forcePaymentStatus, statusReadOnly, preselectedTab } = params;
@@ -91,9 +91,9 @@ export default function AddTransaction() {
     date: new Date().toISOString(), // Fecha de creación
     dueDate: new Date().toISOString(), // Fecha de vencimiento (misma por defecto)
     frequent: false,
-    isPaid: forcePaymentStatus === 'pending' ? false : true // Usar el parámetro si existe
+    isPaid: forcePaymentStatus === "pending" ? false : true, // Usar el parámetro si existe
   });
-  
+
   // Configurar el slider si viene preseleccionado
   useEffect(() => {
     if (preselectedTab) {
@@ -102,19 +102,21 @@ export default function AddTransaction() {
         Ingresos: 1,
         Ahorros: 2,
       };
-      colorValue.value = withTiming(colorIndex[preselectedTab], { duration: 300 });
+      colorValue.value = withTiming(colorIndex[preselectedTab], {
+        duration: 300,
+      });
     }
   }, [preselectedTab, colorValue]);
 
   useEffect(() => {
-    if (forcePaymentStatus === 'pending') {
+    if (forcePaymentStatus === "pending") {
       // Establecer fecha de vencimiento predeterminada (7 días después)
       const defaultDueDate = new Date();
       defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-      
-      updateFormState({ 
+
+      updateFormState({
         isPaid: false,
-        dueDate: defaultDueDate.toISOString() 
+        dueDate: defaultDueDate.toISOString(),
       });
     }
   }, [forcePaymentStatus]);
@@ -149,32 +151,30 @@ export default function AddTransaction() {
   });
 
   // Consulta para transacciones frecuentes
-  const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
-    GET_FREQUENT_TRANSACTIONS,
-    {
+  const { data: frequentData, loading: loadingFrequent } =
+    useQuery<FrequentTransactionsData>(GET_FREQUENT_TRANSACTIONS, {
       variables: {
         type: TRANSACTION_MAPPING[formState.selectedOption],
-        frequent: true
+        frequent: true,
       },
-      fetchPolicy: 'network-only', // Forzar que siempre busque del servidor
-    }
-  );
+      fetchPolicy: "network-only", // Forzar que siempre busque del servidor
+    });
 
   // Mutación de creación de transacción
   const [createTransaction, { loading: creating }] = useMutation(
     CREATE_TRANSACTION,
     {
       refetchQueries: [
-        { 
-          query: GET_TRANSACTIONS 
+        {
+          query: GET_TRANSACTIONS,
         },
-        { 
+        {
           query: GET_FREQUENT_TRANSACTIONS,
           variables: {
             type: TRANSACTION_MAPPING[formState.selectedOption],
-            frequent: true
-          }
-        }
+            frequent: true,
+          },
+        },
       ],
       onCompleted: () => {
         // Resetear formulario
@@ -206,11 +206,11 @@ export default function AddTransaction() {
   // Transformación de transacciones frecuentes
   const frequentTransactions = useMemo(() => {
     if (!frequentData?.frequentTransactions) return [];
-    
+
     return frequentData.frequentTransactions.map((transaction) => ({
       id: transaction.id.toString(),
       title: transaction.title,
-      description: transaction.description || '',
+      description: transaction.description || "",
       type: transaction.type,
       amount: `S/ ${transaction.amount.toFixed(2)}`,
       icon: getTransactionIcon(transaction.category, transaction.type),
@@ -239,6 +239,8 @@ export default function AddTransaction() {
       const userId = parseInt(storedUserId, 10);
 
       // Crear objeto para la transacción
+      // Crear objeto para la transacción
+      // Crear objeto para la transacción
       const transactionInput: CreateTransactionInput = {
         userId,
         title: formState.category,
@@ -248,10 +250,25 @@ export default function AddTransaction() {
         frequent: formState.frequent,
         category: formState.category,
         status: formState.isPaid ? "completed" : "pending",
-        // Para pagos pendientes, usar la fecha seleccionada como dueDate
-        // Para pagos completados, usar la fecha actual
-        dueDate: formState.isPaid ? new Date() : new Date(formState.date)
+        // Ajuste para manejar correctamente la zona horaria
+        dueDate: formState.isPaid
+          ? new Date()
+          : adjustDateForTimezone(new Date(formState.dueDate)),
       };
+
+      // Función para ajustar la fecha según la zona horaria
+      function adjustDateForTimezone(date: Date): Date {
+        // Obtenemos la diferencia de zona horaria en minutos
+        const timezoneOffset = date.getTimezoneOffset();
+
+        // Creamos una nueva fecha con el ajuste para compensar la conversión UTC
+        const adjustedDate = new Date(date.getTime() + timezoneOffset * 60000);
+
+        // Aseguramos que la hora sea mediodía para evitar problemas cerca de medianoche
+        adjustedDate.setHours(12, 0, 0, 0);
+
+        return adjustedDate;
+      }
 
       await createTransaction({
         variables: { input: transactionInput },
@@ -267,32 +284,38 @@ export default function AddTransaction() {
   }, [formState, isFormValid, createTransaction, showToast]);
 
   // Manejo de cambio de estado de pago
-  const handleStatusChange = useCallback((isPaid: boolean) => {
-    // Si el estado de pago es de solo lectura, no permitir cambios
-    if (statusReadOnly) {
-      return;
-    }
-    updateFormState({ isPaid });
-    
-    // Si cambia a pendiente, asegurarse de que haya una fecha de vencimiento seleccionada
-    if (!isPaid && formState.date === new Date().toISOString()) {
-      // Establecer fecha de vencimiento predeterminada (por ejemplo, 7 días después)
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-      updateFormState({ dueDate: defaultDueDate.toISOString() });
-    }
-  }, [formState.date, updateFormState, statusReadOnly]);
+  const handleStatusChange = useCallback(
+    (isPaid: boolean) => {
+      // Si el estado de pago es de solo lectura, no permitir cambios
+      if (statusReadOnly) {
+        return;
+      }
+      updateFormState({ isPaid });
+
+      // Si cambia a pendiente, asegurarse de que haya una fecha de vencimiento seleccionada
+      if (!isPaid && formState.date === new Date().toISOString()) {
+        // Establecer fecha de vencimiento predeterminada (por ejemplo, 7 días después)
+        const defaultDueDate = new Date();
+        defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+        updateFormState({ dueDate: defaultDueDate.toISOString() });
+      }
+    },
+    [formState.date, updateFormState, statusReadOnly]
+  );
 
   // Manejar selección de transacción frecuente
-  const handleSelectFrequent = useCallback((item: any) => {
-    // Autollenar el formulario con los datos de la transacción seleccionada
-    updateFormState({
-      amount: item.amount.replace('S/ ', ''),
-      description: item.description || '',
-      category: item.title,
-      frequent: true,
-    });
-  }, [updateFormState]);
+  const handleSelectFrequent = useCallback(
+    (item: any) => {
+      // Autollenar el formulario con los datos de la transacción seleccionada
+      updateFormState({
+        amount: item.amount.replace("S/ ", ""),
+        description: item.description || "",
+        category: item.title,
+        frequent: true,
+      });
+    },
+    [updateFormState]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -310,7 +333,7 @@ export default function AddTransaction() {
                 onChange={handleSliderChange}
               />
             </View>
-            
+
             {/* Carrusel que ahora se oculta cuando está vacío */}
             <View style={styles.containerCarousel}>
               <Carousel
@@ -364,7 +387,9 @@ export default function AddTransaction() {
           <View style={styles.dateSelectorContainer}>
             <DateSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
-              selectedDate={formState.isPaid ? formState.date : formState.dueDate}
+              selectedDate={
+                formState.isPaid ? formState.date : formState.dueDate
+              }
               onSelectDate={(date) => {
                 if (formState.isPaid) {
                   updateFormState({ date });
