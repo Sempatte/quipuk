@@ -11,7 +11,7 @@ interface PaymentMethodSelectorProps {
 const paymentMethods = [
   { id: "Efectivo", label: "Efectivo" },
   { id: "Tarjeta", label: "Yape" },
-  { id: "BCP", label: "Cuenta BCP" },
+  { id: "Banco", label: "Cuenta Bancaria" },
 ];
 
 // Mapeo de tipos de transacción a opciones de UI

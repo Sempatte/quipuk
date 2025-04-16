@@ -47,7 +47,7 @@ export const ingresosIcons: Record<string, JSX.Element> = {
 export const constPaymentMethodsIcons: Record<string, JSX.Element> = {
   Efectivo: <FluentMoneyIcon width={30} height={30} />,
   Tarjeta: <CardIcon width={30} height={30} />,
-  BCP: <CardIcon width={30} height={30} />,
+  Banco: <CardIcon width={30} height={30} />,
 };
 
 // 📌 Función para obtener el ícono correcto según tipo y categoría

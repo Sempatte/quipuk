@@ -1,4 +1,4 @@
-import { gastosIcons, ingresosIcons, addIcon } from "@/app/contants/iconDictionary";
+import { gastosIcons, ingresosIcons } from "@/app/contants/iconDictionary";
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
@@ -12,21 +12,21 @@ const categoryData = {
   gasto: {
     mainCategories: ["Frecuentes", "Deducibles", "Otros"],
     subCategories: ["Comida", "Transporte", "Hogar", "Alquiler", "Salud", "Teléfono", "Super"],
-    addColor: "#EF674A",
+    selectedColor: "#EF674A",
   },
   ingreso: {
     mainCategories: [],
     subCategories: ["Empleo", "Trabajo Independiente", "Director", "Alquiler", "Airbnb", "Bolsa", "Intereses", "Otros Ingresos"],
-    addColor: "#65CE13",
+    selectedColor: "#65CE13",
   },
   ahorro: {
     mainCategories: [],
     subCategories: ["Cuenta de Ahorro", "Fondo de Inversión", "Cuenta de Retiro", "Cuenta de Inversión", "Cuenta de Emergencia"],
-    addColor: "#2196F3",
+    selectedColor: "#2196F3",
   }
 };
 
-// 📌 Función para truncar texto si es demasiado largo
+// Función para truncar texto si es demasiado largo
 const truncateText = (text: string, maxLength: number) => {
   return text.length > maxLength ? text.substring(0, maxLength).trim() + "." : text;
 };
@@ -34,16 +34,20 @@ const truncateText = (text: string, maxLength: number) => {
 const MAX_LENGTH_FOR_SUBCATEGORY = 16;
 
 const CategorySelector: React.FC<CategorySelectorProps> = ({ type, onSelect }) => {
-  const [selectedCategory, setSelectedCategory] = useState(type === "gasto" ? "Frecuentes" : "Agregar");
+  // Si es tipo ahorro, no mostrar el componente
+  if (type === "ahorro") {
+    return null;
+  }
 
-  const mainCategories = categoryData[type].mainCategories;
+  const [selectedCategory, setSelectedCategory] = useState("");
+
   const subCategories = categoryData[type].subCategories;
   const iconSet = type === "gasto" ? gastosIcons : ingresosIcons;
-  const addBackgroundColor = categoryData[type].addColor;
+  const selectedColor = categoryData[type].selectedColor;
 
   const handleSelectCategory = (category: string) => {
     setSelectedCategory(category);
-    onSelect(category); // 📌 Envía la selección al `add.tsx`
+    onSelect(category);
   };
 
   return (
@@ -51,30 +55,33 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({ type, onSelect }) =
       <Text style={styles.title}>Categoría</Text>
 
       <View style={styles.subCategoryContainer}>
-        <View style={styles.categoryWrapper}>
-          <TouchableOpacity
-            style={[styles.subCategoryButton, { backgroundColor: addBackgroundColor }]}
-            onPress={() => handleSelectCategory("Agregar")}
-          >
-            <View style={styles.icon}>{addIcon}</View>
-          </TouchableOpacity>
-          <Text style={styles.subCategoryText}>Agregar</Text>
-        </View>
-
-        {subCategories.map((category) => (
-          <View key={category} style={styles.categoryWrapper}>
-            <TouchableOpacity
-              style={[
-                styles.subCategoryButton,
-                selectedCategory === category && styles.selectedSubCategory,
-              ]}
-              onPress={() => handleSelectCategory(category)}
-            >
-              {iconSet[category] && <View style={styles.icon}>{iconSet[category]}</View>}
-            </TouchableOpacity>
-            <Text style={styles.subCategoryText}>{truncateText(category, MAX_LENGTH_FOR_SUBCATEGORY)}</Text>
-          </View>
-        ))}
+        {subCategories.map((category) => {
+          const isSelected = selectedCategory === category;
+          
+          return (
+            <View key={category} style={styles.categoryWrapper}>
+              <TouchableOpacity
+                style={[
+                  styles.subCategoryButton,
+                  isSelected && { backgroundColor: selectedColor }
+                ]}
+                onPress={() => handleSelectCategory(category)}
+              >
+                {iconSet[category] && (
+                  <View style={[
+                    styles.icon,
+                    isSelected && styles.selectedIcon
+                  ]}>
+                    {iconSet[category]}
+                  </View>
+                )}
+              </TouchableOpacity>
+              <Text style={styles.subCategoryText}>
+                {truncateText(category, MAX_LENGTH_FOR_SUBCATEGORY)}
+              </Text>
+            </View>
+          );
+        })}
       </View>
     </View>
   );
@@ -113,9 +120,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
-  selectedSubCategory: {
-    borderColor: "#EF674A",
-  },
   subCategoryText: {
     fontSize: 14,
     marginTop: 5,
@@ -128,6 +132,10 @@ const styles = StyleSheet.create({
     height: "80%",
     justifyContent: "center",
     alignItems: "center",
+  },
+  selectedIcon: {
+    // Aplicamos un filtro CSS que convierte todo a blanco, respetando transparencia
+    filter: 'brightness(0) invert(1)',
   },
 });
 

@@ -14,7 +14,15 @@ import { useQuery } from "@apollo/client";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { Calendar } from "react-native-calendars";
-import { format, startOfMonth, endOfMonth, isSameMonth, addDays } from "date-fns";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  isSameMonth,
+  addDays,
+  isLastDayOfMonth,
+  isBefore,
+} from "date-fns";
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -27,7 +35,7 @@ import { RootStackParamList } from "../interfaces/navigation";
 import { Transaction } from "../interfaces/transaction.interface";
 import Loader from "@/components/ui/Loader";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 // Ancho del botón de día
 const DAY_BUTTON_WIDTH = width * 0.15;
 // Espacio entre botones
@@ -54,25 +62,55 @@ const Movements = () => {
   // Array de transacciones
   const transactions: Transaction[] = data?.getTransactions || [];
 
-  // Función para obtener los días del mes en orden ascendente (del más antiguo al más reciente)
+  // Función para obtener los días del mes con la lógica actualizada
   const getDaysOfMonth = useCallback((referenceDate: Date) => {
     const start = startOfMonth(referenceDate);
     const end = endOfMonth(referenceDate);
     const today = new Date();
-    
-    // Limitar el final al día actual si estamos en el mes actual
-    const actualEnd = isSameMonth(today, referenceDate) && today < end ? today : end;
-    
+
     const daysArray: Date[] = [];
     let currentDay = start;
-    
-    // Crear array con todos los días del mes hasta hoy o final del mes
-    while (currentDay <= actualEnd) {
+
+    // Crear array con todos los días del mes hasta el final
+    while (currentDay <= end) {
       daysArray.push(new Date(currentDay));
       currentDay = addDays(currentDay, 1);
     }
-    
+
+    // Verificar si es el mismo mes que el actual
+    if (isSameMonth(today, referenceDate)) {
+      // Obtener la fecha actual
+      const todayDate = today.getDate();
+
+      // Filtrar el array para incluir todos los días hasta hoy + 2 días adicionales o hasta fin de mes
+      const filteredDaysArray = daysArray.filter((day) => {
+        const dayDate = day.getDate();
+
+        // Si es el último día del mes, no mostrar días adicionales
+        if (isLastDayOfMonth(today)) {
+          return dayDate <= todayDate;
+        }
+
+        // Si es el penúltimo día del mes, mostrar hasta el último día
+        if (todayDate === end.getDate() - 1) {
+          return dayDate <= end.getDate();
+        }
+
+        // Para otros casos, mostrar hasta hoy + 2 días o hasta el final del mes
+        return dayDate <= Math.min(todayDate + 2, end.getDate());
+      });
+
+      return filteredDaysArray;
+    }
+
     return daysArray;
+  }, []);
+
+  // Verificar si un día es futuro (después de hoy)
+  const isFutureDay = useCallback((day: Date) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return day > today;
   }, []);
 
   // Actualizar los días cuando cambie la fecha de referencia
@@ -96,38 +134,44 @@ const Movements = () => {
   // Calcular la posición máxima de scroll
   const calculateMaxScrollPosition = useCallback(() => {
     if (days.length === 0) return 0;
-    return Math.max(0, days.length * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2) - width);
+    return Math.max(
+      0,
+      days.length * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2) - width
+    );
   }, [days]);
 
   // Desplazar a un día específico, con más opciones para Android
-  const scrollToDay = useCallback((index: number) => {
-    if (scrollViewRef.current && index >= 0 && index < days.length) {
-      const position = index * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
-      
-      // En Android usamos un pequeño delay para asegurar que el scroll funcione
-      if (Platform.OS === 'android') {
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({
+  const scrollToDay = useCallback(
+    (index: number) => {
+      if (scrollViewRef.current && index >= 0 && index < days.length) {
+        const position = index * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
+
+        // En Android usamos un pequeño delay para asegurar que el scroll funcione
+        if (Platform.OS === "android") {
+          setTimeout(() => {
+            scrollViewRef.current?.scrollTo({
+              x: position,
+              animated: true,
+            });
+          }, 100);
+        } else {
+          scrollViewRef.current.scrollTo({
             x: position,
             animated: true,
           });
-        }, 100);
-      } else {
-        scrollViewRef.current.scrollTo({
-          x: position,
-          animated: true,
-        });
+        }
       }
-    }
-  }, [days]);
+    },
+    [days]
+  );
 
   // Desplazar al final para mostrar los días más recientes primero
   const scrollToEnd = useCallback(() => {
     if (scrollViewRef.current && days.length > 0) {
       const maxPosition = calculateMaxScrollPosition();
-      
+
       // En Android usamos un pequeño delay para asegurar que el scroll funcione
-      if (Platform.OS === 'android') {
+      if (Platform.OS === "android") {
         setTimeout(() => {
           scrollViewRef.current?.scrollTo({
             x: maxPosition,
@@ -151,9 +195,9 @@ const Movements = () => {
         if (selectedDate) {
           // Buscar el índice del día seleccionado
           const selectedIndex = days.findIndex(
-            day => day.toDateString() === selectedDate.toDateString()
+            (day) => day.toDateString() === selectedDate.toDateString()
           );
-          
+
           if (selectedIndex >= 0) {
             scrollToDay(selectedIndex);
           } else {
@@ -164,13 +208,13 @@ const Movements = () => {
           // Si no hay día seleccionado, ir al final (días más recientes)
           scrollToEnd();
         }
-        
+
         setDidInitialScroll(true);
       }, 300);
     }
   }, [days, selectedDate, scrollToDay, scrollToEnd, didInitialScroll]);
 
-  // Verifica si hay transacciones en un día específico
+  // Verifica si hay transacciones en un día específico, sin filtrar por status
   const hasTransactionsOnDay = useCallback(
     (day: Date) =>
       transactions.some(
@@ -217,7 +261,8 @@ const Movements = () => {
 
   // Filtra transacciones por mes
   const monthlyTransactions = transactions.filter(
-    (transaction) => format(new Date(transaction.createdAt), "yyyy-MM") === selectedMonthYear
+    (transaction) =>
+      format(new Date(transaction.createdAt), "yyyy-MM") === selectedMonthYear
   );
 
   // Calcula ingresos, gastos y balance
@@ -235,50 +280,78 @@ const Movements = () => {
     { income: 0, expenses: 0, balance: 0 }
   );
 
-  // Prepara los datos para el FlatList con el tipo correcto
-  const getFilteredTransactionsForRender = useCallback((): GroupedTransactionItem[] => {
-    if (selectedDate) {
-      // Filtramos transacciones por día seleccionado
-      const filteredItems = transactions.filter(
-        (transaction) =>
-          new Date(transaction.createdAt).toDateString() === selectedDate.toDateString()
-      );
-
-      const dateKey = format(selectedDate, "dd-MM-yyyy");
-      
-      // Siempre devolvemos un formato compatible con renderItem
-      return [[dateKey, filteredItems.length > 0 ? filteredItems : []]];
-    } else {
-      // Convertimos el objeto de transacciones agrupadas a un array
-      const entries = Object.entries(groupedTransactions) as GroupedTransactionItem[];
-
-      // Ordenamos por fecha (más reciente primero)
-      entries.sort(([dateA], [dateB]) => {
-        const [dayA, monthA, yearA] = dateA.split("-").map(Number);
-        const [dayB, monthB, yearB] = dateB.split("-").map(Number);
-
-        // Comparamos por año, mes y día
-        if (yearA !== yearB) return yearB - yearA;
-        if (monthA !== monthB) return monthB - monthA;
-        return dayB - dayA;
+  // Prepara los datos para el FlatList con el tipo correcto y filtrando por status completed
+  const getFilteredTransactionsForRender =
+    useCallback((): GroupedTransactionItem[] => {
+      // Filtramos solo las transacciones completadas, con algunas verificaciones adicionales
+      const completedTransactions = transactions.filter((transaction) => {
+        // Verificar que la transacción existe y tiene un campo status
+        if (!transaction || typeof transaction.status === "undefined") {
+          return false;
+        }
+        // Comprobar si el status es completed (o cualquier otro valor que indique "completado")
+        return transaction.status === "completed";
       });
 
-      return entries;
-    }
-  }, [selectedDate, transactions, groupedTransactions]);
+
+
+      if (selectedDate) {
+        // Filtramos transacciones por día seleccionado
+        const filteredItems = completedTransactions.filter(
+          (transaction) =>
+            new Date(transaction.createdAt).toDateString() ===
+            selectedDate.toDateString()
+        );
+
+        const dateKey = format(selectedDate, "dd-MM-yyyy");
+
+
+        // Siempre devolvemos un formato compatible con renderItem
+        return [[dateKey, filteredItems.length > 0 ? filteredItems : []]];
+      } else {
+        // Agrupar las transacciones completadas por día
+        const completedGroupedTransactions = groupTransactionsByDay(
+          completedTransactions
+        );
+
+        // Convertimos el objeto de transacciones agrupadas a un array
+        const entries = Object.entries(
+          completedGroupedTransactions
+        ) as GroupedTransactionItem[];
+
+        // Log para debug
+        console.log("Grouped transactions entries:", entries.length);
+
+        // Ordenamos por fecha (más reciente primero)
+        entries.sort(([dateA], [dateB]) => {
+          const [dayA, monthA, yearA] = dateA.split("-").map(Number);
+          const [dayB, monthB, yearB] = dateB.split("-").map(Number);
+
+          // Comparamos por año, mes y día
+          if (yearA !== yearB) return yearB - yearA;
+          if (monthA !== monthB) return monthB - monthA;
+          return dayB - dayA;
+        });
+
+        return entries;
+      }
+    }, [selectedDate, transactions, groupTransactionsByDay]);
 
   const filteredTransactionsForRender = getFilteredTransactionsForRender();
 
   // Maneja la selección de un día
   const toggleDateSelection = (day: Date) => {
-    if (selectedDate && day.toDateString() === selectedDate.toDateString()) {
-      setSelectedDate(null); // Deseleccionamos si es el mismo día
-    } else {
-      setSelectedDate(day); // Seleccionamos el nuevo día
-      
-      // Si el día seleccionado no es del mes actual, actualizar referenceDay
-      if (!isSameMonth(day, referenceDay)) {
-        setReferenceDay(day);
+    // Solo permitir seleccionar días que no son futuros
+    if (!isFutureDay(day)) {
+      if (selectedDate && day.toDateString() === selectedDate.toDateString()) {
+        setSelectedDate(null); // Deseleccionamos si es el mismo día
+      } else {
+        setSelectedDate(day); // Seleccionamos el nuevo día
+
+        // Si el día seleccionado no es del mes actual, actualizar referenceDay
+        if (!isSameMonth(day, referenceDay)) {
+          setReferenceDay(day);
+        }
       }
     }
   };
@@ -305,12 +378,14 @@ const Movements = () => {
   const goToNextMonth = () => {
     const newReference = new Date(referenceDay);
     newReference.setMonth(newReference.getMonth() + 1);
-    
+
     // No permitir avanzar más allá del mes actual
     const today = new Date();
-    if (newReference <= today || 
-        (newReference.getMonth() === today.getMonth() && 
-         newReference.getFullYear() === today.getFullYear())) {
+    if (
+      newReference <= today ||
+      (newReference.getMonth() === today.getMonth() &&
+        newReference.getFullYear() === today.getFullYear())
+    ) {
       setReferenceDay(newReference);
       setSelectedDate(null);
       setDidInitialScroll(false); // Resetear el scroll inicial
@@ -318,9 +393,7 @@ const Movements = () => {
   };
 
   if (loading) {
-    return (
-      <Loader visible={true} fullScreen text="Cargando movimientos..." />
-    );
+    return <Loader visible={true} fullScreen text="Cargando movimientos..." />;
   }
 
   if (error) {
@@ -333,8 +406,9 @@ const Movements = () => {
 
   // Determinar si podemos avanzar al siguiente mes
   const today = new Date();
-  const canGoNext = referenceDay.getMonth() < today.getMonth() || 
-                    referenceDay.getFullYear() < today.getFullYear();
+  const canGoNext =
+    referenceDay.getMonth() < today.getMonth() ||
+    referenceDay.getFullYear() < today.getFullYear();
 
   return (
     <ThemedView style={styles.container}>
@@ -342,13 +416,13 @@ const Movements = () => {
         <Text style={styles.headerTitle}>Transacciones</Text>
 
         <View style={styles.monthYearContainer}>
-          <TouchableOpacity 
+          <TouchableOpacity
             onPress={goToPreviousMonth}
             style={styles.monthArrowButton}
           >
             <Text style={styles.arrowText}>{"<"}</Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             onPress={() => setIsCalendarVisible(true)}
             style={styles.monthTextButton}
@@ -358,13 +432,17 @@ const Movements = () => {
               <Text style={styles.monthText}>{monthYear}</Text>
             </Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             onPress={goToNextMonth}
             disabled={!canGoNext}
             style={styles.monthArrowButton}
           >
-            <Text style={[styles.arrowText, !canGoNext && styles.disabledArrow]}>{">"}</Text>
+            <Text
+              style={[styles.arrowText, !canGoNext && styles.disabledArrow]}
+            >
+              {">"}
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -379,39 +457,61 @@ const Movements = () => {
             snapToAlignment="start"
           >
             {days.map((day, index) => {
-              const isActive = selectedDate && day.toDateString() === selectedDate.toDateString();
+              const isActive =
+                selectedDate &&
+                day.toDateString() === selectedDate.toDateString();
               const hasTransactions = hasTransactionsOnDay(day);
-              const isToday = day.toDateString() === new Date().toDateString();
+              const isCurrentDay =
+                day.toDateString() === new Date().toDateString();
+              const isFuture = isFutureDay(day);
 
               return (
-                <View 
-                  key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`} 
+                <View
+                  key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
                   style={styles.dayButtonContainer}
                 >
                   <TouchableOpacity
                     style={[
                       styles.dayButton,
                       isActive && styles.activeDaySelected,
-                      !isActive && hasTransactions && styles.hasTransactionsDay,
-                      !isActive && !hasTransactions && styles.noTransactionsDay,
+                      !isActive &&
+                        hasTransactions &&
+                        !isFuture &&
+                        styles.hasTransactionsDay,
+                      !isActive &&
+                        !hasTransactions &&
+                        !isFuture &&
+                        styles.noTransactionsDay,
+                      isFuture && styles.futureDayButton, // Estilo para días futuros
                     ]}
                     onPress={() => toggleDateSelection(day)}
-                    activeOpacity={0.8}
+                    activeOpacity={isFuture ? 1 : 0.8} // No mostrar feedback en días futuros
+                    disabled={isFuture} // Deshabilitamos días futuros
                   >
-                    <Text style={styles.dayNumber}>
+                    <Text
+                      style={[
+                        styles.dayNumber,
+                        isFuture && styles.futureDayText, // Texto gris para días futuros
+                      ]}
+                    >
                       {format(day, "dd", { locale: es })}
                     </Text>
-                    <Text style={styles.dayLabel}>
+                    <Text
+                      style={[
+                        styles.dayLabel,
+                        isFuture && styles.futureDayText, // Texto gris para días futuros
+                      ]}
+                    >
                       {format(day, "EEE", { locale: es })}
                     </Text>
 
-                    {hasTransactions && (
-                      <View style={[styles.greenDot, isActive && styles.whiteDot]} />
+                    {hasTransactions && !isFuture && (
+                      <View
+                        style={[styles.greenDot, isActive && styles.whiteDot]}
+                      />
                     )}
                   </TouchableOpacity>
-                  {isToday && (
-                    <View style={styles.todayIndicator}></View>
-                  )}
+                  {isCurrentDay && <View style={styles.todayIndicator}></View>}
                 </View>
               );
             })}
@@ -499,9 +599,9 @@ const Movements = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#FFF" 
+  container: {
+    flex: 1,
+    backgroundColor: "#FFF",
   },
   centeredContainer: {
     flex: 1,
@@ -541,8 +641,8 @@ const styles = StyleSheet.create({
   monthArrowButton: {
     padding: 10,
     width: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   monthYearText: {
     fontSize: 20,
@@ -571,7 +671,7 @@ const styles = StyleSheet.create({
     minWidth: width,
   },
   dayButtonContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginHorizontal: DAY_BUTTON_MARGIN,
     width: DAY_BUTTON_WIDTH,
   },
@@ -596,15 +696,22 @@ const styles = StyleSheet.create({
     borderColor: "#FFF",
     borderWidth: 1,
   },
-  dayNumber: { 
-    color: "#FFF", 
+  futureDayButton: {
+    borderColor: "#555", // Borde gris para días futuros
+    borderWidth: 1,
+  },
+  dayNumber: {
+    color: "#FFF",
     fontSize: 18,
     fontFamily: "Outfit_500Medium",
   },
-  dayLabel: { 
-    color: "#FFF", 
+  dayLabel: {
+    color: "#FFF",
     fontSize: 14,
     fontFamily: "Outfit_500Medium",
+  },
+  futureDayText: {
+    color: "#555", // Texto gris para días futuros
   },
   greenDot: {
     width: 6,
@@ -668,8 +775,8 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
   },
-  listContent: { 
-    paddingBottom: 20 
+  listContent: {
+    paddingBottom: 20,
   },
 });
 

@@ -46,6 +46,7 @@ export const GET_TRANSACTIONS_BY_USER = gql`
       type
       updatedAt
       userId
+      status
     }
   }
 `;
