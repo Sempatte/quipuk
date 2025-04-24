@@ -6,11 +6,12 @@ import { TransactionType, TRANSACTION_COLORS, TransactionOption } from "@/app/in
 interface PaymentMethodSelectorProps {
   type: TransactionType;
   onSelect: (method: string) => void;
+  isPending?: boolean; // Agregado para distinguir entre gastos pagados y pendientes
 }
 
 const paymentMethods = [
   { id: "Efectivo", label: "Efectivo" },
-  { id: "Tarjeta", label: "Yape" },
+  { id: "Yape", label: "Yape" },
   { id: "Banco", label: "Cuenta Bancaria" },
 ];
 
@@ -18,27 +19,37 @@ const paymentMethods = [
 const TYPE_TO_OPTION_MAP: Record<TransactionType, TransactionOption> = {
   "gasto": "Gastos",
   "ingreso": "Ingresos",
-  "ahorro": "Ahorros" // Agregado para manejar el tipo "ahorro"
+  "ahorro": "Ahorros"
 };
 
-// Mapeo de tipos de transacción a textos de título
-const TYPE_TO_TITLE_MAP: Record<TransactionType, string> = {
-  "gasto": "¿Con qué pagaste?",
-  "ingreso": "¿Cómo recibiste el pago?",
-  "ahorro": "¿Cómo guardaste el dinero?"
+// Función para obtener el título según el tipo y estado
+const getTitleForType = (type: TransactionType, isPending: boolean): string => {
+  if (type === "gasto") {
+    return isPending ? "¿Con qué vas a pagar?" : "¿Con qué pagaste?";
+  } else if (type === "ingreso") {
+    return "¿Cómo recibiste el pago?";
+  } else if (type === "ahorro") {
+    return "¿Cómo guardaste el dinero?";
+  }
+  return "¿Qué método usaste?";
 };
 
 /**
  * Componente para seleccionar el método de pago
  * @param type - Tipo de transacción (gasto/ingreso/ahorro)
  * @param onSelect - Función para manejar la selección del método
+ * @param isPending - Indica si el gasto está pendiente
  */
-const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ type, onSelect }) => {
+const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ 
+  type, 
+  onSelect, 
+  isPending = false // Valor predeterminado: false (no pendiente)
+}) => {
   const [selectedMethod, setSelectedMethod] = useState("Efectivo");
   const [showMoreOptions, setShowMoreOptions] = useState(false);
 
-  // Obtener el título según el tipo de transacción
-  const selectorTitle = TYPE_TO_TITLE_MAP[type] || "¿Qué método usaste?";
+  // Obtener el título según el tipo de transacción y estado pendiente
+  const selectorTitle = getTitleForType(type, isPending);
 
   // Obtener el color basado en el tipo de transacción
   const themeColor = useMemo(() => {
@@ -129,7 +140,8 @@ const styles = StyleSheet.create({
     fontSize: 22, 
     fontFamily: "Outfit_600SemiBold", 
     color: "#000", 
-    marginBottom: 5 
+    marginBottom: 5,
+    lineHeight: 25
   },
   methodContainer: { 
     flexDirection: "row", 

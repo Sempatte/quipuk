@@ -12,7 +12,7 @@ const categoryData = {
   gasto: {
     mainCategories: ["Frecuentes", "Deducibles", "Otros"],
     subCategories: ["Comida", "Transporte", "Hogar", "Alquiler", "Salud", "Teléfono", "Super"],
-    selectedColor: "#EF674A",
+    selectedColor: "#FF5252",
   },
   ingreso: {
     mainCategories: [],

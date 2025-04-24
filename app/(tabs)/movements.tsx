@@ -293,8 +293,6 @@ const Movements = () => {
         return transaction.status === "completed";
       });
 
-
-
       if (selectedDate) {
         // Filtramos transacciones por día seleccionado
         const filteredItems = completedTransactions.filter(
@@ -304,7 +302,6 @@ const Movements = () => {
         );
 
         const dateKey = format(selectedDate, "dd-MM-yyyy");
-
 
         // Siempre devolvemos un formato compatible con renderItem
         return [[dateKey, filteredItems.length > 0 ? filteredItems : []]];
@@ -511,7 +508,9 @@ const Movements = () => {
                       />
                     )}
                   </TouchableOpacity>
-                  {isCurrentDay && <View style={styles.todayIndicator}></View>}
+                  {isCurrentDay && (
+                    <Text style={styles.todayIndicator}>Hoy</Text>
+                  )}
                 </View>
               );
             })}
@@ -724,11 +723,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF",
   },
   todayIndicator: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#FFF",
-    marginTop: 5,
+    color: "#FFF",
+    fontSize: 7.5,
+    marginTop: 2,
+    fontWeight: "bold",
+    lineHeight: 10,
   },
   transactionGroup: {
     marginBottom: 20,

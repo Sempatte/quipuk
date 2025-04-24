@@ -119,7 +119,7 @@ const RecentTransactions = () => {
       category = "", 
       createdAt = new Date().toISOString(),
       title = "",
-      paymentMethod = "Efectivo"
+      paymentMethod = "Tarjeta"
     } = item;
     
     // Formato de hora y fecha

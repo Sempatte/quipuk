@@ -17,6 +17,9 @@ import SavingMoneyIcon from "@/assets/images/icons/categories/ingresos/savingmon
 import AddIcon from "@/assets/images/icons/Add.svg";
 import FluentMoneyIcon from "@/assets/images/icons/payment_methods/fluent_money.svg";
 import CardIcon from "@/assets/images/icons/payment_methods/card.svg";
+// Importando el PNG directamente
+import YapeIcon from "@/assets/images/icons/yape_bn.png";
+import { Image } from 'react-native';
 
 // 📌 Mapeo de iconos por categoría y tipo de transacción
 export const gastosIcons: Record<string, JSX.Element> = {
@@ -45,8 +48,8 @@ export const ingresosIcons: Record<string, JSX.Element> = {
 };
 
 export const constPaymentMethodsIcons: Record<string, JSX.Element> = {
-  Efectivo: <FluentMoneyIcon width={30} height={30} />,
-  Tarjeta: <CardIcon width={30} height={30} />,
+  Efectivo: <FluentMoneyIcon  width={30} height={30} />,
+  Yape: <Image source={YapeIcon} style={{ width: 30, height: 30 }} />,
   Banco: <CardIcon width={30} height={30} />,
 };
 

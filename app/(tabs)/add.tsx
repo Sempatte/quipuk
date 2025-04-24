@@ -239,8 +239,6 @@ export default function AddTransaction() {
       const userId = parseInt(storedUserId, 10);
 
       // Crear objeto para la transacción
-      // Crear objeto para la transacción
-      // Crear objeto para la transacción
       const transactionInput: CreateTransactionInput = {
         userId,
         title: formState.category,
@@ -380,6 +378,7 @@ export default function AddTransaction() {
             <PaymentMethodSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
               onSelect={(paymentMethod) => updateFormState({ paymentMethod })}
+              isPending={formState.isPaid}
             />
           </View>
 
