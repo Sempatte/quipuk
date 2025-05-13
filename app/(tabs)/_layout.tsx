@@ -44,9 +44,9 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="graphics"
+          name="board"
           options={{
-            title: "Gráficos",
+            title: "Board",
             headerShown: false, // Oculta el encabezado en esta pantalla
           }}
         />

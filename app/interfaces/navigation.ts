@@ -9,6 +9,7 @@ export type RootStackParamList = {
   "(tabs)": undefined;
   movements: undefined;
   index: undefined;
+  board: undefined;
   add: {
     forcePaymentStatus?: 'pending' | 'completed';
     statusReadOnly?: boolean;

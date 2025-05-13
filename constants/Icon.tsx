@@ -11,7 +11,7 @@ interface SvgProps_ extends SvgProps {
 export const icon = {
   index: (props: SvgProps_) => <HomeIcon {...props} />,
   movements: (props: SvgProps_) => <MovementsIcon {...props} />,
-  graphics: (props: SvgProps_) => <GraphicIcon {...props} />,
+  board: (props: SvgProps_) => <GraphicIcon {...props} />,
   profile: (props: SvgProps_) => <ProfileIcon {...props} />,
   add: (props: SvgProps_) => (
     <Svg width={24} height={24} viewBox="0 0 24 24" {...props}>

@@ -81,7 +81,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               name={
                 route.name === "movements"
                   ? "swap-horiz"
-                  : route.name === "graphics"
+                  : route.name === "board"
                   ? "bar-chart"
                   : route.name === "profile"
                   ? "person"
