@@ -14,62 +14,64 @@ const Legend: React.FC<LegendProps> = ({ categories }) => {
     return null;
   }
 
-  // Agrupar las categorías por filas
-  const rows: CategoryData[][] = [];
-  let currentRow: CategoryData[] = [];
-
+  // Dividir las categorías en dos columnas
+  const leftColumnCategories: CategoryData[] = [];
+  const rightColumnCategories: CategoryData[] = [];
+  
   categories.forEach((category, index) => {
-    currentRow.push(category);
-    // Crear una nueva fila cada 2 elementos o al final de la lista
-    if (currentRow.length === 2 || index === categories.length - 1) {
-      rows.push([...currentRow]);
-      currentRow = [];
+    if (index % 2 === 0) {
+      leftColumnCategories.push(category);
+    } else {
+      rightColumnCategories.push(category);
     }
   });
 
+  // Renderizar una categoría
+  const renderCategory = (category: CategoryData) => (
+    <View key={category.name} style={styles.legendItem}>
+      <View
+        style={[
+          styles.colorIndicator,
+          { backgroundColor: category.color },
+        ]}
+      />
+      <Text style={styles.legendText}>
+        {category.name} {category.percentage}%
+      </Text>
+    </View>
+  );
+
   return (
     <View style={styles.legendContainer}>
-      {rows.map((row, rowIndex) => (
-        <View key={`row-${rowIndex}`} style={styles.legendRow}>
-          {row.map((category) => (
-            <View key={category.name} style={styles.legendItem}>
-              <View
-                style={[
-                  styles.colorIndicator,
-                  { backgroundColor: category.color },
-                ]}
-              />
-              <Text style={styles.legendText}>
-                {category.name} {category.percentage}%
-              </Text>
-            </View>
-          ))}
-        </View>
-      ))}
+      <View style={styles.column}>
+        {leftColumnCategories.map(renderCategory)}
+      </View>
+      <View style={styles.column}>
+        {rightColumnCategories.map(renderCategory)}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   legendContainer: {
-    marginTop: 20,
-    paddingHorizontal: 10,
-  },
-  legendRow: {
     flexDirection: "row",
     justifyContent: "space-between",
+    paddingHorizontal: 10,
+    marginTop: 20,
     marginBottom: 10,
+  },
+  column: {
+    width: "48%",
   },
   legendItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 5,
-    marginVertical: 5,
-    minWidth: "45%",
+    marginVertical: 6,
   },
   colorIndicator: {
-    width: 15,
-    height: 15,
+    width: 16,
+    height: 16,
     borderRadius: 8,
     marginRight: 8,
   },

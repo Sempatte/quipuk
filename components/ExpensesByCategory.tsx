@@ -9,14 +9,12 @@ import { useQuery } from "@apollo/client";
 import { GET_TRANSACTIONS } from "@/app/graphql/transaction.graphql";
 import { useFocusEffect } from "@react-navigation/native";
 import { globalStyles } from "@/app/styles/globalStyles";
-import { Colors } from "@/constants/Colors";
 import { useExpenseCategories, PeriodFilter } from "@/hooks/useExpenseCategories";
 import PieChart from "./ui/PieChart";
 import Legend from "./ui/Legend";
-
 // Componente principal
 const ExpensesByCategory: React.FC = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("Este mes");
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("Este mes"); // Cambiado a "Este mes" según la imagen
   const currentYear = new Date().getFullYear().toString();
   
   // Consulta para obtener las transacciones
@@ -30,6 +28,8 @@ const ExpensesByCategory: React.FC = () => {
       refetch();
     }, [refetch])
   );
+
+  
   
   // Usar el hook para procesar los datos de gastos por categoría
   const expenseData = useExpenseCategories(
@@ -94,6 +94,7 @@ const ExpensesByCategory: React.FC = () => {
               categories={expenseData.categories} 
               totalExpense={expenseData.totalExpense}
               month={expenseData.month}
+              periodLabel={expenseData.periodLabel}
             />
             <Legend categories={expenseData.categories} />
           </>
@@ -106,17 +107,20 @@ const ExpensesByCategory: React.FC = () => {
 const styles = StyleSheet.create({
   filterContainer: {
     flexDirection: "row",
-    marginBottom: 16,
-    gap: 8,
+    justifyContent: "space-between",
+    marginBottom: 20,
+    paddingHorizontal: 5,
   },
   filterButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
     backgroundColor: "#F5F5F5",
+    minWidth: 75,
+    alignItems: "center",
   },
   selectedFilterButton: {
-    backgroundColor: Colors.chart.income,
+    backgroundColor: "#00DC5A", // Usando el color verde como en la imagen
   },
   filterText: {
     fontSize: 14,

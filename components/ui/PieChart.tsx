@@ -7,12 +7,13 @@ interface PieChartProps {
   categories: CategoryData[];
   totalExpense: number;
   month: string;
+  periodLabel: string; // Nuevo parámetro para el rango de meses
 }
 
 /**
  * Componente PieChart para visualizar distribución de gastos por categoría
  */
-const PieChart: React.FC<PieChartProps> = ({ categories, totalExpense, month }) => {
+const PieChart: React.FC<PieChartProps> = ({ categories, totalExpense, month, periodLabel }) => {
   if (!categories.length) {
     return (
       <View style={styles.emptyDataContainer}>
@@ -29,11 +30,14 @@ const PieChart: React.FC<PieChartProps> = ({ categories, totalExpense, month }) 
   const strokeWidth = 30;
   const innerRadius = radius - strokeWidth;
 
+  // Verificar que los porcentajes sumen exactamente 100
+  const totalPercentage = categories.reduce((sum, cat) => sum + cat.percentage, 0);
+  
   // Calculamos las secciones del gráfico circular
   let cumulativeAngle = 0;
   const segments = categories.map((category, index) => {
-    const angle = (category.percentage / 100) * 360;
-    const startAngle = cumulativeAngle;
+    // Usar el porcentaje exacto para calcular el ángulo
+    const angle = (category.percentage / totalPercentage) * 360;
     cumulativeAngle += angle;
 
     return (
@@ -56,21 +60,43 @@ const PieChart: React.FC<PieChartProps> = ({ categories, totalExpense, month }) 
     );
   });
 
-  // Capitalizar primera letra
-  const capitalize = (s: string) => {
-    return s.charAt(0).toUpperCase() + s.slice(1);
+  // Formatear el importe según el formato de la imagen
+  const formatAmount = (amount: number) => {
+    return amount.toLocaleString("es-PE", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
   };
+
+  // Obtener el texto formateado del monto
+  const formattedAmount = formatAmount(totalExpense);
+  
+  // IMPORTANTE: Ajustar el texto para que sea exactamente como en la imagen
+  // Eliminar los espacios que genera el toLocaleString entre miles
+  const amountText = `S/${formattedAmount.replace(/\s/g, '')}`;
+  
+  // Determinar el tamaño de fuente de forma más precisa
+  let amountFontSize;
+  if (amountText.length > 12) {
+    amountFontSize = 18; // Montos extremadamente grandes
+  } else if (amountText.length > 10) {
+    amountFontSize = 20; // Montos muy grandes
+  } else if (amountText.length > 8) {
+    amountFontSize = 22; // Montos grandes
+  } else {
+    amountFontSize = 28; // Montos normales o pequeños
+  }
 
   return (
     <View style={styles.chartContainer}>
       <Svg width={size} height={size}>
         {segments}
 
-        {/* Contenido central */}
+        {/* Contenido central con mejor ajuste */}
         <G>
           <SvgText
             x={centerX}
-            y={centerY - 15}
+            y={centerY - 32}
             fill="#000"
             fontSize={16}
             fontFamily="Outfit_500Medium"
@@ -78,29 +104,30 @@ const PieChart: React.FC<PieChartProps> = ({ categories, totalExpense, month }) 
           >
             Gasto Total
           </SvgText>
+          
+          {/* Utilizamos el texto formateado sin espacios */}
           <SvgText
             x={centerX}
-            y={centerY + 20}
+            y={centerY + 6}
             fill="#000"
-            fontSize={32}
+            fontSize={amountFontSize}
             fontWeight="bold"
             fontFamily="Outfit_700Bold"
             textAnchor="middle"
           >
-            S/ {totalExpense.toLocaleString("es-PE", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })}
+            {amountText}
           </SvgText>
+          
+          {/* Mostrar el rango de meses o el año */}
           <SvgText
             x={centerX}
-            y={centerY + 50}
+            y={centerY + 35}
             fill="#000"
             fontSize={16}
             fontFamily="Outfit_400Regular"
             textAnchor="middle"
           >
-            {capitalize(month)}
+            {periodLabel}
           </SvgText>
         </G>
       </Svg>
