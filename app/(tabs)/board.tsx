@@ -6,6 +6,7 @@ import FinancialSituation from '@/components/ui/FinancialSituation';
 import RecentTransactions from '@/components/ui/RecentTransactions';
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
 import { globalStyles } from '../styles/globalStyles';
+import UpcomingPayments from '@/components/ui/UpcomingPayments';
 
 export default function Board() {
   return (
@@ -18,7 +19,7 @@ export default function Board() {
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.contentContainer}>
           <FinancialSituation />
-          {/* Aquí puedes agregar más componentes si es necesario */}
+          <UpcomingPayments />
         </View>
       </ScrollView>
     </ThemedView>
@@ -33,6 +34,6 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
     paddingTop: 10,
-    paddingBottom: 20,
+    paddingBottom: 50,
   },
 });
