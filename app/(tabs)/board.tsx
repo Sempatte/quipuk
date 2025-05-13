@@ -7,7 +7,7 @@ import RecentTransactions from '@/components/ui/RecentTransactions';
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
 import { globalStyles } from '../styles/globalStyles';
 
-export default function board() {
+export default function Board() {
   return (
     <ThemedView style={styles.mainContainer}>
       {/* Header con la imagen del logo */}

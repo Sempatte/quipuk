@@ -26,7 +26,7 @@ type LoginScreenNavigationProp = NativeStackNavigationProp<
   "movements"
 >;
 
-export default function HomeScreen() {
+export default function Index() {
   const { data, loading, error } = useQuery(GET_USER_PROFILE);
   const navigation = useNavigation<LoginScreenNavigationProp>();
 
