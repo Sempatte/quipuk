@@ -67,7 +67,7 @@ export default function HomeScreen() {
           <Text style={styles.welcome}>
             Hola,{" "}
             <Text style={styles.username}>
-              {loading ? "..." : data?.getUserProfile.fullName || "ELMER"}
+              {loading ? "..." : data?.getUserProfile.fullName || "Usuario"}
             </Text>
           </Text>
         </View>

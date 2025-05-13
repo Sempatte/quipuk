@@ -23,4 +23,12 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
+  // Colores para el gráfico
+  chart: {
+    expense: '#FF5252', // Rojo para gastos
+    income: '#00DC5A',
+    // Verde para ingresos
+    inactive: '#DDDDDD', // Gris para meses inactivos
+  },
 };
+

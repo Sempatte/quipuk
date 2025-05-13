@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useEffect, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -22,6 +22,8 @@ import EyeOffIcon from "@/assets/images/icons/eye-off.svg";
 import ChevronDownIcon from "@/assets/images/icons/chevron-down.svg";
 import ChevronUpIcon from "@/assets/images/icons/chevron-up.svg";
 import TransactionSkeleton from "@/components/ui/TransactionSkeleton";
+import { globalStyles } from "@/app/styles/globalStyles";
+import { Colors } from "@/constants/Colors";
 
 type MovementsNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -35,7 +37,7 @@ interface TransactionsData {
 
 const MAX_HEIGHT = 300; // Altura máxima del contenedor expandido
 
-const RecentTransactions = () => {
+const RecentTransactions: React.FC = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const animation = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<MovementsNavigationProp>();
@@ -106,7 +108,7 @@ const RecentTransactions = () => {
     if (!item) {
       return (
         <View style={styles.transactionItem}>
-          <Text style={styles.errorText}>Datos no disponibles</Text>
+          <Text style={globalStyles.errorText}>Datos no disponibles</Text>
         </View>
       );
     }
@@ -168,7 +170,7 @@ const RecentTransactions = () => {
 
     if (error) {
       return (
-        <Text style={styles.errorText}>
+        <Text style={globalStyles.errorText}>
           Error al cargar transacciones
         </Text>
       );
@@ -204,10 +206,10 @@ const RecentTransactions = () => {
 
   return (
     <View>
-      <View style={styles.titleContainer}>
-        <Text style={styles.title}>Últimos Movimientos</Text>
+      <View style={globalStyles.titleContainer}>
+        <Text style={globalStyles.sectionTitle}>Últimos Movimientos</Text>
       </View>
-      <View style={styles.outerContainer}>
+      <View style={[globalStyles.sectionContainer, { padding: 0 }]}>
         <TouchableOpacity
           style={[
             styles.expandButton,
@@ -225,7 +227,7 @@ const RecentTransactions = () => {
             <View style={styles.expandButtonLeftContent}>
               {isExpanded ? (
                 <>
-                  <EyeOffIcon width={20} height={20} fill="#00DC5A" />
+                  <EyeOffIcon width={20} height={20} fill={Colors.chart.income} />
                   <Text style={styles.expandButtonTextActive}>
                     Ocultar movimientos
                   </Text>
@@ -241,7 +243,7 @@ const RecentTransactions = () => {
             </View>
 
             {isExpanded ? (
-              <ChevronUpIcon width={18} height={18} fill="#00DC5A" />
+              <ChevronUpIcon width={18} height={18} fill={Colors.chart.income} />
             ) : (
               <ChevronDownIcon width={18} height={18} fill="#666" />
             )}
@@ -259,28 +261,6 @@ const RecentTransactions = () => {
 };
 
 const styles = StyleSheet.create({
-  outerContainer: {
-    marginHorizontal: 15,
-    marginVertical: 10,
-    borderRadius: 12,
-    backgroundColor: "#FFF",
-    overflow: "hidden",
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  titleContainer: {
-    paddingHorizontal: 15,
-    paddingVertical: 5,
-  },
-  title: {
-    fontSize: 25,
-    fontFamily: "Outfit_600SemiBold",
-    color: "#000",
-    marginBottom: 15,
-  },
   expandButton: {
     width: "100%",
     borderRadius: 12,
@@ -316,7 +296,7 @@ const styles = StyleSheet.create({
   expandButtonTextActive: {
     fontSize: 20,
     fontFamily: "Outfit_500Medium",
-    color: "#00DC5A",
+    color: Colors.chart.income,
     marginLeft: 8,
   },
   animatedContainer: {
@@ -386,21 +366,6 @@ const styles = StyleSheet.create({
     color: "#666",
     fontFamily: "Outfit_400Regular",
   },
-  transactionInfo: {
-    flex: 1,
-  },
-  transactionTime: {
-    fontSize: 12,
-    fontFamily: "Outfit_400Regular",
-    color: "#666",
-    marginTop: 2,
-  },
-  transactionCategory: {
-    fontSize: 12,
-    fontFamily: "Outfit_400Regular",
-    color: "#666",
-    marginTop: 2,
-  },
   transactionAmount: {
     fontSize: 16,
     fontFamily: "Outfit_600SemiBold",
@@ -418,17 +383,12 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
     color: "#000",
   },
-  errorText: {
-    textAlign: "center",
-    color: "#FF5252",
-    padding: 15,
-  },
   noTransactionsText: {
     textAlign: "center",
     color: "#666",
     padding: 15,
     fontStyle: "italic",
-  },
+  }
 });
 
 export default RecentTransactions;
