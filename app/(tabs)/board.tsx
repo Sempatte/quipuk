@@ -7,6 +7,7 @@ import RecentTransactions from '@/components/ui/RecentTransactions';
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
 import { globalStyles } from '../styles/globalStyles';
 import UpcomingPayments from '@/components/ui/UpcomingPayments';
+import ExpensesByCategory from '@/components/ExpensesByCategory';
 
 export default function Board() {
   return (
@@ -20,6 +21,7 @@ export default function Board() {
         <View style={styles.contentContainer}>
           <FinancialSituation />
           <UpcomingPayments />
+          <ExpensesByCategory />
         </View>
       </ScrollView>
     </ThemedView>
