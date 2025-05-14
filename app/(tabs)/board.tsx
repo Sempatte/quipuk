@@ -8,6 +8,7 @@ import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
 import { globalStyles } from '../styles/globalStyles';
 import UpcomingPayments from '@/components/ui/UpcomingPayments';
 import ExpensesByCategory from '@/components/ExpensesByCategory';
+import SpendingHeatmap from '@/components/SpendingHeatmap';
 
 export default function Board() {
   return (
@@ -22,6 +23,7 @@ export default function Board() {
           <FinancialSituation />
           <UpcomingPayments />
           <ExpensesByCategory />
+          <SpendingHeatmap />
         </View>
       </ScrollView>
     </ThemedView>
