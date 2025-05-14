@@ -9,13 +9,15 @@ import { globalStyles } from '../styles/globalStyles';
 import UpcomingPayments from '@/components/ui/UpcomingPayments';
 import ExpensesByCategory from '@/components/ExpensesByCategory';
 import SpendingHeatmap from '@/components/SpendingHeatmap';
+import SpendingHistory from '@/components/SpendingHistory';
+import SpendingHistoryChart from '@/components/ui/SpendingHistoryChart';
 
 export default function Board() {
   return (
     <ThemedView style={styles.mainContainer}>
       {/* Header con la imagen del logo */}
       <View style={globalStyles.header}>
-        <QuipuBoardLogo width={200} height={60} />
+        <QuipuBoardLogo width={400} height={60} />
       </View>
       
       <ScrollView showsVerticalScrollIndicator={false}>
@@ -23,6 +25,7 @@ export default function Board() {
           <FinancialSituation />
           <UpcomingPayments />
           <ExpensesByCategory />
+          <SpendingHistory />
           <SpendingHeatmap />
         </View>
       </ScrollView>
@@ -41,3 +44,5 @@ const styles = StyleSheet.create({
     paddingBottom: 50,
   },
 });
+
+// TO DO: En la leyenda de los gastos por categoria, deben ser botones los cuales deben filtrar el PieChart. Guiarse del figma de la app de Quipuk. Darle el mismo diseño de los botones de la parte superior de la pantalla. Agregar borde blanco a las barritas que componen el PieChart. En los filtro superiores la letra es negra y el fondo verde.
