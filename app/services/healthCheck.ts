@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 // URL base del API - considera moverla a un archivo de configuración
-const API_URL = 'http://192.168.0.50:3000';
+const API_URL = 'http://172.20.10.10:3000';
 
 // Interfaz para la respuesta del health check (ajustada a la estructura real)
 interface HealthCheckResponse {
