@@ -1,9 +1,7 @@
+// app/services/healthCheck.ts
 import axios from 'axios';
+import env from '@/app/config/env';
 
-// URL base del API - considera moverla a un archivo de configuración
-const API_URL = 'http://172.20.10.10:3000';
-
-// Interfaz para la respuesta del health check (ajustada a la estructura real)
 interface HealthCheckResponse {
   success: boolean;
   data: {
@@ -23,22 +21,41 @@ interface HealthCheckResponse {
 }
 
 /**
- * Verifica el estado del backend
- * @returns Promise<boolean> - true si el backend está activo, false en caso contrario
+ * Verifica el estado del backend con retry y timeout optimizados
  */
-export const checkBackendHealth = async (): Promise<boolean> => {
+export const checkBackendHealth = async (retries = 2): Promise<boolean> => {
   try {
-    const response = await axios.get<HealthCheckResponse>(`${API_URL}/health`, {
-      timeout: 5000 // 5 segundos de timeout
-    });
-
-    console.log('Health Check Response:', response.data.data);
+    // Se ha aumentado el timeout para entornos de producción
+    const timeout = env.isProduction ? 8000 : 5000;
     
-    // Verificación exacta según la estructura de respuesta esperada
-    return response.data?.success === true && 
-           response.data?.data?.status === "ok" &&
-           response.data?.data?.info?.database?.status === "up";
+    const response = await axios.get<HealthCheckResponse>(`${env.API_URL}/health`, {
+      timeout,
+      // Headers básicos
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    // Logging solo en desarrollo
+    if (env.isDevelopment) {
+      console.log('🏥 Health Check Response:', response.data);
+    }
+    
+    return (
+      response.data?.success === true && 
+      response.data?.data?.status === "ok" &&
+      response.data?.data?.info?.database?.status === "up"
+    );
   } catch (error) {
+    // Intenta nuevamente si hay retries disponibles
+    if (retries > 0) {
+      console.log(`⚠️ Health check failed, retrying... (${retries} attempts left)`);
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1 segundo
+      return checkBackendHealth(retries - 1);
+    }
+    
+    console.error('❌ Health check failed:', error);
     return false;
   }
 };
