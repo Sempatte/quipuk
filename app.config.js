@@ -29,7 +29,9 @@ export default ({config}) => {
   // Obtener y validar las variables requeridas
   const apiUrl = getEnvVar('API_URL', 'http://172.20.10.10:3000');
   const graphqlUrl = getEnvVar('GRAPHQL_URL', 'http://172.20.10.10:3000/graphql');
-  
+  console.log(`📦 Building app for ${ENV.toUpperCase()} environment`);
+  console.log(`API URL: ${apiUrl}`);
+  console.log(`GraphQL URL: ${graphqlUrl}`);
   // Validación básica de variables
   const missingVars = [];
   if (!apiUrl) missingVars.push('API_URL');
