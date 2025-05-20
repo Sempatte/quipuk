@@ -1,5 +1,8 @@
+// ---- SpendingHistoryChart.tsx ----
+
+// components/ui/SpendingHistoryChart.tsx
 import React, { useRef, useEffect } from "react";
-import { View, StyleSheet, Dimensions, Text } from "react-native";
+import { View, StyleSheet, Text } from "react-native";
 import Svg, {
   Path,
   Line,
@@ -7,7 +10,6 @@ import Svg, {
   Defs,
   LinearGradient,
   Stop,
-  Circle as SvgCircle,
 } from "react-native-svg";
 import { PeriodFilter } from "@/hooks/useSpendingHistory";
 import Animated, {
@@ -16,14 +18,6 @@ import Animated, {
   withTiming,
   Easing,
 } from "react-native-reanimated";
-
-const { width } = Dimensions.get("window");
-const CHART_WIDTH = width - 60; // Allow for padding
-const CHART_HEIGHT = 230; // Aumentado para dar más espacio vertical
-const CHART_PADDING_TOP = 20;
-const CHART_PADDING_BOTTOM = 30;
-const CHART_PADDING_LEFT = 50; // Ajustado para las etiquetas del eje Y
-const CHART_PADDING_RIGHT = 10;
 
 // Create animated path component
 const AnimatedPath = Animated.createAnimatedComponent(Path);
@@ -59,146 +53,182 @@ const SpendingHistoryChart: React.FC<SpendingHistoryChartProps> = ({
     );
   }
 
-  // Calculate chart dimensions
-  const chartWidth = CHART_WIDTH - CHART_PADDING_LEFT - CHART_PADDING_RIGHT;
-  const chartHeight = CHART_HEIGHT - CHART_PADDING_TOP - CHART_PADDING_BOTTOM;
+  // Chart dimensions
+  const chartWidth = 350;
+  const chartHeight = 200;
+  const paddingTop = 20;
+  const paddingBottom = 40;
+  const paddingLeft = 40;
+  const paddingRight = 10;
+  const chartAreaWidth = chartWidth - paddingLeft - paddingRight;
+  const chartAreaHeight = chartHeight - paddingTop - paddingBottom;
 
-  // Calculate the maximum value for the y-axis scaling with proper steps
-  const maxValue = Math.max(...data, 100); // Ensure we have at least 100 as max for scale
+  // Calculate max value for Y axis with some extra space at the top
+  const maxValue = Math.max(...data, 1) * 1.2;
   
-  // Calculate appropriate Y-axis step size based on the max value
-  let yStepSize = 1700; // Default step size
-  if (maxValue > 8000) {
-    yStepSize = 1700;
-  } else if (maxValue > 5000) {
-    yStepSize = 1700;
-  } else if (maxValue > 3000) {
-    yStepSize = 850;
-  } else if (maxValue > 1000) {
-    yStepSize = 500;
-  } else if (maxValue > 500) {
-    yStepSize = 200;
-  } else if (maxValue > 200) {
-    yStepSize = 100;
-  } else {
-    yStepSize = 50;
-  }
-  
-  // Generate Y axis ticks with appropriate steps
-  const maxYValue = Math.ceil(maxValue / yStepSize) * yStepSize;
-  const numYTicks = maxYValue / yStepSize + 1;
-  const yTicks = Array.from({ length: numYTicks }, (_, i) => i * yStepSize);
-  
-  // Calculate x and y positions for the line chart
+  // Define Y axis values with 5 steps
+  const ySteps = 5;
+  const yStepSize = Math.ceil(maxValue / ySteps);
+  const yValues = Array.from({ length: ySteps + 1 }, (_, i) => i * yStepSize);
+
+  // Calculate point coordinates
   const points = data.map((value, index) => ({
-    x: CHART_PADDING_LEFT + (index * chartWidth) / Math.max(data.length - 1, 1),
-    y: CHART_PADDING_TOP + chartHeight - (value * chartHeight) / maxYValue,
+    x: paddingLeft + (index * chartAreaWidth) / Math.max(data.length - 1, 1),
+    y: paddingTop + chartAreaHeight - (value * chartAreaHeight) / maxValue,
+    value,
   }));
 
-  // Create SVG path for the line
-  const linePath = points
-    .map((point, index) => (index === 0 ? `M ${point.x} ${point.y}` : `L ${point.x} ${point.y}`))
-    .join(" ");
-
-  // Create SVG path for the area under the line
-  const areaPath = `${linePath} L ${points[points.length - 1].x} ${
-    CHART_PADDING_TOP + chartHeight
-  } L ${points[0].x} ${CHART_PADDING_TOP + chartHeight} Z`;
-
-  // Animated props for the path
+  // Create animated props directly within the useAnimatedProps with enhanced curvature
   const animatedAreaProps = useAnimatedProps(() => {
+    const progressedPoints = points.map(point => ({
+      ...point,
+      y: paddingTop + chartAreaHeight - (point.value * animation.value * chartAreaHeight) / maxValue,
+    }));
+
+    // Start at the bottom left
+    let path = `M ${progressedPoints[0].x} ${paddingTop + chartAreaHeight} `;
+    
+    // Line to first point
+    path += `L ${progressedPoints[0].x} ${progressedPoints[0].y} `;
+    
+    // Enhanced curvature using cubic bezier curves for smoother lines
+    if (progressedPoints.length > 1) {
+      for (let i = 0; i < progressedPoints.length - 1; i++) {
+        const currentPoint = progressedPoints[i];
+        const nextPoint = progressedPoints[i + 1];
+        
+        // Control points for the cubic bezier curve (more pronounced curve)
+        const cp1x = currentPoint.x + (nextPoint.x - currentPoint.x) * 0.4; // 40% between points
+        const cp1y = currentPoint.y;
+        const cp2x = currentPoint.x + (nextPoint.x - currentPoint.x) * 0.6; // 60% between points
+        const cp2y = nextPoint.y;
+        
+        // Add cubic bezier curve
+        path += `C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${nextPoint.x} ${nextPoint.y} `;
+      }
+    }
+    
+    // Close the path back to x-axis
+    path += `L ${progressedPoints[progressedPoints.length - 1].x} ${paddingTop + chartAreaHeight} Z`;
+    
     return {
-      d: areaPath,
+      d: path,
       opacity: animation.value,
+    };
+  });
+
+  // Animated props for the line with enhanced curvature
+  const animatedLineProps = useAnimatedProps(() => {
+    const progressedPoints = points.map(point => ({
+      ...point,
+      y: paddingTop + chartAreaHeight - (point.value * animation.value * chartAreaHeight) / maxValue,
+    }));
+
+    let path = "";
+    
+    if (progressedPoints.length > 0) {
+      // Start at the first point
+      path = `M ${progressedPoints[0].x} ${progressedPoints[0].y} `;
+      
+      // Enhanced curvature using cubic bezier curves
+      if (progressedPoints.length > 1) {
+        for (let i = 0; i < progressedPoints.length - 1; i++) {
+          const currentPoint = progressedPoints[i];
+          const nextPoint = progressedPoints[i + 1];
+          
+          // Control points for the cubic bezier curve (more pronounced curve)
+          const cp1x = currentPoint.x + (nextPoint.x - currentPoint.x) * 0.4; // 40% between points
+          const cp1y = currentPoint.y;
+          const cp2x = currentPoint.x + (nextPoint.x - currentPoint.x) * 0.6; // 60% between points
+          const cp2y = nextPoint.y;
+          
+          // Add cubic bezier curve
+          path += `C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${nextPoint.x} ${nextPoint.y} `;
+        }
+      }
+    }
+    
+    return {
+      d: path,
+      strokeOpacity: animation.value,
     };
   });
 
   return (
     <View style={styles.container}>
-      <Svg width={CHART_WIDTH} height={CHART_HEIGHT}>
+      <Svg width={chartWidth} height={chartHeight}>
         <Defs>
           <LinearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#E57254" stopOpacity="0.8" />
-            <Stop offset="1" stopColor="#E57254" stopOpacity="0.1" />
+            <Stop offset="0" stopColor="#96260D" stopOpacity="0.8" />
+            <Stop offset="1" stopColor="#96260D" stopOpacity="0.1" />
           </LinearGradient>
         </Defs>
 
-        {/* Y-axis grid lines and labels */}
-        {yTicks.map((tick, index) => {
-          const y = CHART_PADDING_TOP + chartHeight - (tick * chartHeight) / maxYValue;
+        {/* Líneas de cuadrícula y etiquetas del eje Y */}
+        {yValues.map((value, index) => {
+          const y = paddingTop + chartAreaHeight - (value * chartAreaHeight) / maxValue;
           return (
             <React.Fragment key={`grid-${index}`}>
               <Line
-                x1={CHART_PADDING_LEFT}
+                x1={paddingLeft}
                 y1={y}
-                x2={CHART_WIDTH - CHART_PADDING_RIGHT}
+                x2={chartWidth - paddingRight}
                 y2={y}
                 stroke="#E0E0E0"
                 strokeWidth={1}
               />
               <SvgText
-                x={CHART_PADDING_LEFT - 8}
+                x={paddingLeft - 5}
                 y={y + 4}
-                fontSize={12}
+                fontSize={10}
                 fontFamily="Outfit_400Regular"
-                fill="#888888"
+                fill="#666666"
                 textAnchor="end"
               >
-                {`S/${tick.toLocaleString()}`}
+                {`S/ ${value}`}
               </SvgText>
             </React.Fragment>
           );
         })}
 
-        {/* Area under the line */}
+        {/* Área bajo la curva */}
         <AnimatedPath
           animatedProps={animatedAreaProps}
           fill="url(#areaGradient)"
         />
 
-        {/* Line on top */}
-        <Path 
-          d={linePath} 
-          stroke="#E57254" 
-          strokeWidth={2.5} 
-          fill="none" 
+        {/* Línea principal */}
+        <AnimatedPath
+          animatedProps={animatedLineProps}
+          stroke="#96260D"
+          strokeWidth={2.5}
+          fill="none"
         />
 
-        {/* X-axis labels */}
+        {/* Etiquetas del eje X - mostrar cada enésima etiqueta para evitar amontonamiento */}
         {labels.map((label, index) => {
-          // Only show every other label if we have many data points to avoid crowding
-          if (labels.length > 10 && index % 2 !== 0 && index !== labels.length - 1) {
+          // Determinar cuántas etiquetas omitir según la longitud de los datos
+          const skipFactor = labels.length > 10 ? 2 : 1;
+          
+          if (index % skipFactor !== 0 && index !== labels.length - 1) {
             return null;
           }
           
-          const x = CHART_PADDING_LEFT + (index * chartWidth) / Math.max(labels.length - 1, 1);
+          const x = paddingLeft + (index * chartAreaWidth) / Math.max(labels.length - 1, 1);
           return (
             <SvgText
               key={`label-${index}`}
               x={x}
-              y={CHART_HEIGHT - 10}
+              y={chartHeight - 10}
               fontSize={11}
               fontFamily="Outfit_400Regular"
-              fill="#888888"
+              fill="#666666"
               textAnchor="middle"
             >
               {label}
             </SvgText>
           );
         })}
-
-        {/* Data points */}
-        {points.map((point, index) => (
-          <SvgCircle
-            key={`point-${index}`}
-            cx={point.x}
-            cy={point.y}
-            r={4}
-            fill="#FFFFFF"
-            stroke="#E57254"
-            strokeWidth={2}
-          />
-        ))}
       </Svg>
     </View>
   );
@@ -207,7 +237,8 @@ const SpendingHistoryChart: React.FC<SpendingHistoryChartProps> = ({
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    paddingRight: 5,
+    justifyContent: "center",
+    marginTop: 5,
   },
   emptyContainer: {
     height: 180,

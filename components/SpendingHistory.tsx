@@ -1,3 +1,5 @@
+
+// components/SpendingHistory.tsx
 import React, { useState, useCallback, useMemo } from "react";
 import {
   View,
@@ -22,6 +24,14 @@ const { width } = Dimensions.get("window");
 const SpendingHistory: React.FC = () => {
   // Estado para el filtro de período seleccionado
   const [selectedFilter, setSelectedFilter] = useState<PeriodFilter>("Este mes");
+
+  // Definir los filtros con su versión mostrada
+  const periodFilters: PeriodFilter[] = [
+    "Semanal", 
+    "Este mes", 
+    "Mes ant.", // Abreviación de "Mes anterior" para que quepa
+    "Anual"
+  ];
 
   // Consulta GraphQL para obtener transacciones
   const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
@@ -50,9 +60,10 @@ const SpendingHistory: React.FC = () => {
   const getStatLabels = useCallback((filter: PeriodFilter) => {
     switch (filter) {
       case "Semanal":
-        return { left: "Gasto semana", right: "Gasto promedio diario" };
+        return { left: "Gasto del mes", right: "Gasto promedio semanal" };
       case "Este mes":
       case "Mes anterior":
+      case "Mes ant.": // Agregamos el caso para la versión abreviada
         return { left: "Gasto del mes", right: "Gasto promedio semanal" };
       case "Anual":
         return { left: "Gasto del año", right: "Gasto promedio mensual" };
@@ -76,7 +87,9 @@ const SpendingHistory: React.FC = () => {
 
   // Manejar la selección del filtro
   const handleFilterChange = (filter: PeriodFilter) => {
-    setSelectedFilter(filter);
+    // Si se selecciona la versión abreviada, usar el nombre completo internamente
+    const actualFilter = filter === "Mes ant." ? "Mes anterior" : filter;
+    setSelectedFilter(actualFilter);
   };
 
   // Renderizar mensaje de error
@@ -98,12 +111,16 @@ const SpendingHistory: React.FC = () => {
       <View style={globalStyles.sectionContainer}>
         {/* Filtros de período */}
         <View style={styles.filterContainer}>
-          {(['Semanal', 'Este mes', 'Mes anterior', 'Anual'] as PeriodFilter[]).map((filter) => (
+          {periodFilters.map((filter) => (
             <TouchableOpacity
               key={filter}
               style={[
                 styles.filterButton,
-                selectedFilter === filter && styles.selectedFilterButton,
+                // Modificar la comparación para aceptar tanto "Mes ant." como "Mes anterior"
+                (selectedFilter === filter || 
+                 (filter === "Mes ant." && selectedFilter === "Mes anterior") ||
+                 (filter === "Mes anterior" && selectedFilter === "Mes ant.")) 
+                && styles.selectedFilterButton,
               ]}
               onPress={() => handleFilterChange(filter)}
               activeOpacity={0.7}
@@ -111,8 +128,12 @@ const SpendingHistory: React.FC = () => {
               <Text
                 style={[
                   styles.filterText,
-                  selectedFilter === filter && styles.selectedFilterText,
+                  (selectedFilter === filter || 
+                   (filter === "Mes ant." && selectedFilter === "Mes anterior") ||
+                   (filter === "Mes anterior" && selectedFilter === "Mes ant."))
+                  && styles.selectedFilterText,
                 ]}
+                numberOfLines={1}
               >
                 {filter}
               </Text>
@@ -157,32 +178,36 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 15,
-    flexWrap: "wrap",
+    width: "100%",
+    flexWrap: "nowrap", // Asegura que los elementos no se envuelvan a la siguiente línea
   },
   filterButton: {
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    paddingHorizontal: 6, // Reducido para acomodar los 4 filtros
+    borderRadius: 8,
     backgroundColor: "#ECECEC",
-    minWidth: 80,
+    flex: 1, // Distribuye el espacio equitativamente
+    marginHorizontal: 2, // Pequeño espacio horizontal entre botones
     alignItems: "center",
+    justifyContent: "center",
   },
   selectedFilterButton: {
-    backgroundColor: "#E57254",
+    backgroundColor: "#EF674A",
   },
   filterText: {
-    fontSize: 14,
+    fontSize: 13, // Ligeramente más pequeño para asegurar que quepa
     fontFamily: "Outfit_400Regular",
-    color: "#555555",
+    color: "#000000",
+    textAlign: "center",
   },
   selectedFilterText: {
-    color: "#FFFFFF",
+    color: "#000000",
     fontFamily: "Outfit_500Medium",
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 15,
     marginTop: 5,
   },
   statItem: {
@@ -200,16 +225,16 @@ const styles = StyleSheet.create({
   statValueTotal: {
     fontSize: 28,
     fontFamily: "Outfit_700Bold",
-    color: "#E57254",
+    color: "#EF674A",
   },
   statValueAverage: {
     fontSize: 28,
     fontFamily: "Outfit_700Bold",
-    color: "#E57254",
+    color: "#EF674A",
     textAlign: "right",
   },
   chartContainer: {
-    marginTop: 10,
+    marginTop: 5,
     height: 220,
   },
   loadingContainer: {
