@@ -1,20 +1,39 @@
-import React from "react";
-import { View, StyleSheet, Dimensions, ScrollView } from "react-native";
-import Svg, { Rect, Line, Text as SvgText } from "react-native-svg";
+// components/ui/FinancialChart.tsx
+import React, { useEffect } from "react";
+import { View, StyleSheet } from "react-native";
+import Svg, { Line, Text as SvgText, G } from "react-native-svg";
 import { MonthData } from "@/hooks/useFinancialData";
 import { Colors } from "@/constants/Colors";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  Easing,
+  runOnJS,
+} from "react-native-reanimated";
+
+const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 
 interface FinancialChartProps {
   data: MonthData[];
 }
 
-// Dimensiones para el gráfico
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const CHART_WIDTH = SCREEN_WIDTH - 80;
-
 export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
+  // Valor de progreso de la animación
+  const animationProgress = useSharedValue(0);
+  
+  // Iniciar la animación cuando cambian los datos
+  useEffect(() => {
+    // Reiniciar y animar
+    animationProgress.value = 0;
+    animationProgress.value = withTiming(1, {
+      duration: 800,
+      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+    });
+  }, [data, animationProgress]);
+
   // Definir dimensiones
-  const chartWidth = CHART_WIDTH;
+  const chartWidth = 280;
   const chartHeight = 180;
   const paddingTop = 10;
   const paddingBottom = 30;
@@ -22,12 +41,6 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
   const paddingRight = 10;
   const graphHeight = chartHeight - paddingTop - paddingBottom;
   const graphWidth = chartWidth - paddingLeft - paddingRight;
-
-  // Calcular anchura de barras y espaciados
-  const numMonths = data.length;
-  const barGroupWidth = graphWidth / numMonths;
-  const barWidth = barGroupWidth * 0.3;
-  const barGap = barWidth * 0.2;
 
   // Determinar el valor máximo para escalar las barras
   const maxValue = Math.max(
@@ -39,9 +52,22 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
   // Definir escalas de ejes Y
   const yAxisValues = [0, 1000, 2000, 3000];
 
+  // Calcular anchura de barras y espaciados
+  const numMonths = data.length;
+  const barGroupWidth = graphWidth / numMonths;
+  const barWidth = barGroupWidth * 0.3;
+  const barGap = barWidth * 0.2;
+
+  // Crear un estilo animado para todo el gráfico
+  const animatedStyle = useAnimatedStyle(() => {
+    return {
+      opacity: 1, // Solo para forzar la actualización
+    };
+  });
+
   return (
     <View style={styles.chartContainer}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <Animated.View style={animatedStyle}>
         <Svg width={chartWidth} height={chartHeight}>
           {/* Líneas horizontales y etiquetas del eje Y */}
           {yAxisValues.map((value, index) => {
@@ -71,7 +97,7 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
             );
           })}
 
-          {/* Barras del gráfico */}
+          {/* Barras del gráfico con animación */}
           {data.map((item, index) => {
             const barX =
               paddingLeft +
@@ -81,38 +107,51 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
               barGap / 2;
 
             // Calcular las alturas de las barras
-            const expenseHeight = item.expenses
+            // Multiplicamos por la variable animationProgress.value para animar
+            const expenseHeight = (item.expenses
               ? (item.expenses / maxValue) * graphHeight
-              : 0;
-            const incomeHeight = item.income
+              : 0) * animationProgress.value;
+              
+            const incomeHeight = (item.income
               ? (item.income / maxValue) * graphHeight
-              : 0;
+              : 0) * animationProgress.value;
 
             // Determinar los colores de las barras según si el mes está activo
             const expenseColor = item.isActive ? Colors.chart.expense : Colors.chart.inactive;
             const incomeColor = item.isActive ? Colors.chart.income : Colors.chart.inactive;
 
-            return (
-              <React.Fragment key={`bars-${index}`}>
-                {/* Barra de gastos */}
-                <Rect
-                  x={barX}
-                  y={paddingTop + graphHeight - expenseHeight}
-                  width={barWidth}
-                  height={expenseHeight || 1} // Al menos 1 de altura para que sea visible
-                  fill={expenseColor}
-                  rx={2}
-                />
+            // Posición Y de cada barra
+            const expenseY = paddingTop + graphHeight - expenseHeight;
+            const incomeY = paddingTop + graphHeight - incomeHeight;
 
-                {/* Barra de ingresos */}
-                <Rect
-                  x={barX + barWidth + barGap}
-                  y={paddingTop + graphHeight - incomeHeight}
-                  width={barWidth}
-                  height={incomeHeight || 1} // Al menos 1 de altura para que sea visible
-                  fill={incomeColor}
-                  rx={2}
-                />
+            return (
+              <G key={`bars-${index}`}>
+                {/* Barra de gastos - Normal (no animada) pero calculada con valores animados */}
+                <Animated.View>
+                  <Svg>
+                    <G>
+                      {/* Barra de gastos */}
+                      <Rect
+                        x={barX}
+                        y={expenseY}
+                        width={barWidth}
+                        height={Math.max(1, expenseHeight)}
+                        rx={2}
+                        fill={expenseColor}
+                      />
+
+                      {/* Barra de ingresos */}
+                      <Rect
+                        x={barX + barWidth + barGap}
+                        y={incomeY}
+                        width={barWidth}
+                        height={Math.max(1, incomeHeight)}
+                        rx={2}
+                        fill={incomeColor}
+                      />
+                    </G>
+                  </Svg>
+                </Animated.View>
 
                 {/* Etiqueta del mes */}
                 <SvgText
@@ -125,14 +164,17 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
                 >
                   {item.name}
                 </SvgText>
-              </React.Fragment>
+              </G>
             );
           })}
         </Svg>
-      </ScrollView>
+      </Animated.View>
     </View>
   );
 };
+
+// Importamos Rect
+import { Rect } from 'react-native-svg';
 
 const styles = StyleSheet.create({
   chartContainer: {

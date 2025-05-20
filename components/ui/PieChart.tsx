@@ -1,21 +1,18 @@
-// Corregido: usando withDelay en lugar de la propiedad delay
+// components/ui/PieChart.tsx
 import React, { useMemo, useEffect } from "react";
 import { View, Text, StyleSheet } from "react-native";
 import Svg, { Circle, G, Text as SvgText } from "react-native-svg";
 import { CategoryData } from "@/hooks/useExpenseCategories";
 import Animated, {
   useSharedValue,
-  useAnimatedProps,
   useAnimatedStyle,
   withTiming,
   withSequence,
-  withDelay, // Importamos withDelay para manejar correctamente los retrasos
+  withDelay,
   Easing,
 } from "react-native-reanimated";
 
 // Componentes animados
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
-const AnimatedSvgText = Animated.createAnimatedComponent(SvgText);
 const AnimatedSvg = Animated.createAnimatedComponent(Svg);
 
 interface PieChartProps {
@@ -44,17 +41,19 @@ const PieChart: React.FC<PieChartProps> = ({
     );
   }
 
-  // Configuración de animaciones
+  // Configuración de animaciones centralizadas
   const chartScale = useSharedValue(1);
   const textOpacity = useSharedValue(1);
-  const segmentExpansion = useSharedValue(0);
+  const highlightedCategory = useSharedValue(activeCategory || "");
   
   // Disparar animaciones cuando cambia la selección
   useEffect(() => {
+    // Actualizar la categoría destacada
+    highlightedCategory.value = activeCategory || "";
+    
     // Animar texto (fade out -> fade in)
     textOpacity.value = withSequence(
       withTiming(0, { duration: 200 }),
-      // Usando withDelay en lugar de la propiedad delay
       withDelay(150, withTiming(1, { duration: 400 }))
     );
     
@@ -64,13 +63,7 @@ const PieChart: React.FC<PieChartProps> = ({
       withTiming(1.03, { duration: 250 }),
       withTiming(1, { duration: 200 })
     );
-    
-    // Animar expansión de segmentos
-    segmentExpansion.value = withTiming(activeCategory ? 1 : 0, {
-      duration: 600,
-      easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-    });
-  }, [activeCategory, chartScale, textOpacity, segmentExpansion]);
+  }, [activeCategory, chartScale, textOpacity, highlightedCategory]);
 
   // Estilo animado para el SVG principal
   const chartAnimatedStyle = useAnimatedStyle(() => ({
@@ -107,75 +100,25 @@ const PieChart: React.FC<PieChartProps> = ({
   // Verificar que los porcentajes sumen exactamente 100
   const totalPercentage = categories.reduce((sum, cat) => sum + cat.percentage, 0);
   
-  // Renderizar segmentos del gráfico
-  let cumulativeAngle = 0;
-  const segments = categories.map((category, index) => {
-    const isActive = !activeCategory || activeCategory === category.name;
-    const angle = (category.percentage / totalPercentage) * 360;
-    
-    // Propiedades animadas para el segmento
-    const segmentProps = useAnimatedProps(() => {
-      // Calcular expansión basada en si está activo
-      const expansionOffset = segmentExpansion.value * (isActive ? 6 : 0);
+  // Preparar datos de los segmentos
+  const segmentsData = useMemo(() => {
+    let accumulatedAngle = 0;
+    return categories.map((category) => {
+      const isActive = !activeCategory || activeCategory === category.name;
+      const angle = (category.percentage / totalPercentage) * 360;
+      const startAngle = accumulatedAngle;
+      accumulatedAngle += angle;
       
       return {
-        r: innerRadius + expansionOffset,
-        opacity: isActive ? 1 : 1 - (segmentExpansion.value * 0.7),
+        name: category.name,
+        isActive,
+        color: category.color,
+        percentage: category.percentage,
+        startAngle,
+        angle
       };
     });
-    
-    // Propiedades animadas para el borde
-    const borderProps = useAnimatedProps(() => {
-      const expansionOffset = segmentExpansion.value * (isActive ? 6 : 0);
-      
-      return {
-        r: innerRadius + 1 + expansionOffset,
-        opacity: isActive ? 1 : 1 - (segmentExpansion.value * 0.7),
-      };
-    });
-    
-    // Crear segmento con animación
-    const arc = (
-      <React.Fragment key={index}>
-        {/* Borde blanco */}
-        <AnimatedCircle
-          cx={centerX}
-          cy={centerY}
-          fill="transparent"
-          stroke="#FFFFFF"
-          strokeWidth={strokeWidth + 2}
-          strokeDasharray={`${(category.percentage / 100) * 2 * Math.PI * (innerRadius + 1)} ${
-            2 * Math.PI * (innerRadius + 1)
-          }`}
-          strokeDashoffset={
-            -((cumulativeAngle) / 360) * 2 * Math.PI * (innerRadius + 1)
-          }
-          transform={`rotate(-90, ${centerX}, ${centerY})`}
-          animatedProps={borderProps}
-        />
-        
-        {/* Segmento de color */}
-        <AnimatedCircle
-          cx={centerX}
-          cy={centerY}
-          fill="transparent"
-          stroke={category.color}
-          strokeWidth={strokeWidth}
-          strokeDasharray={`${(category.percentage / 100) * 2 * Math.PI * innerRadius} ${
-            2 * Math.PI * innerRadius
-          }`}
-          strokeDashoffset={
-            -((cumulativeAngle) / 360) * 2 * Math.PI * innerRadius
-          }
-          transform={`rotate(-90, ${centerX}, ${centerY})`}
-          animatedProps={segmentProps}
-        />
-      </React.Fragment>
-    );
-    
-    cumulativeAngle += angle;
-    return arc;
-  });
+  }, [categories, activeCategory, totalPercentage]);
 
   // Formatear importe
   const formatAmount = (amount: number): string => {
@@ -189,23 +132,70 @@ const PieChart: React.FC<PieChartProps> = ({
   const amountText = `S/${formattedAmount.replace(/\s/g, '')}`;
   
   // Determinar tamaño de fuente
-  let amountFontSize: number;
-  if (amountText.length > 12) {
-    amountFontSize = 18; 
-  } else if (amountText.length > 10) {
-    amountFontSize = 20;
-  } else if (amountText.length > 8) {
-    amountFontSize = 22;
-  } else {
-    amountFontSize = 28;
-  }
+  const amountFontSize = useMemo(() => {
+    if (amountText.length > 12) return 18; 
+    if (amountText.length > 10) return 20;
+    if (amountText.length > 8) return 22;
+    return 28;
+  }, [amountText]);
+
+  // Solución mejorada: Usamos un enfoque diferente para la animación
+  // En lugar de modificar el radio de los círculos, usamos strokeWidth para el efecto destacado
+  const renderSegments = () => {
+    return segmentsData.map((segment, index) => {
+      const { name, isActive, color, percentage, startAngle } = segment;
+      
+      // Ajustar el ancho del trazo en lugar del radio para evitar desalineación
+      const extraStrokeWidth = isActive && activeCategory ? 3 : 0;
+      
+      return (
+        <React.Fragment key={name}>
+          {/* Borde blanco */}
+          <Circle
+            cx={centerX}
+            cy={centerY}
+            r={innerRadius + 1}
+            fill="transparent"
+            stroke="#FFFFFF"
+            strokeWidth={strokeWidth + 2 + extraStrokeWidth}
+            strokeDasharray={`${(percentage / 100) * 2 * Math.PI * (innerRadius + 1)} ${
+              2 * Math.PI * (innerRadius + 1)
+            }`}
+            strokeDashoffset={
+              -((startAngle) / 360) * 2 * Math.PI * (innerRadius + 1)
+            }
+            transform={`rotate(-90, ${centerX}, ${centerY})`}
+            opacity={isActive ? 1 : 0.3}
+          />
+          
+          {/* Segmento de color */}
+          <Circle
+            cx={centerX}
+            cy={centerY}
+            r={innerRadius}
+            fill="transparent"
+            stroke={color}
+            strokeWidth={strokeWidth + extraStrokeWidth}
+            strokeDasharray={`${(percentage / 100) * 2 * Math.PI * innerRadius} ${
+              2 * Math.PI * innerRadius
+            }`}
+            strokeDashoffset={
+              -((startAngle) / 360) * 2 * Math.PI * innerRadius
+            }
+            transform={`rotate(-90, ${centerX}, ${centerY})`}
+            opacity={isActive ? 1 : 0.3}
+          />
+        </React.Fragment>
+      );
+    });
+  };
 
   return (
     <View style={styles.chartContainer}>
       {/* Gráfico circular animado */}
       <Animated.View style={chartAnimatedStyle}>
         <Svg width={size} height={size}>
-          {segments}
+          {renderSegments()}
         </Svg>
       </Animated.View>
       

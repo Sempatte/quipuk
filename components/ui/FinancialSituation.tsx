@@ -1,11 +1,10 @@
-import React, { useState, useCallback, useMemo } from "react";
+// components/ui/FinancialSituation.tsx
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
-  Dimensions,
-  ScrollView,
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import { GET_TRANSACTIONS } from "@/app/graphql/transaction.graphql";
@@ -22,6 +21,7 @@ export type PeriodFilter = "Este mes" | "3 M" | "6 M" | string;
 const FinancialSituation: React.FC = () => {
   const currentYear = new Date().getFullYear().toString();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("3 M");
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Obtener los datos financieros utilizando nuestro hook personalizado
   const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
@@ -41,10 +41,22 @@ const FinancialSituation: React.FC = () => {
     }, [refetch])
   );
 
-  // Gestionar selección de período
+  // Gestionar selección de período con animación
   const handlePeriodChange = useCallback((period: PeriodFilter) => {
-    setSelectedPeriod(period);
-  }, []);
+    // Solo aplicar si es un período diferente
+    if (period !== selectedPeriod) {
+      // Activar flag de animación
+      setIsAnimating(true);
+      
+      // Establecer nuevo período
+      setSelectedPeriod(period);
+      
+      // Restablecer flag de animación después de que finalice
+      setTimeout(() => {
+        setIsAnimating(false);
+      }, 800); // Coincide con la duración de la animación
+    }
+  }, [selectedPeriod]);
 
   // Renderizar mensaje de error
   if (error) {
@@ -77,6 +89,7 @@ const FinancialSituation: React.FC = () => {
                     selectedPeriod === period && styles.selectedFilterButton,
                   ]}
                   onPress={() => handlePeriodChange(period)}
+                  disabled={isAnimating} // Deshabilitar durante la animación
                   activeOpacity={0.7}
                 >
                   <Text
@@ -124,7 +137,7 @@ const FinancialSituation: React.FC = () => {
             </View>
           </View>
 
-          {/* Gráfico de barras */}
+          {/* Gráfico de barras animado */}
           <FinancialChart data={chartData} />
         </View>
       )}
