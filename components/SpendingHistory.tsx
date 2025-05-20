@@ -7,12 +7,13 @@ import {
   TouchableOpacity,
   Dimensions,
 } from "react-native";
-import { useQuery } from "@apollo/client";
+import { useQuery, useApolloClient } from "@apollo/client";
 import { GET_TRANSACTIONS } from "@/app/graphql/transaction.graphql";
 import { useFocusEffect } from "@react-navigation/native";
 import { globalStyles } from "@/app/styles/globalStyles";
 import { useSpendingHistory, PeriodFilter } from "@/hooks/useSpendingHistory";
 import SpendingHistoryChart from "./ui/SpendingHistoryChart";
+import { Transaction } from "@/app/interfaces/transaction.interface";
 
 const { width } = Dimensions.get("window");
 
@@ -26,12 +27,15 @@ interface SpendingHistoryProps {
 /**
  * Componente para mostrar el histórico de gastos
  * Mejorado con soporte para refresco forzado desde componente padre
+ * Solución para asegurar actualización de datos
  */
 const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => {
   // Estado para el filtro de período seleccionado
   const [selectedFilter, setSelectedFilter] = useState<PeriodFilter>("Este mes");
-  // Estado para manejar animación de refresco (opcional)
+  // Estado para manejar animación de refresco
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Acceso al cliente Apollo para manipulación directa de caché
+  const apolloClient = useApolloClient();
 
   // Definir los filtros con su versión mostrada
   const periodFilters: PeriodFilter[] = [
@@ -41,32 +45,62 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     "Anual"
   ];
 
-  // Consulta GraphQL para obtener transacciones con mejor control de caché
-  const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
-    fetchPolicy: "network-only", // Siempre buscar datos nuevos
-    notifyOnNetworkStatusChange: true,
-  });
+  // Consulta GraphQL para obtener transacciones
+  // Usamos 'cache-and-network' para equilibrar rendimiento y frescura de datos
+  const { data, loading, error, refetch } = useQuery<{ transactions: Transaction[] }>(GET_TRANSACTIONS, {
+      fetchPolicy: "network-only",
+      notifyOnNetworkStatusChange: true,
+    });
 
-  // Refrescar datos cuando cambia el refreshTrigger
+  // SOLUCIÓN: Efecto mejorado para reaccionar al refreshTrigger con limpieza de caché
   useEffect(() => {
     if (refreshTrigger !== undefined) {
-      // Marcar refrescando
+      // Marcar como refrescando para mostrar indicadores visuales
       setIsRefreshing(true);
       
-      // Ejecutar refetch y resetear estado
-      refetch().finally(() => {
+      // PASO CLAVE 1: Limpiar la caché específicamente para este tipo de datos
+      apolloClient.cache.evict({ 
+        fieldName: 'transactions' 
+      });
+      apolloClient.cache.gc();
+      
+      // PASO CLAVE 2: Forzar nueva consulta después de limpiar caché
+      refetch({
+        fetchPolicy: 'network-only' // Forzar consulta a la red ignorando caché
+      }).finally(() => {
         setIsRefreshing(false);
-        if (__DEV__) console.log('SpendingHistory refrescado por trigger:', refreshTrigger);
+        // Log para debugging
+        if (__DEV__) console.log('SpendingHistory refrescado, transacciones:', 
+          data?.transactions?.length || 0);
       });
     }
-  }, [refreshTrigger, refetch]);
+  }, [refreshTrigger, refetch, apolloClient]);
 
-  // Refrescar datos cuando la pantalla reciba el foco (para navegación directa)
+  // También mantener el refresco normal al enfocar la pantalla (para navegación directa)
   useFocusEffect(
     useCallback(() => {
       refetch();
     }, [refetch])
   );
+
+  // PASO CLAVE 3: Verificar explícitamente los datos antes de procesarlos
+  // Esto ayuda a identificar si el problema está en la consulta o en el procesamiento
+  const verifiedTransactions = useMemo(() => {
+    const transactions = data?.transactions || [];
+    if (__DEV__) {
+      console.log(`SpendingHistory recibió ${transactions.length} transacciones`);
+      // Log de algunas transacciones para verificar
+      if (transactions.length > 0) {
+        console.log('Última transacción:', {
+          id: transactions[0].id,
+          type: transactions[0].type,
+          amount: transactions[0].amount,
+          date: transactions[0].createdAt
+        });
+      }
+    }
+    return transactions;
+  }, [data]);
 
   // Procesar datos para el gráfico utilizando el hook personalizado
   const { 
@@ -75,7 +109,7 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     averageSpending, 
     labels
   } = useSpendingHistory(
-    data?.transactions || [],
+    verifiedTransactions,
     selectedFilter
   );
 

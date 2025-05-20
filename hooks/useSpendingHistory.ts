@@ -27,7 +27,11 @@ export interface SpendingHistoryResult {
 }
 
 /**
- * Hook para procesar datos de gastos históricos
+ * Hook mejorado para procesar datos de gastos históricos
+ * - Verificación mejorada de datos
+ * - Filtrado más robusto
+ * - Mejor manejo de casos bordes
+ * 
  * @param transactions - Las transacciones a procesar
  * @param periodFilter - El filtro de período seleccionado
  * @returns Datos procesados para el gráfico y estadísticas
@@ -38,8 +42,14 @@ export const useSpendingHistory = (
 ): SpendingHistoryResult => {
   
   return useMemo(() => {
+    // Log para verificación en desarrollo
+    if (__DEV__) {
+      console.log(`useSpendingHistory procesando ${transactions.length} transacciones para período ${periodFilter}`);
+    }
+    
     // Si no hay transacciones, devolver datos vacíos
-    if (!transactions.length) {
+    if (!transactions || transactions.length === 0) {
+      if (__DEV__) console.log('No hay transacciones para procesar');
       return {
         chartData: [],
         totalSpending: 0,
@@ -89,15 +99,35 @@ export const useSpendingHistory = (
         formatString = "d";
     }
 
-    // Filtrar transacciones solo de tipo "gasto" y completadas
-    const expenseTransactions = transactions.filter(
-      tx => tx.type === "gasto" && tx.status !== "pending"
+    // MEJORA: Verificación explícita de que las transacciones son objetos válidos
+    const validTransactions = transactions.filter(tx => 
+      tx && typeof tx === 'object' && tx.type && tx.amount !== undefined && tx.createdAt
     );
+    
+    // MEJORA: Filtrar transacciones solo de tipo "gasto" y completadas, con verificación adicional
+    const expenseTransactions = validTransactions.filter(tx => {
+      const isExpense = tx.type === "gasto";
+      const isCompleted = tx.status !== "pending";
+      const hasTxDate = Boolean(tx.createdAt);
+      
+      return isExpense && isCompleted && hasTxDate;
+    });
+    
+    if (__DEV__) {
+      console.log(`Filtrado: ${validTransactions.length} transacciones válidas, ${expenseTransactions.length} gastos`);
+    }
 
     // Obtener los intervalos (días, semanas o meses)
     let intervals: Date[] = [];
     
     if (intervalType === "day") {
+      // MEJORA: Verificación para asegurarse que endDate es después de startDate
+      if (startDate > endDate) {
+        console.warn('startDate es después de endDate, usando fechas por defecto');
+        startDate = startOfMonth(now);
+        endDate = now;
+      }
+      
       intervals = eachDayOfInterval({ start: startDate, end: endDate });
     } else if (intervalType === "month") {
       intervals = eachMonthOfInterval({ start: startDate, end: endDate });
@@ -112,28 +142,51 @@ export const useSpendingHistory = (
       format(date, formatString, { locale: es })
     );
 
-    // Sumar los gastos para cada intervalo
+    // MEJORA: Verificar que haya intervalos
+    if (intervals.length === 0) {
+      console.warn('No se pudieron generar intervalos de tiempo');
+      return {
+        chartData: [],
+        totalSpending: 0,
+        averageSpending: 0,
+        labels: [],
+      };
+    }
+
+    // Sumar los gastos para cada intervalo, con mejor manejo de errores
     expenseTransactions.forEach(tx => {
-      const txDate = new Date(tx.createdAt);
-      
-      // Saltar transacciones fuera del rango de fechas
-      if (txDate < startDate || txDate > endDate) return;
+      try {
+        const txDate = new Date(tx.createdAt);
+        
+        // Saltar transacciones con fechas inválidas
+        if (isNaN(txDate.getTime())) {
+          console.warn('Fecha inválida para transacción:', tx.id);
+          return;
+        }
+        
+        // Saltar transacciones fuera del rango de fechas
+        if (txDate < startDate || txDate > endDate) return;
 
-      // Encontrar el índice correspondiente según el tipo de intervalo
-      let index = -1;
-      
-      if (intervalType === "day") {
-        index = intervals.findIndex(date => isSameDay(date, txDate));
-      } else if (intervalType === "month") {
-        index = intervals.findIndex(date => isSameMonth(date, txDate));
-      } else {
-        // Fallback
-        index = intervals.findIndex(date => isSameDay(date, txDate));
-      }
+        // Encontrar el índice correspondiente según el tipo de intervalo
+        let index = -1;
+        
+        if (intervalType === "day") {
+          index = intervals.findIndex(date => isSameDay(date, txDate));
+        } else if (intervalType === "month") {
+          index = intervals.findIndex(date => isSameMonth(date, txDate));
+        } else {
+          // Fallback
+          index = intervals.findIndex(date => isSameDay(date, txDate));
+        }
 
-      // Si encontramos el intervalo, sumar el gasto
-      if (index !== -1) {
-        chartData[index] += tx.amount;
+        // Si encontramos el intervalo, sumar el gasto
+        if (index !== -1) {
+          // MEJORA: Verificar que amount es un número válido
+          const amount = typeof tx.amount === 'number' && !isNaN(tx.amount) ? tx.amount : 0;
+          chartData[index] += amount;
+        }
+      } catch (error) {
+        console.error('Error procesando transacción:', error);
       }
     });
 
@@ -156,16 +209,16 @@ export const useSpendingHistory = (
       averageSpending = totalSpending / totalWeeks;
     }
 
-    // Para el gráfico del ejemplo, si los datos son demasiado uniformes,
-    // podemos añadir algunas variaciones para que se parezca más al ejemplo
-    // (solo para fines de demostración visual)
-    const enhancedChartData = chartData.length > 0 ? chartData : [0];
+    // Log para verificación en desarrollo
+    if (__DEV__) {
+      console.log(`Resultado: Total=${totalSpending}, Promedio=${averageSpending}, Puntos=${chartData.length}`);
+    }
 
     return {
-      chartData: enhancedChartData,
+      chartData: chartData.length > 0 ? chartData : [0],
       totalSpending,
       averageSpending,
       labels,
     };
-  }, [transactions, periodFilter]);
+  }, [transactions, periodFilter]); // Dependencias correctas y minimizadas
 };

@@ -1,8 +1,8 @@
 // app/(tabs)/board.tsx
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useQuery, useApolloClient } from '@apollo/client';
+import { useQuery } from '@apollo/client';
 import { ThemedView } from "@/components/ThemedView";
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
 import { globalStyles } from '../styles/globalStyles';
@@ -15,63 +15,63 @@ import ExpensesByCategory from '@/components/ExpensesByCategory';
 import SpendingHeatmap from '@/components/SpendingHeatmap';
 import SpendingHistory from '@/components/SpendingHistory';
 
-/**
- * Board screen component that displays financial data visualizations
- * Enhanced with comprehensive data refresh when screen is focused
- */
+
 export default function Board() {
   // State for pull-to-refresh functionality
   const [refreshing, setRefreshing] = useState(false);
+  
   // Estado para forzar el refresco de componentes hijos
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  // Apollo Client para operaciones manuales de caché
-  const apolloClient = useApolloClient();
+  
+  // Ref para controlar si ya se refrescó en esta sesión de enfoque
+  const hasRefreshedRef = useRef(false);
 
   // Main query to fetch transaction data
-  const { refetch: refetchTransactions, loading } = useQuery(GET_TRANSACTIONS, {
+  const { refetch, loading } = useQuery(GET_TRANSACTIONS, {
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
 
-  // Función para realizar un refresco completo
-  const performFullRefresh = useCallback(async () => {
-    try {
-      // 1. Refrescar datos principales
-      await refetchTransactions();
-      
-      // 2. Limpiar caché específica para forzar nuevas consultas
-      // Esto es crítico para el componente de histórico que podría estar usando diferentes variables
-      await apolloClient.cache.evict({ 
-        fieldName: 'transactions'
-      });
-      await apolloClient.cache.gc();
-      
-      // 3. Incrementar el trigger de refresco para los componentes hijos
-      setRefreshTrigger(prev => prev + 1);
-      
-      if (__DEV__) console.log('Refresco completo ejecutado, trigger:', refreshTrigger + 1);
-    } catch (error) {
-      console.error('Error durante el refresco completo:', error);
-    }
-  }, [refetchTransactions, apolloClient, refreshTrigger]);
-
   // Function to handle manual pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await performFullRefresh();
-    setRefreshing(false);
-  }, [performFullRefresh]);
+    
+    try {
+      // Refrescar datos principales
+      await refetch();
+      
+      // Actualizar trigger para refrescar componentes hijos
+      setRefreshTrigger(prev => prev + 1);
+    } catch (error) {
+      console.error('Error durante el refresco manual:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetch]);
 
-  // Refresh data when the screen comes into focus
+  // Solución simplificada: un solo useEffect que se activa cuando la pantalla obtiene foco
   useFocusEffect(
     useCallback(() => {
-      // Ejecutar refresco completo cuando la pantalla obtiene foco
-      performFullRefresh();
+      // Solo refrescar una vez al entrar a la pantalla
+      if (!hasRefreshedRef.current) {
+        // Indicar que ya se refrescó
+        hasRefreshedRef.current = true;
+        
+        // Realizar refresco
+        refetch().then(() => {
+          // Incrementar trigger para actualizar componentes hijos
+          setRefreshTrigger(prev => prev + 1);
+          if (__DEV__) console.log('Refresco único ejecutado al entrar a Board');
+        }).catch(error => {
+          console.error('Error durante el refresco inicial:', error);
+        });
+      }
       
+      // Cleanup: reiniciar la bandera cuando la pantalla pierde foco
       return () => {
-        // Cleanup si es necesario
+        hasRefreshedRef.current = false;
       };
-    }, [performFullRefresh])
+    }, [refetch])
   );
 
   return (
@@ -94,7 +94,7 @@ export default function Board() {
         }
       >
         <View style={styles.contentContainer}>
-          {/* Todos los componentes ahora reciben el refreshTrigger */}
+          {/* Componentes con refreshTrigger */}
           <FinancialSituation refreshTrigger={refreshTrigger} />
           <UpcomingPayments refreshTrigger={refreshTrigger} />
           <ExpensesByCategory refreshTrigger={refreshTrigger} />
