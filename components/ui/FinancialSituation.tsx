@@ -14,6 +14,7 @@ import { FinancialChart } from "./FinancialChart";
 import { useFinancialData } from "@/hooks/useFinancialData";
 import { Colors } from "@/constants/Colors";
 import { globalStyles } from "@/app/styles/globalStyles";
+import FinancialSituationSkeleton from "./FinancialSituationSkeleton";
 
 // Tipos para los filtros de período
 export type PeriodFilter = "Este mes" | "3 M" | "6 M" | string;
@@ -60,74 +61,73 @@ const FinancialSituation: React.FC = () => {
       <View style={globalStyles.titleContainer}>
         <Text style={globalStyles.sectionTitle}>Situación Financiera</Text>
       </View>
-      <View style={globalStyles.sectionContainer}>
-        {/* Filtros de período */}
-        <View style={styles.filterContainer}>
-          {(["Este mes", "3 M", "6 M", currentYear] as PeriodFilter[]).map(
-            (period) => (
-              <TouchableOpacity
-                key={period}
-                style={[
-                  styles.filterButton,
-                  selectedPeriod === period && styles.selectedFilterButton,
-                ]}
-                onPress={() => handlePeriodChange(period)}
-                activeOpacity={0.7}
-              >
-                <Text
+      
+      {loading ? (
+        <FinancialSituationSkeleton />
+      ) : (
+        <View style={globalStyles.sectionContainer}>
+          {/* Filtros de período */}
+          <View style={styles.filterContainer}>
+            {(["Este mes", "3 M", "6 M", currentYear] as PeriodFilter[]).map(
+              (period) => (
+                <TouchableOpacity
+                  key={period}
                   style={[
-                    styles.filterText,
-                    selectedPeriod === period && styles.selectedFilterText,
+                    styles.filterButton,
+                    selectedPeriod === period && styles.selectedFilterButton,
                   ]}
+                  onPress={() => handlePeriodChange(period)}
+                  activeOpacity={0.7}
                 >
-                  {period}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
-        </View>
+                  <Text
+                    style={[
+                      styles.filterText,
+                      selectedPeriod === period && styles.selectedFilterText,
+                    ]}
+                  >
+                    {period}
+                  </Text>
+                </TouchableOpacity>
+              )
+            )}
+          </View>
 
-        {/* Resumen de gastos e ingresos */}
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Gastos</Text>
-            <Text style={[styles.summaryValue, styles.expensesText]}>
-              -S/{" "}
-              {totalExpenses.toLocaleString("es-PE", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </Text>
+          {/* Resumen de gastos e ingresos */}
+          <View style={styles.summaryContainer}>
+            <View style={styles.summaryItem}>
+              <Text style={styles.summaryLabel}>Gastos</Text>
+              <Text style={[styles.summaryValue, styles.expensesText]}>
+                -S/{" "}
+                {totalExpenses.toLocaleString("es-PE", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}
+              </Text>
+            </View>
+            <View style={styles.summaryItem}>
+              <Text style={[styles.summaryLabel, styles.rightAligned]}>
+                Ingresos
+              </Text>
+              <Text
+                style={[
+                  styles.summaryValue,
+                  styles.incomeText,
+                  styles.rightAligned,
+                ]}
+              >
+                +S/{" "}
+                {totalIncome.toLocaleString("es-PE", {
+                  minimumFractionDigits: 0,
+                  maximumFractionDigits: 0,
+                })}
+              </Text>
+            </View>
           </View>
-          <View style={styles.summaryItem}>
-            <Text style={[styles.summaryLabel, styles.rightAligned]}>
-              Ingresos
-            </Text>
-            <Text
-              style={[
-                styles.summaryValue,
-                styles.incomeText,
-                styles.rightAligned,
-              ]}
-            >
-              +S/{" "}
-              {totalIncome.toLocaleString("es-PE", {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
-              })}
-            </Text>
-          </View>
-        </View>
 
-        {/* Gráfico de barras */}
-        {loading ? (
-          <View style={globalStyles.loadingContainer}>
-            <Text style={globalStyles.loadingText}>Cargando datos...</Text>
-          </View>
-        ) : (
+          {/* Gráfico de barras */}
           <FinancialChart data={chartData} />
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 };
