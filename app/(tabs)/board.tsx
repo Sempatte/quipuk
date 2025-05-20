@@ -10,7 +10,6 @@ import UpcomingPayments from '@/components/ui/UpcomingPayments';
 import ExpensesByCategory from '@/components/ExpensesByCategory';
 import SpendingHeatmap from '@/components/SpendingHeatmap';
 import SpendingHistory from '@/components/SpendingHistory';
-import SpendingHistoryChart from '@/components/ui/SpendingHistoryChart';
 
 export default function Board() {
   return (
