@@ -18,14 +18,20 @@ import FinancialSituationSkeleton from "./FinancialSituationSkeleton";
 // Tipos para los filtros de período
 export type PeriodFilter = "Este mes" | "3 M" | "6 M" | string;
 
-const FinancialSituation: React.FC = () => {
+// Props con soporte para refreshTrigger
+interface FinancialSituationProps {
+  refreshTrigger?: number;
+}
+
+const FinancialSituation: React.FC<FinancialSituationProps> = ({ refreshTrigger }) => {
   const currentYear = new Date().getFullYear().toString();
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("3 M");
-  const [isAnimating, setIsAnimating] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Obtener los datos financieros utilizando nuestro hook personalizado
   const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
     fetchPolicy: "network-only",
+    notifyOnNetworkStatusChange: true,
   });
 
   // Procesar datos con el hook personalizado
@@ -34,6 +40,18 @@ const FinancialSituation: React.FC = () => {
     selectedPeriod
   );
 
+  // Refrescar datos cuando cambia el refreshTrigger
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      setIsRefreshing(true);
+      
+      refetch().finally(() => {
+        setIsRefreshing(false);
+        if (__DEV__) console.log('FinancialSituation refrescado por trigger:', refreshTrigger);
+      });
+    }
+  }, [refreshTrigger, refetch]);
+
   // Refrescar datos cuando la pantalla obtiene el foco
   useFocusEffect(
     useCallback(() => {
@@ -41,32 +59,28 @@ const FinancialSituation: React.FC = () => {
     }, [refetch])
   );
 
-  // Gestionar selección de período con animación
+  // Gestionar selección de período
   const handlePeriodChange = useCallback((period: PeriodFilter) => {
-    // Solo aplicar si es un período diferente
-    if (period !== selectedPeriod) {
-      // Activar flag de animación
-      setIsAnimating(true);
-      
-      // Establecer nuevo período
-      setSelectedPeriod(period);
-      
-      // Restablecer flag de animación después de que finalice
-      setTimeout(() => {
-        setIsAnimating(false);
-      }, 800); // Coincide con la duración de la animación
-    }
-  }, [selectedPeriod]);
+    setSelectedPeriod(period);
+  }, []);
 
   // Renderizar mensaje de error
   if (error) {
     return (
-      <View style={globalStyles.sectionContainer}>
-        <Text style={globalStyles.errorText}>Error al cargar datos financieros</Text>
-        <Text style={globalStyles.errorSubtext}>{error.message}</Text>
+      <View>
+        <View style={globalStyles.titleContainer}>
+          <Text style={globalStyles.sectionTitle}>Situación Financiera</Text>
+        </View>
+        <View style={globalStyles.sectionContainer}>
+          <Text style={globalStyles.errorText}>Error al cargar datos financieros</Text>
+          <Text style={globalStyles.errorSubtext}>{error.message}</Text>
+        </View>
       </View>
     );
   }
+
+  // Determinar si está cargando (carga inicial o refresco)
+  const isLoading = loading || isRefreshing;
 
   return (
     <View>
@@ -74,7 +88,7 @@ const FinancialSituation: React.FC = () => {
         <Text style={globalStyles.sectionTitle}>Situación Financiera</Text>
       </View>
       
-      {loading ? (
+      {isLoading ? (
         <FinancialSituationSkeleton />
       ) : (
         <View style={globalStyles.sectionContainer}>
@@ -89,7 +103,6 @@ const FinancialSituation: React.FC = () => {
                     selectedPeriod === period && styles.selectedFilterButton,
                   ]}
                   onPress={() => handlePeriodChange(period)}
-                  disabled={isAnimating} // Deshabilitar durante la animación
                   activeOpacity={0.7}
                 >
                   <Text

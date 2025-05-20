@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef, useMemo } from "react";
+import React, { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -48,10 +48,16 @@ type AddTrxScreenNavigationProp = NativeStackNavigationProp<
   "add"
 >;
 
-const UpcomingPayments = () => {
+// Props para recibir el refreshTrigger
+interface UpcomingPaymentsProps {
+  refreshTrigger?: number;
+}
+
+const UpcomingPayments: React.FC<UpcomingPaymentsProps> = ({ refreshTrigger }) => {
   const navigation = useNavigation<AddTrxScreenNavigationProp>();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Estado para el modal de confirmación
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -60,15 +66,28 @@ const UpcomingPayments = () => {
 
   const { data, loading, error, refetch } =
     useQuery<GetPendingTransactionsData>(GET_PENDING_TRANSACTIONS, {
-      fetchPolicy: "network-only", // Forzar que siempre busque del servidor
+      fetchPolicy: "network-only", // Siempre buscar datos nuevos
+      notifyOnNetworkStatusChange: true,
     });
+
+  // Refrescar datos cuando cambia el refreshTrigger
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      setIsRefreshing(true);
+      
+      refetch().finally(() => {
+        setIsRefreshing(false);
+        if (__DEV__) console.log('UpcomingPayments refrescado por trigger:', refreshTrigger);
+      });
+    }
+  }, [refreshTrigger, refetch]);
 
   // Usar useFocusEffect para refrescar datos cuando la pantalla reciba el foco
   useFocusEffect(
     useCallback(() => {
       // Refrescar datos cada vez que la pantalla reciba el foco
       refetch();
-
+      
       return () => {
         // Código de limpieza si es necesario
       };
@@ -323,6 +342,9 @@ const UpcomingPayments = () => {
     [renderPayment, handleNavigateToNewPayment]
   );
 
+  // Determinar si está cargando (carga inicial o refresco)
+  const isLoading = loading || isRefreshing;
+
   if (error) {
     return (
       <View style={styles.errorContainer}>
@@ -335,7 +357,7 @@ const UpcomingPayments = () => {
   }
 
   // Si no hay datos pero está cargando, mostrar skeleton
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.container}>
         <Text style={styles.sectionTitle}>Próximos pagos</Text>

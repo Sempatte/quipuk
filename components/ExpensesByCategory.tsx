@@ -1,5 +1,5 @@
 // components/ExpensesByCategory.tsx
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,23 +14,37 @@ import { useExpenseCategories, PeriodFilter } from "@/hooks/useExpenseCategories
 import PieChart from "./ui/PieChart";
 import Legend from "./ui/Legend";
 import ExpensesByCategorySkeleton from "./ui/ExpensesByCategorySkeleton";
-import { Transaction } from "@/app/interfaces/transaction.interface"; // Importamos la interfaz Transaction directamente
+import { Transaction } from "@/app/interfaces/transaction.interface";
 
-// Tipado para la respuesta GraphQL
-interface TransactionsData {
-  transactions: Transaction[]; // Utilizamos directamente Transaction[] para asegurar compatibilidad
+// Props para el componente con soporte de refreshTrigger
+interface ExpensesByCategoryProps {
+  refreshTrigger?: number;
 }
 
 // Componente principal
-const ExpensesByCategory: React.FC = () => {
+const ExpensesByCategory: React.FC<ExpensesByCategoryProps> = ({ refreshTrigger }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("Este mes");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const currentYear = new Date().getFullYear().toString();
   
   // Consulta para obtener las transacciones con tipo adecuado
-  const { data, loading, error, refetch } = useQuery<TransactionsData>(GET_TRANSACTIONS, {
+  const { data, loading, error, refetch } = useQuery<{ transactions: Transaction[] }>(GET_TRANSACTIONS, {
     fetchPolicy: "network-only",
+    notifyOnNetworkStatusChange: true,
   });
+
+  // Refrescar datos cuando cambia el refreshTrigger
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      setIsRefreshing(true);
+      
+      refetch().finally(() => {
+        setIsRefreshing(false);
+        if (__DEV__) console.log('ExpensesByCategory refrescado por trigger:', refreshTrigger);
+      });
+    }
+  }, [refreshTrigger, refetch]);
 
   // Refrescar datos cuando la pantalla recibe el foco
   useFocusEffect(
@@ -59,14 +73,22 @@ const ExpensesByCategory: React.FC = () => {
 
   if (error) {
     return (
-      <View style={globalStyles.sectionContainer}>
-        <Text style={globalStyles.errorText}>Error al cargar datos</Text>
-        <Text style={globalStyles.errorSubtext}>{error.message}</Text>
+      <View>
+        <View style={globalStyles.titleContainer}>
+          <Text style={globalStyles.sectionTitle}>Gastos por categoría</Text>
+        </View>
+        <View style={globalStyles.sectionContainer}>
+          <Text style={globalStyles.errorText}>Error al cargar datos</Text>
+          <Text style={globalStyles.errorSubtext}>{error.message}</Text>
+        </View>
       </View>
     );
   }
 
-  if (loading) {
+  // Determinar si está cargando, ya sea por carga inicial o refresco
+  const isLoading = loading || isRefreshing;
+
+  if (isLoading) {
     return <ExpensesByCategorySkeleton />;
   }
 
@@ -144,10 +166,10 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 14,
     fontFamily: "Outfit_400Regular",
-    color: "#000000", // Cambiado a negro como solicitaste
+    color: "#000000", 
   },
   selectedFilterText: {
-    color: "#000000", // Cambiado a negro como solicitaste
+    color: "#000000", 
     fontFamily: "Outfit_500Medium",
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { useQuery } from '@apollo/client';
 import { GET_TRANSACTIONS } from '@/app/graphql/transaction.graphql';
@@ -18,13 +18,32 @@ interface Transaction {
   status?: string;
 }
 
-const SpendingHeatmap: React.FC = () => {
+// Props para recibir el refreshTrigger
+interface SpendingHeatmapProps {
+  refreshTrigger?: number;
+}
+
+const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ refreshTrigger }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>('28 días');
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   // Consulta GraphQL para obtener transacciones
   const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
     fetchPolicy: 'network-only',
+    notifyOnNetworkStatusChange: true,
   });
+
+  // Refrescar datos cuando cambia el refreshTrigger
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      setIsRefreshing(true);
+      
+      refetch().finally(() => {
+        setIsRefreshing(false);
+        if (__DEV__) console.log('SpendingHeatmap refrescado por trigger:', refreshTrigger);
+      });
+    }
+  }, [refreshTrigger, refetch]);
 
   // Refrescar datos cuando la pantalla recibe el foco
   useFocusEffect(
@@ -102,6 +121,9 @@ const SpendingHeatmap: React.FC = () => {
     if (intensity < 0.9) return '#FF6F5A';
     return '#E86F51';
   };
+
+  // Determinar si está cargando (carga inicial o refresco)
+  const isLoading = loading || isRefreshing;
 
   if (error) {
     return (
@@ -207,6 +229,7 @@ const SpendingHeatmap: React.FC = () => {
               ]}
               onPress={() => handlePeriodChange(period)}
               activeOpacity={0.7}
+              disabled={isLoading} // Deshabilitar durante carga
             >
               <Text
                 style={[
@@ -220,10 +243,8 @@ const SpendingHeatmap: React.FC = () => {
           ))}
         </View>
 
-       
-
         {/* Mapa de calor */}
-        {loading ? (
+        {isLoading ? (
           <View style={globalStyles.loadingContainer}>
             <Text style={globalStyles.loadingText}>Cargando datos...</Text>
           </View>

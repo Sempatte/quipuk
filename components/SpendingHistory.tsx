@@ -1,6 +1,5 @@
-
 // components/SpendingHistory.tsx
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -18,12 +17,21 @@ import SpendingHistoryChart from "./ui/SpendingHistoryChart";
 const { width } = Dimensions.get("window");
 
 /**
- * Componente para mostrar el histórico de gastos
- * Muestra un gráfico de área y estadísticas de gastos en diferentes períodos
+ * Props interface for SpendingHistory component
  */
-const SpendingHistory: React.FC = () => {
+interface SpendingHistoryProps {
+  refreshTrigger?: number; // Optional prop to force refresh
+}
+
+/**
+ * Componente para mostrar el histórico de gastos
+ * Mejorado con soporte para refresco forzado desde componente padre
+ */
+const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => {
   // Estado para el filtro de período seleccionado
   const [selectedFilter, setSelectedFilter] = useState<PeriodFilter>("Este mes");
+  // Estado para manejar animación de refresco (opcional)
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Definir los filtros con su versión mostrada
   const periodFilters: PeriodFilter[] = [
@@ -33,12 +41,27 @@ const SpendingHistory: React.FC = () => {
     "Anual"
   ];
 
-  // Consulta GraphQL para obtener transacciones
+  // Consulta GraphQL para obtener transacciones con mejor control de caché
   const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
-    fetchPolicy: "network-only",
+    fetchPolicy: "network-only", // Siempre buscar datos nuevos
+    notifyOnNetworkStatusChange: true,
   });
 
-  // Refrescar datos cuando la pantalla reciba el foco
+  // Refrescar datos cuando cambia el refreshTrigger
+  useEffect(() => {
+    if (refreshTrigger !== undefined) {
+      // Marcar refrescando
+      setIsRefreshing(true);
+      
+      // Ejecutar refetch y resetear estado
+      refetch().finally(() => {
+        setIsRefreshing(false);
+        if (__DEV__) console.log('SpendingHistory refrescado por trigger:', refreshTrigger);
+      });
+    }
+  }, [refreshTrigger, refetch]);
+
+  // Refrescar datos cuando la pantalla reciba el foco (para navegación directa)
   useFocusEffect(
     useCallback(() => {
       refetch();
@@ -102,6 +125,9 @@ const SpendingHistory: React.FC = () => {
     );
   }
 
+  // Determinar si está cargando, ya sea por carga inicial o refresco
+  const isLoading = loading || isRefreshing;
+
   return (
     <View>
       <View style={globalStyles.titleContainer}>
@@ -124,6 +150,7 @@ const SpendingHistory: React.FC = () => {
               ]}
               onPress={() => handleFilterChange(filter)}
               activeOpacity={0.7}
+              disabled={isLoading} // Deshabilitar durante carga
             >
               <Text
                 style={[
@@ -155,7 +182,7 @@ const SpendingHistory: React.FC = () => {
         </View>
 
         {/* Gráfico de gastos */}
-        {loading ? (
+        {isLoading ? (
           <View style={styles.loadingContainer}>
             <Text style={styles.loadingText}>Cargando datos...</Text>
           </View>
