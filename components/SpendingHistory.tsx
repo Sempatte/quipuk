@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
+  Alert
 } from "react-native";
 import { useQuery, useApolloClient } from "@apollo/client";
 import { GET_TRANSACTIONS } from "@/app/graphql/transaction.graphql";
@@ -26,14 +28,15 @@ interface SpendingHistoryProps {
 
 /**
  * Componente para mostrar el histórico de gastos
- * Mejorado con soporte para refresco forzado desde componente padre
- * Solución para asegurar actualización de datos
+ * Solución completa para problemas de refresco y visualización de nuevas transacciones
  */
 const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => {
   // Estado para el filtro de período seleccionado
   const [selectedFilter, setSelectedFilter] = useState<PeriodFilter>("Este mes");
   // Estado para manejar animación de refresco
   const [isRefreshing, setIsRefreshing] = useState(false);
+  // Estado para seguimiento de refrescos
+  const refreshCountRef = React.useRef(0);
   // Acceso al cliente Apollo para manipulación directa de caché
   const apolloClient = useApolloClient();
 
@@ -45,64 +48,92 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     "Anual"
   ];
 
-  // Consulta GraphQL para obtener transacciones
-  // Usamos 'cache-and-network' para equilibrar rendimiento y frescura de datos
+  // SOLUCIÓN CLAVE: Consulta con política de no caché para forzar consulta a la red SIEMPRE
   const { data, loading, error, refetch } = useQuery<{ transactions: Transaction[] }>(GET_TRANSACTIONS, {
-      fetchPolicy: "network-only",
+      fetchPolicy: "no-cache", // Forzar consulta a la red siempre
       notifyOnNetworkStatusChange: true,
     });
 
-  // SOLUCIÓN: Efecto mejorado para reaccionar al refreshTrigger con limpieza de caché
+  // SOLUCIÓN CRÍTICA 1: Efecto para manejar el refreshTrigger desde componente padre
   useEffect(() => {
     if (refreshTrigger !== undefined) {
-      // Marcar como refrescando para mostrar indicadores visuales
+      // Incrementar contador de refrescos
+      refreshCountRef.current += 1;
+      
+      // Mostrar indicador de refresco
       setIsRefreshing(true);
       
-      // PASO CLAVE 1: Limpiar la caché específicamente para este tipo de datos
-      apolloClient.cache.evict({ 
-        fieldName: 'transactions' 
-      });
-      apolloClient.cache.gc();
-      
-      // PASO CLAVE 2: Forzar nueva consulta después de limpiar caché
-      refetch({
-        fetchPolicy: 'network-only' // Forzar consulta a la red ignorando caché
-      }).finally(() => {
-        setIsRefreshing(false);
-        // Log para debugging
-        if (__DEV__) console.log('SpendingHistory refrescado, transacciones:', 
-          data?.transactions?.length || 0);
+      // Limpiar caché completamente
+      apolloClient.cache.reset().then(() => {
+        // Luego refrescar con política de no-cache
+        refetch({
+          fetchPolicy: 'no-cache'
+        }).finally(() => {
+          setIsRefreshing(false);
+          
+          if (__DEV__) {
+            console.log(`[SpendingHistory] Refrescado #${refreshCountRef.current}, transacciones: ${data?.transactions?.length || 0}`);
+          }
+        });
       });
     }
-  }, [refreshTrigger, refetch, apolloClient]);
+  }, [refreshTrigger, refetch, apolloClient, data?.transactions?.length]);
 
-  // También mantener el refresco normal al enfocar la pantalla (para navegación directa)
+  // SOLUCIÓN CRÍTICA 2: Refrescar también al enfocar la pantalla
   useFocusEffect(
     useCallback(() => {
-      refetch();
-    }, [refetch])
+      // Resetear caché completamente
+      apolloClient.cache.reset().then(() => {
+        // Refrescar con política de no-cache
+        refetch({
+          fetchPolicy: 'no-cache'
+        });
+      });
+      
+      return () => {
+        // Al salir de la pantalla, podemos hacer alguna limpieza si es necesario
+      };
+    }, [refetch, apolloClient])
   );
 
-  // PASO CLAVE 3: Verificar explícitamente los datos antes de procesarlos
-  // Esto ayuda a identificar si el problema está en la consulta o en el procesamiento
+  // SOLUCIÓN CRÍTICA 3: Verificación de datos antes de procesarlos
   const verifiedTransactions = useMemo(() => {
     const transactions = data?.transactions || [];
+    
+    // Verificar y filtrar transacciones
+    const filteredTransactions = transactions.filter(tx => 
+      tx && 
+      tx.id && 
+      typeof tx.amount === 'number' && 
+      !isNaN(tx.amount) &&
+      tx.createdAt && 
+      new Date(tx.createdAt).toString() !== 'Invalid Date'
+    );
+    
+    // En modo desarrollo, mostrar información de diagnóstico
     if (__DEV__) {
-      console.log(`SpendingHistory recibió ${transactions.length} transacciones`);
-      // Log de algunas transacciones para verificar
+      // Si hay transacciones, mostrar algunas estadísticas
       if (transactions.length > 0) {
-        console.log('Última transacción:', {
-          id: transactions[0].id,
-          type: transactions[0].type,
-          amount: transactions[0].amount,
-          date: transactions[0].createdAt
-        });
+        console.log(`[SpendingHistory] Recibidas ${transactions.length} transacciones, válidas: ${filteredTransactions.length}`);
+        
+        // Ver las transacciones más recientes (ordenadas por fecha)
+        const recentTransactions = [...filteredTransactions]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          .slice(0, 3);
+        
+        if (recentTransactions.length > 0) {
+          console.log('[SpendingHistory] Transacciones más recientes:');
+          recentTransactions.forEach((tx, i) => {
+            console.log(`  ${i+1}. ID: ${tx.id}, Fecha: ${new Date(tx.createdAt).toLocaleDateString()}, Tipo: ${tx.type}, Monto: ${tx.amount}`);
+          });
+        }
       }
     }
-    return transactions;
-  }, [data]);
+    
+    return filteredTransactions;
+  }, [data?.transactions]);
 
-  // Procesar datos para el gráfico utilizando el hook personalizado
+  // SOLUCIÓN CRÍTICA 4: Usar el hook mejorado para procesar datos
   const { 
     chartData, 
     totalSpending, 
@@ -115,12 +146,13 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
 
   // Obtener etiquetas para estadísticas según el periodo seleccionado
   const getStatLabels = useCallback((filter: PeriodFilter) => {
-    switch (filter) {
+    const normalizedFilter = filter === "Mes ant." ? "Mes anterior" : filter;
+    
+    switch (normalizedFilter) {
       case "Semanal":
-        return { left: "Gasto del mes", right: "Gasto promedio semanal" };
+        return { left: "Gasto de la semana", right: "Gasto promedio diario" };
       case "Este mes":
       case "Mes anterior":
-      case "Mes ant.": // Agregamos el caso para la versión abreviada
         return { left: "Gasto del mes", right: "Gasto promedio semanal" };
       case "Anual":
         return { left: "Gasto del año", right: "Gasto promedio mensual" };
@@ -142,12 +174,27 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     [averageSpending]
   );
 
-  // Manejar la selección del filtro
+  // SOLUCIÓN CRÍTICA 5: Mejorar manejo del cambio de filtro
   const handleFilterChange = (filter: PeriodFilter) => {
-    // Si se selecciona la versión abreviada, usar el nombre completo internamente
+    // Normalizar el filtro si es necesario
     const actualFilter = filter === "Mes ant." ? "Mes anterior" : filter;
     setSelectedFilter(actualFilter);
+    
+    // Mostrar indicador de refresco
+    setIsRefreshing(true);
+    
+    // Resetear caché para obtener datos frescos
+    apolloClient.cache.reset().then(() => {
+      // Refrescar con política de no-cache
+      refetch({
+        fetchPolicy: 'no-cache'
+      }).finally(() => {
+        setIsRefreshing(false);
+      });
+    });
   };
+
+  
 
   // Renderizar mensaje de error
   if (error) {
@@ -166,6 +213,7 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     <View>
       <View style={globalStyles.titleContainer}>
         <Text style={globalStyles.sectionTitle}>Histórico de Gastos</Text>
+        
       </View>
       
       <View style={globalStyles.sectionContainer}>
@@ -206,19 +254,28 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
             <Text style={styles.statLabel}>{statLabels.left}</Text>
-            <Text style={styles.statValueTotal}>{formattedTotal}</Text>
+            <Text style={styles.statValueTotal}>
+              {isLoading ? "-" : formattedTotal}
+            </Text>
           </View>
           
           <View style={styles.statItem}>
             <Text style={[styles.statLabel, styles.textRight]}>{statLabels.right}</Text>
-            <Text style={styles.statValueAverage}>{formattedAverage}</Text>
+            <Text style={styles.statValueAverage}>
+              {isLoading ? "-" : formattedAverage}
+            </Text>
           </View>
         </View>
 
         {/* Gráfico de gastos */}
         {isLoading ? (
           <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#EF674A" />
             <Text style={styles.loadingText}>Cargando datos...</Text>
+          </View>
+        ) : chartData.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No hay datos para mostrar</Text>
           </View>
         ) : (
           <View style={styles.chartContainer}>
@@ -296,7 +353,7 @@ const styles = StyleSheet.create({
   },
   chartContainer: {
     marginTop: 5,
-    height: 220,
+    height: 240, // Aumentado para dar espacio al contador de transacciones
   },
   loadingContainer: {
     height: 220,
@@ -307,7 +364,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#666666",
     fontFamily: "Outfit_400Regular",
+    marginTop: 10,
   },
+  transactionCountText: {
+    fontSize: 12, 
+    color: "#777",
+    textAlign: "center",
+    marginTop: 5,
+  },
+  emptyContainer: {
+    height: 220,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  emptyText: {
+    fontSize: 16,
+    color: "#666666",
+    fontFamily: "Outfit_400Regular",
+  },
+  debugButton: {
+    position: 'absolute',
+    right: 5,
+    top: 5,
+    backgroundColor: 'rgba(239, 103, 74, 0.2)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  debugButtonText: {
+    fontSize: 10,
+    color: '#EF674A',
+    fontFamily: "Outfit_400Regular",
+  }
 });
 
 export default SpendingHistory;
