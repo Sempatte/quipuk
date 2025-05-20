@@ -1,3 +1,4 @@
+// components/ExpensesByCategory.tsx
 import React, { useState, useCallback } from "react";
 import {
   View,
@@ -12,13 +13,22 @@ import { globalStyles } from "@/app/styles/globalStyles";
 import { useExpenseCategories, PeriodFilter } from "@/hooks/useExpenseCategories";
 import PieChart from "./ui/PieChart";
 import Legend from "./ui/Legend";
+import ExpensesByCategorySkeleton from "./ui/ExpensesByCategorySkeleton";
+import { Transaction } from "@/app/interfaces/transaction.interface"; // Importamos la interfaz Transaction directamente
+
+// Tipado para la respuesta GraphQL
+interface TransactionsData {
+  transactions: Transaction[]; // Utilizamos directamente Transaction[] para asegurar compatibilidad
+}
+
 // Componente principal
 const ExpensesByCategory: React.FC = () => {
-  const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("Este mes"); // Cambiado a "Este mes" según la imagen
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("Este mes");
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const currentYear = new Date().getFullYear().toString();
   
-  // Consulta para obtener las transacciones
-  const { data, loading, error, refetch } = useQuery(GET_TRANSACTIONS, {
+  // Consulta para obtener las transacciones con tipo adecuado
+  const { data, loading, error, refetch } = useQuery<TransactionsData>(GET_TRANSACTIONS, {
     fetchPolicy: "network-only",
   });
 
@@ -28,8 +38,6 @@ const ExpensesByCategory: React.FC = () => {
       refetch();
     }, [refetch])
   );
-
-  
   
   // Usar el hook para procesar los datos de gastos por categoría
   const expenseData = useExpenseCategories(
@@ -38,8 +46,15 @@ const ExpensesByCategory: React.FC = () => {
   );
 
   // Gestionar la selección de período
-  const handlePeriodChange = (period: PeriodFilter) => {
+  const handlePeriodChange = (period: PeriodFilter): void => {
     setSelectedPeriod(period);
+    // Resetear la categoría activa al cambiar el periodo
+    setActiveCategory(null);
+  };
+
+  // Gestionar la selección de categoría
+  const handleCategorySelect = (categoryName: string | null): void => {
+    setActiveCategory(categoryName);
   };
 
   if (error) {
@@ -51,6 +66,13 @@ const ExpensesByCategory: React.FC = () => {
     );
   }
 
+  if (loading) {
+    return <ExpensesByCategorySkeleton />;
+  }
+
+  // Crear array tipado para los filtros
+  const periodFilters: PeriodFilter[] = ["Este mes", "3 Meses", "6 Meses", currentYear as PeriodFilter];
+
   return (
     <View>
       <View style={globalStyles.titleContainer}>
@@ -59,46 +81,43 @@ const ExpensesByCategory: React.FC = () => {
       <View style={globalStyles.sectionContainer}>
         {/* Filtros de período */}
         <View style={styles.filterContainer}>
-          {(["Este mes", "3 Meses", "6 Meses", currentYear] as PeriodFilter[]).map(
-            (period) => (
-              <TouchableOpacity
-                key={period}
+          {periodFilters.map((period) => (
+            <TouchableOpacity
+              key={period}
+              style={[
+                styles.filterButton,
+                selectedPeriod === period && styles.selectedFilterButton,
+              ]}
+              onPress={() => handlePeriodChange(period)}
+              activeOpacity={0.7}
+            >
+              <Text
                 style={[
-                  styles.filterButton,
-                  selectedPeriod === period && styles.selectedFilterButton,
+                  styles.filterText,
+                  selectedPeriod === period && styles.selectedFilterText,
                 ]}
-                onPress={() => handlePeriodChange(period)}
-                activeOpacity={0.7}
               >
-                <Text
-                  style={[
-                    styles.filterText,
-                    selectedPeriod === period && styles.selectedFilterText,
-                  ]}
-                >
-                  {period}
-                </Text>
-              </TouchableOpacity>
-            )
-          )}
+                {period}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Gráfico circular y leyenda */}
-        {loading ? (
-          <View style={globalStyles.loadingContainer}>
-            <Text style={globalStyles.loadingText}>Cargando datos...</Text>
-          </View>
-        ) : (
-          <>
-            <PieChart 
-              categories={expenseData.categories} 
-              totalExpense={expenseData.totalExpense}
-              month={expenseData.month}
-              periodLabel={expenseData.periodLabel}
-            />
-            <Legend categories={expenseData.categories} />
-          </>
-        )}
+        {/* Gráfico circular */}
+        <PieChart 
+          categories={expenseData.categories} 
+          totalExpense={expenseData.totalExpense}
+          month={expenseData.month}
+          periodLabel={expenseData.periodLabel}
+          activeCategory={activeCategory}
+        />
+        
+        {/* Leyenda interactiva */}
+        <Legend 
+          categories={expenseData.categories}
+          activeCategory={activeCategory}
+          onSelectCategory={handleCategorySelect}
+        />
       </View>
     </View>
   );
@@ -120,15 +139,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   selectedFilterButton: {
-    backgroundColor: "#00DC5A", // Usando el color verde como en la imagen
+    backgroundColor: "#00DC5A",
   },
   filterText: {
     fontSize: 14,
     fontFamily: "Outfit_400Regular",
-    color: "#666666",
+    color: "#000000", // Cambiado a negro como solicitaste
   },
   selectedFilterText: {
-    color: "#FFFFFF",
+    color: "#000000", // Cambiado a negro como solicitaste
     fontFamily: "Outfit_500Medium",
   },
 });
