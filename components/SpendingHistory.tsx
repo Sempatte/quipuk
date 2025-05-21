@@ -16,6 +16,7 @@ import { globalStyles } from "@/app/styles/globalStyles";
 import { useSpendingHistory, PeriodFilter } from "@/hooks/useSpendingHistory";
 import SpendingHistoryChart from "./ui/SpendingHistoryChart";
 import { Transaction } from "@/app/interfaces/transaction.interface";
+import SpendingHistorySkeleton from "./ui/SpendingHistorySkeleton";
 
 const { width } = Dimensions.get("window");
 
@@ -174,24 +175,15 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     [averageSpending]
   );
 
-  // SOLUCIÓN CRÍTICA 5: Mejorar manejo del cambio de filtro
+  // SOLUCIÓN CRÍTICA 5: Manejar el cambio de filtro sin refrescar datos
   const handleFilterChange = (filter: PeriodFilter) => {
     // Normalizar el filtro si es necesario
     const actualFilter = filter === "Mes ant." ? "Mes anterior" : filter;
     setSelectedFilter(actualFilter);
     
-    // Mostrar indicador de refresco
-    setIsRefreshing(true);
-    
-    // Resetear caché para obtener datos frescos
-    apolloClient.cache.reset().then(() => {
-      // Refrescar con política de no-cache
-      refetch({
-        fetchPolicy: 'no-cache'
-      }).finally(() => {
-        setIsRefreshing(false);
-      });
-    });
+    // Ya no hacemos refetch ni reset del caché al cambiar filtros
+    // Solo cambiamos el filtro y el hook useSpendingHistory se encargará
+    // de procesar los datos con el nuevo filtro
   };
 
   
@@ -204,6 +196,10 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
         <Text style={globalStyles.errorSubtext}>{error.message}</Text>
       </View>
     );
+  }
+
+  if (loading) {
+    <SpendingHistorySkeleton />
   }
 
   // Determinar si está cargando, ya sea por carga inicial o refresco
@@ -268,12 +264,7 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
         </View>
 
         {/* Gráfico de gastos */}
-        {isLoading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#EF674A" />
-            <Text style={styles.loadingText}>Cargando datos...</Text>
-          </View>
-        ) : chartData.length === 0 ? (
+        {chartData.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Text style={styles.emptyText}>No hay datos para mostrar</Text>
           </View>
