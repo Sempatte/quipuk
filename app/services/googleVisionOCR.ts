@@ -1,6 +1,7 @@
-// app/services/googleVisionOCR.ts - OPTIMIZADO
+// app/services/googleVisionOCR.ts - PARSING DE FECHAS MEJORADO
 import env from '@/app/config/env';
 import { ExtractedReceiptData, OCRResult } from './ocrService';
+import { DateParsingUtils } from '@/app/utils/dateValidation';
 
 const GOOGLE_VISION_API_KEY = env.GOOGLE_VISION_API_KEY || '';
 const GOOGLE_VISION_URL = `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
@@ -159,7 +160,8 @@ class GoogleVisionOCR {
             category: extractedData.category,
             confidence: extractedData.confidence,
             hasDescription: !!extractedData.description,
-            hasDate: !!extractedData.date
+            hasDate: !!extractedData.date,
+            extractedDate: extractedData.date
           });
           
           return {
@@ -191,7 +193,7 @@ class GoogleVisionOCR {
   }
 
   /**
-   * Parser optimizado para comprobantes peruanos
+   * Parser optimizado para comprobantes peruanos - CON MEJORAS EN FECHAS
    */
   private parseReceiptTextOptimized(text: string): ExtractedReceiptData {
     console.log('🔍 [GoogleVision] Iniciando parsing optimizado...');
@@ -210,12 +212,22 @@ class GoogleVisionOCR {
         /(?:pagar|cobrar|debe|total)[:\s]*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
       ],
       
-      // Patrones de fecha mejorados
+      // 🚀 PATRONES DE FECHA COMPLETAMENTE MEJORADOS
       date: [
+        // Formato específico peruano DD/MM/YYYY HH:MM (más común en comprobantes)
+        /(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}:\d{2})/g,
+        // Formato DD/MM/YYYY sin hora
         /(\d{1,2}\/\d{1,2}\/\d{4})/g,
+        // Formato con texto "Fecha:" seguido de fecha
+        /(?:fecha|date)[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(\d{1,2}:\d{2}))?/gi,
+        // Formato DD-MM-YYYY (alternativo)
         /(\d{1,2}-\d{1,2}-\d{4})/g,
+        // Formato YYYY-MM-DD (ISO)
         /(\d{4}-\d{1,2}-\d{1,2})/g,
-        /(?:fecha|date|día)[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
+        // Formato con palabras en español
+        /(\d{1,2})\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?(\d{4})/gi,
+        // Búsqueda por contexto cerca de números que parecen fechas
+        /(?:emitido|emision|compra|venta|operacion)[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
       ],
       
       // Patrones de comercio mejorados para Perú
@@ -225,7 +237,7 @@ class GoogleVisionOCR {
         // Después de RUC
         /RUC[:\s]*\d{11}[^\r\n]*\n([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ\s]{3,})/gi,
         // Patrones específicos de cadenas peruanas
-        /(PLAZA VEA|WONG|TOTTUS|METRO|VIVANDA|KFC|POPEYES|BEMBOS|NORKY'S|PARDOS|LA LUCHA|SECOND CUP)/gi,
+        /(PLAZA VEA|WONG|TOTTUS|METRO|VIVANDA|KFC|POPEYES|BEMBOS|NORKY'S|PARDOS|OXXO|TAMBO)/gi,
       ],
     };
 
@@ -246,7 +258,7 @@ class GoogleVisionOCR {
       ],
       'Super': [
         'supermercado', 'market', 'plaza vea', 'wong', 'tottus', 'metro', 'vivanda', 'abarrotes',
-        'minimarket', 'bodega', 'mass', 'makro', 'mayorista', 'retail', 'hipermercado'
+        'minimarket', 'bodega', 'mass', 'makro', 'mayorista', 'retail', 'hipermercado', 'oxxo', 'tambo'
       ],
       'Salud': [
         'farmacia', 'clinica', 'hospital', 'medico', 'medicamento', 'botica', 'inkafarma', 'mifarma',
@@ -318,34 +330,142 @@ class GoogleVisionOCR {
       }
     }
 
-    // 3. Extraer fecha
+    // 3. 🚀 EXTRAER FECHA CON ALGORITMO COMPLETAMENTE MEJORADO
     console.log('🔍 [GoogleVision] Buscando fecha...');
+    console.log('📄 [GoogleVision] Texto completo para análisis de fecha:', text);
+    
+    // Buscar todas las posibles fechas en el texto
+    const foundDates: { date: Date; confidence: number; source: string }[] = [];
+    
     for (const pattern of patterns.date) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
+      const matches = Array.from(text.matchAll(pattern));
+      console.log(`🔍 [GoogleVision] Patrón ${pattern.source} encontró ${matches.length} coincidencias`);
+      
+      for (const match of matches) {
+        console.log(`🔍 [GoogleVision] Analizando coincidencia: "${match[0]}"`);
+        
         try {
-          let dateStr = match[1];
-          // Convertir formato DD/MM/YYYY a formato ISO
+          let dateStr = '';
+          let timeStr = '';
+          
+          // Verificar si tenemos fecha y hora separadas
+          if (match[1] && match[2]) {
+            dateStr = match[1];
+            timeStr = match[2];
+            console.log(`🔍 [GoogleVision] Fecha con hora detectada: ${dateStr} ${timeStr}`);
+          } else if (match[1]) {
+            dateStr = match[1];
+            console.log(`🔍 [GoogleVision] Solo fecha detectada: ${dateStr}`);
+          } else {
+            dateStr = match[0];
+            console.log(`🔍 [GoogleVision] Fecha completa: ${dateStr}`);
+          }
+          
+          // Parsear fecha según el formato
+          let parsedDate: Date | null = null;
+          let confidence = 0;
+          
           if (dateStr.includes('/')) {
+            // Formato DD/MM/YYYY o MM/DD/YYYY
             const parts = dateStr.split('/');
             if (parts.length === 3) {
-              // Asumir DD/MM/YYYY (formato peruano)
-              const [day, month, year] = parts;
-              dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+              const [part1, part2, year] = parts.map(p => parseInt(p, 10));
+              
+              // Validar año
+              if (year >= 2020 && year <= 2030) {
+                // Asumir formato peruano DD/MM/YYYY si el primer número > 12
+                if (part1 > 12) {
+                  parsedDate = new Date(year, part2 - 1, part1);
+                  confidence = 90; // Alta confianza para formato peruano
+                  console.log(`✅ [GoogleVision] Formato DD/MM/YYYY confirmado: ${part1}/${part2}/${year}`);
+                } 
+                // Si ambos son <= 12, priorizar formato DD/MM/YYYY (Perú)
+                else if (part2 <= 12) {
+                  parsedDate = new Date(year, part2 - 1, part1);
+                  confidence = 80; // Buena confianza
+                  console.log(`✅ [GoogleVision] Asumiendo formato DD/MM/YYYY: ${part1}/${part2}/${year}`);
+                }
+                // Último recurso: MM/DD/YYYY
+                else {
+                  parsedDate = new Date(year, part1 - 1, part2);
+                  confidence = 60; // Menor confianza
+                  console.log(`⚠️ [GoogleVision] Formato MM/DD/YYYY como último recurso: ${part1}/${part2}/${year}`);
+                }
+                
+                // Si tenemos hora, aplicarla
+                if (timeStr && parsedDate) {
+                  const timeParts = timeStr.split(':');
+                  if (timeParts.length >= 2) {
+                    const hours = parseInt(timeParts[0], 10);
+                    const minutes = parseInt(timeParts[1], 10);
+                    if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
+                      parsedDate.setHours(hours, minutes, 0, 0);
+                      confidence += 10; // Bonus por tener hora válida
+                      console.log(`✅ [GoogleVision] Hora aplicada: ${hours}:${minutes}`);
+                    }
+                  }
+                }
+              }
+            }
+          } else if (dateStr.includes('-')) {
+            // Formato YYYY-MM-DD o DD-MM-YYYY
+            const parts = dateStr.split('-');
+            if (parts.length === 3) {
+              const [part1, part2, part3] = parts.map(p => parseInt(p, 10));
+              
+              if (part1 > 2000) {
+                // Formato YYYY-MM-DD
+                parsedDate = new Date(part1, part2 - 1, part3);
+                confidence = 85;
+                console.log(`✅ [GoogleVision] Formato YYYY-MM-DD: ${part1}-${part2}-${part3}`);
+              } else if (part3 > 2000) {
+                // Formato DD-MM-YYYY
+                parsedDate = new Date(part3, part2 - 1, part1);
+                confidence = 85;
+                console.log(`✅ [GoogleVision] Formato DD-MM-YYYY: ${part1}-${part2}-${part3}`);
+              }
             }
           }
           
-          const date = new Date(dateStr);
-          if (!isNaN(date.getTime()) && date.getFullYear() > 2020) {
-            result.date = date.toISOString();
-            result.confidence += 20;
-            console.log(`✅ [GoogleVision] Fecha encontrada: ${match[1]}`);
-            break;
+          // Validar fecha parseada
+          if (parsedDate && !isNaN(parsedDate.getTime())) {
+            // Verificar que la fecha sea razonable (no muy antigua ni muy futura)
+            const now = new Date();
+            const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
+            const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
+            
+            if (parsedDate >= oneYearAgo && parsedDate <= oneYearFromNow) {
+              foundDates.push({
+                date: parsedDate,
+                confidence,
+                source: match[0]
+              });
+              console.log(`✅ [GoogleVision] Fecha válida encontrada: ${parsedDate.toLocaleDateString('es-PE')} (confianza: ${confidence})`);
+            } else {
+              console.log(`⚠️ [GoogleVision] Fecha fuera de rango válido: ${parsedDate.toLocaleDateString('es-PE')}`);
+            }
+          } else {
+            console.log(`❌ [GoogleVision] No se pudo parsear la fecha: ${dateStr}`);
           }
         } catch (error) {
           console.log('⚠️ [GoogleVision] Error parseando fecha:', error);
         }
       }
+    }
+    
+    // Seleccionar la mejor fecha encontrada
+    if (foundDates.length > 0) {
+      // Ordenar por confianza (mayor a menor)
+      foundDates.sort((a, b) => b.confidence - a.confidence);
+      
+      const bestDate = foundDates[0];
+      result.date = bestDate.date.toISOString();
+      result.confidence += 25; // Bonus por tener fecha
+      
+      console.log(`✅ [GoogleVision] Mejor fecha seleccionada: ${bestDate.date.toLocaleDateString('es-PE')} ${bestDate.date.toLocaleTimeString('es-PE')} (confianza: ${bestDate.confidence}) desde "${bestDate.source}"`);
+      console.log(`📅 [GoogleVision] Fecha ISO resultante: ${result.date}`);
+    } else {
+      console.log('❌ [GoogleVision] No se encontraron fechas válidas');
     }
 
     // 4. Determinar categoría con scoring
