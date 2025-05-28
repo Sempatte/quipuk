@@ -1,27 +1,17 @@
+// app/services/googleVisionOCR.ts - OPTIMIZADO
 import env from '@/app/config/env';
 import { ExtractedReceiptData, OCRResult } from './ocrService';
 
-// Configuración para Google Vision API
 const GOOGLE_VISION_API_KEY = env.GOOGLE_VISION_API_KEY || '';
 const GOOGLE_VISION_URL = `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
 
-/**
- * Servicio OCR real usando Google Vision API
- * Con logging detallado para debugging
- */
 class GoogleVisionOCR {
-  /**
-   * Verifica si la API está configurada correctamente
-   */
   public isConfigured(): boolean {
     const isConfigured = !!GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY.length > 10;
     console.log(`🔍 [GoogleVision] isConfigured: ${isConfigured}, keyLength: ${GOOGLE_VISION_API_KEY?.length || 0}`);
     return isConfigured;
   }
 
-  /**
-   * Procesa una imagen usando Google Vision API
-   */
   public async processReceiptImage(imageUri: string): Promise<OCRResult> {
     const startTime = Date.now();
     
@@ -31,7 +21,7 @@ class GoogleVisionOCR {
       console.log('❌ [GoogleVision] API no configurada');
       return {
         success: false,
-        error: 'Google Vision API no está configurada. Usando simulación OCR.',
+        error: 'Google Vision API no está configurada',
         processingTime: Date.now() - startTime,
       };
     }
@@ -39,7 +29,6 @@ class GoogleVisionOCR {
     try {
       console.log('🔍 [GoogleVision] Convirtiendo imagen a base64...');
       
-      // Convertir imagen a base64
       const base64Image = await this.convertImageToBase64(imageUri);
       
       if (!base64Image) {
@@ -53,7 +42,7 @@ class GoogleVisionOCR {
 
       console.log(`🔍 [GoogleVision] Base64 generado exitosamente, tamaño: ${base64Image.length} caracteres`);
 
-      // Preparar request para Google Vision API
+      // Request optimizado para comprobantes
       const requestBody = {
         requests: [
           {
@@ -65,15 +54,22 @@ class GoogleVisionOCR {
                 type: 'TEXT_DETECTION',
                 maxResults: 1,
               },
+              // Añadir detección de documentos para mejor OCR
+              {
+                type: 'DOCUMENT_TEXT_DETECTION',
+                maxResults: 1,
+              }
             ],
+            // Configuración de imagen para mejor procesamiento
+            imageContext: {
+              languageHints: ['es', 'en'] // Español e inglés para comprobantes peruanos
+            }
           },
         ],
       };
 
       console.log('🔍 [GoogleVision] Enviando request a Google Vision API...');
-      console.log('🔍 [GoogleVision] URL:', GOOGLE_VISION_URL.replace(GOOGLE_VISION_API_KEY, '***API_KEY***'));
 
-      // Realizar llamada a la API
       const response = await fetch(GOOGLE_VISION_URL, {
         method: 'POST',
         headers: {
@@ -90,10 +86,9 @@ class GoogleVisionOCR {
         console.error('❌ [GoogleVision] Error en API:', {
           status: response.status,
           statusText: response.statusText,
-          body: errorText.substring(0, 300) + (errorText.length > 300 ? '...' : '')
+          body: errorText.substring(0, 300)
         });
 
-        // Mensajes de error específicos
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
         switch (response.status) {
@@ -114,20 +109,11 @@ class GoogleVisionOCR {
         throw new Error(errorMessage);
       }
 
-      console.log('🔍 [GoogleVision] Parseando respuesta JSON...');
       const result = await response.json();
       const endTime = Date.now();
 
       console.log('🔍 [GoogleVision] Respuesta parseada exitosamente');
-      console.log('🔍 [GoogleVision] Estructura de respuesta:', {
-        hasResponses: !!result.responses,
-        responsesLength: result.responses?.length || 0,
-        hasFirstResponse: !!(result.responses && result.responses[0]),
-        hasTextAnnotations: !!(result.responses && result.responses[0] && result.responses[0].textAnnotations),
-        textAnnotationsLength: result.responses?.[0]?.textAnnotations?.length || 0
-      });
 
-      // Verificar si hay errores en la respuesta
       if (result.error) {
         console.error('❌ [GoogleVision] Error en respuesta de API:', result.error);
         return {
@@ -137,7 +123,6 @@ class GoogleVisionOCR {
         };
       }
 
-      // Procesar respuesta
       if (result.responses && result.responses[0]) {
         const apiResponse = result.responses[0];
         
@@ -150,41 +135,42 @@ class GoogleVisionOCR {
           };
         }
 
-        if (apiResponse.textAnnotations && apiResponse.textAnnotations[0]) {
-          const detectedText = apiResponse.textAnnotations[0].description;
-          
-          console.log(`✅ [GoogleVision] Texto detectado exitosamente:`);
-          console.log(`📄 [GoogleVision] Longitud del texto: ${detectedText?.length || 0} caracteres`);
-          console.log(`📄 [GoogleVision] Primeros 200 caracteres:`, detectedText?.substring(0, 200) + '...');
-          
-          if (detectedText && detectedText.trim().length > 0) {
-            console.log('🔍 [GoogleVision] Iniciando parsing de texto...');
-            // Usar el parser existente para extraer datos estructurados
-            const extractedData = this.parseReceiptText(detectedText);
-            
-            console.log('✅ [GoogleVision] Datos extraídos:', {
-              amount: extractedData.amount,
-              merchantName: extractedData.merchantName,
-              category: extractedData.category,
-              confidence: extractedData.confidence,
-              hasDescription: !!extractedData.description,
-              hasDate: !!extractedData.date
-            });
-            
-            return {
-              success: true,
-              data: extractedData,
-              rawText: detectedText,
-              processingTime: endTime - startTime,
-            };
-          } else {
-            console.log('⚠️ [GoogleVision] Texto detectado está vacío');
-          }
-        } else {
-          console.log('⚠️ [GoogleVision] No hay textAnnotations en la respuesta');
+        // Priorizar DOCUMENT_TEXT_DETECTION si está disponible
+        let detectedText = '';
+        
+        if (apiResponse.fullTextAnnotation && apiResponse.fullTextAnnotation.text) {
+          detectedText = apiResponse.fullTextAnnotation.text;
+          console.log('✅ [GoogleVision] Usando DOCUMENT_TEXT_DETECTION (mejor calidad)');
+        } else if (apiResponse.textAnnotations && apiResponse.textAnnotations[0]) {
+          detectedText = apiResponse.textAnnotations[0].description;
+          console.log('✅ [GoogleVision] Usando TEXT_DETECTION (estándar)');
         }
-      } else {
-        console.log('⚠️ [GoogleVision] No hay responses en el resultado');
+        
+        console.log(`📄 [GoogleVision] Longitud del texto: ${detectedText?.length || 0} caracteres`);
+        console.log(`📄 [GoogleVision] Primeros 200 caracteres:`, detectedText?.substring(0, 200) + '...');
+        
+        if (detectedText && detectedText.trim().length > 0) {
+          console.log('🔍 [GoogleVision] Iniciando parsing optimizado...');
+          const extractedData = this.parseReceiptTextOptimized(detectedText);
+          
+          console.log('✅ [GoogleVision] Datos extraídos:', {
+            amount: extractedData.amount,
+            merchantName: extractedData.merchantName,
+            category: extractedData.category,
+            confidence: extractedData.confidence,
+            hasDescription: !!extractedData.description,
+            hasDate: !!extractedData.date
+          });
+          
+          return {
+            success: true,
+            data: extractedData,
+            rawText: detectedText,
+            processingTime: endTime - startTime,
+          };
+        } else {
+          console.log('⚠️ [GoogleVision] Texto detectado está vacío');
+        }
       }
 
       console.log('❌ [GoogleVision] No se detectó texto válido en la imagen');
@@ -205,16 +191,216 @@ class GoogleVisionOCR {
   }
 
   /**
-   * Convierte imagen a base64 para envío a la API - MEJORADA
+   * Parser optimizado para comprobantes peruanos
    */
+  private parseReceiptTextOptimized(text: string): ExtractedReceiptData {
+    console.log('🔍 [GoogleVision] Iniciando parsing optimizado...');
+    
+    // Patrones mejorados para comprobantes peruanos
+    const patterns = {
+      // Patrones de monto más específicos y ordenados por prioridad
+      amount: [
+        // Buscar "TOTAL" primero (más confiable)
+        /(?:total|subtotal|importe final|monto total)[:\s]*s\/?\s*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
+        // Buscar montos con formato peruano
+        /s\/\s*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
+        // Buscar números al final de líneas (probablemente totales)
+        /(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2}))\s*$/gm,
+        // Buscar montos cerca de palabras clave
+        /(?:pagar|cobrar|debe|total)[:\s]*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
+      ],
+      
+      // Patrones de fecha mejorados
+      date: [
+        /(\d{1,2}\/\d{1,2}\/\d{4})/g,
+        /(\d{1,2}-\d{1,2}-\d{4})/g,
+        /(\d{4}-\d{1,2}-\d{1,2})/g,
+        /(?:fecha|date|día)[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
+      ],
+      
+      // Patrones de comercio mejorados para Perú
+      merchant: [
+        // Líneas que empiezan con mayúsculas (nombres de empresa)
+        /^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,}(?:S\.A\.C?|S\.R\.L?|E\.I\.R\.L?|S\.A\.|LTDA\.)?)/m,
+        // Después de RUC
+        /RUC[:\s]*\d{11}[^\r\n]*\n([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ\s]{3,})/gi,
+        // Patrones específicos de cadenas peruanas
+        /(PLAZA VEA|WONG|TOTTUS|METRO|VIVANDA|KFC|POPEYES|BEMBOS|NORKY'S|PARDOS|LA LUCHA|SECOND CUP)/gi,
+      ],
+    };
+
+    // Keywords expandidos para categorización peruana
+    const categoryKeywords = {
+      'Comida': [
+        // Restaurantes y comida rápida
+        'restaurant', 'comida', 'food', 'burger', 'pizza', 'pollo', 'menu', 'almuerzo', 'cena', 'desayuno',
+        'cafe', 'bar', 'polleria', 'sangucheria', 'chifa', 'cevicheria', 'parrilla', 'anticucheria',
+        // Cadenas peruanas conocidas
+        'bembos', 'norky', 'pardos', 'kfc', 'popeyes', 'papa john', 'domino', 'chin wok', 'mr. pollo',
+        'la lucha', 'segundo muelle', 'madam tusan', 'tanta', 'pardo chicken', 'rokys'
+      ],
+      'Transporte': [
+        'taxi', 'uber', 'bus', 'combustible', 'gasolina', 'grifo', 'peaje', 'estacionamiento', 'parking',
+        'petroperu', 'primax', 'shell', 'repsol', 'esso', 'mobil', 'via expresa', 'metropolitano',
+        'transporte publico', 'combi', 'micro'
+      ],
+      'Super': [
+        'supermercado', 'market', 'plaza vea', 'wong', 'tottus', 'metro', 'vivanda', 'abarrotes',
+        'minimarket', 'bodega', 'mass', 'makro', 'mayorista', 'retail', 'hipermercado'
+      ],
+      'Salud': [
+        'farmacia', 'clinica', 'hospital', 'medico', 'medicamento', 'botica', 'inkafarma', 'mifarma',
+        'fasa', 'arcangel', 'boticas', 'drogueria', 'laboratorio', 'consulta', 'doctor', 'dental'
+      ],
+      'Hogar': [
+        'ferreteria', 'sodimac', 'maestro', 'promart', 'decoracion', 'muebles', 'casa', 'hogar',
+        'ace home center', 'construmart', 'cassinelli', 'pinturas', 'herramientas', 'jardin'
+      ],
+      'Teléfono': [
+        'claro', 'movistar', 'entel', 'bitel', 'telefono', 'celular', 'internet', 'recarga',
+        'plan', 'linea', 'movil', 'chip', 'saldo', 'megas', 'gigas'
+      ],
+      'Alquiler': [
+        'alquiler', 'renta', 'rent', 'inmobiliaria', 'vivienda', 'departamento', 'casa',
+        'propiedad', 'arrendamiento', 'mensualidad'
+      ],
+      'Deducibles': [
+        'servicios profesionales', 'honorarios', 'consultoria', 'asesoria', 'capacitacion',
+        'educacion', 'universidad', 'instituto', 'colegio', 'academia'
+      ]
+    };
+
+    const result: ExtractedReceiptData = {
+      confidence: 0,
+    };
+
+    // 1. Extraer monto con algoritmo mejorado
+    console.log('🔍 [GoogleVision] Buscando montos...');
+    const amounts: number[] = [];
+    
+    for (const pattern of patterns.amount) {
+      const matches = Array.from(text.matchAll(pattern));
+      for (const match of matches) {
+        let amountStr = match[1];
+        // Normalizar formato peruano (coma como separador de miles, punto como decimal)
+        amountStr = amountStr.replace(/,(\d{3})/g, '$1'); // Remover comas de miles
+        amountStr = amountStr.replace(',', '.'); // Convertir coma decimal a punto
+        
+        const amount = parseFloat(amountStr);
+        if (!isNaN(amount) && amount > 0 && amount < 100000) { // Filtro realista
+          amounts.push(amount);
+        }
+      }
+    }
+    
+    if (amounts.length > 0) {
+      // Tomar el monto más grande (probablemente el total)
+      result.amount = Math.max(...amounts);
+      result.confidence += 40;
+      console.log(`✅ [GoogleVision] Monto encontrado: S/ ${result.amount} (de ${amounts.length} candidatos)`);
+    }
+
+    // 2. Extraer comercio con priorización
+    console.log('🔍 [GoogleVision] Buscando nombre de comercio...');
+    for (const pattern of patterns.merchant) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        let merchantName = match[1].trim();
+        // Limpiar nombre del comercio
+        merchantName = merchantName.replace(/[^\w\s\.\-áéíóúñÁÉÍÓÚÑ]/g, ' ').trim();
+        
+        if (merchantName.length >= 3) {
+          result.merchantName = merchantName;
+          result.confidence += 30;
+          console.log(`✅ [GoogleVision] Comercio encontrado: ${merchantName}`);
+          break;
+        }
+      }
+    }
+
+    // 3. Extraer fecha
+    console.log('🔍 [GoogleVision] Buscando fecha...');
+    for (const pattern of patterns.date) {
+      const match = text.match(pattern);
+      if (match && match[1]) {
+        try {
+          let dateStr = match[1];
+          // Convertir formato DD/MM/YYYY a formato ISO
+          if (dateStr.includes('/')) {
+            const parts = dateStr.split('/');
+            if (parts.length === 3) {
+              // Asumir DD/MM/YYYY (formato peruano)
+              const [day, month, year] = parts;
+              dateStr = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+          }
+          
+          const date = new Date(dateStr);
+          if (!isNaN(date.getTime()) && date.getFullYear() > 2020) {
+            result.date = date.toISOString();
+            result.confidence += 20;
+            console.log(`✅ [GoogleVision] Fecha encontrada: ${match[1]}`);
+            break;
+          }
+        } catch (error) {
+          console.log('⚠️ [GoogleVision] Error parseando fecha:', error);
+        }
+      }
+    }
+
+    // 4. Determinar categoría con scoring
+    console.log('🔍 [GoogleVision] Determinando categoría...');
+    const lowerText = text.toLowerCase();
+    const categoryScores: {[key: string]: number} = {};
+    
+    for (const [category, keywords] of Object.entries(categoryKeywords)) {
+      let score = 0;
+      for (const keyword of keywords) {
+        const regex = new RegExp(keyword.toLowerCase(), 'g');
+        const matches = lowerText.match(regex);
+        if (matches) {
+          score += matches.length;
+        }
+      }
+      if (score > 0) {
+        categoryScores[category] = score;
+      }
+    }
+    
+    // Seleccionar categoría con mayor score
+    if (Object.keys(categoryScores).length > 0) {
+      const bestCategory = Object.keys(categoryScores).reduce((a, b) => 
+        categoryScores[a] > categoryScores[b] ? a : b
+      );
+      result.category = bestCategory;
+      result.confidence += 15;
+      console.log(`✅ [GoogleVision] Categoría encontrada: ${bestCategory} (score: ${categoryScores[bestCategory]})`);
+    } else {
+      result.category = 'Otros';
+      console.log('📝 [GoogleVision] Asignando categoría por defecto: Otros');
+    }
+
+    // 5. Generar descripción inteligente
+    if (result.merchantName) {
+      result.description = `Compra en ${result.merchantName}`;
+      if (result.category && result.category !== 'Otros') {
+        result.description += ` (${result.category})`;
+      }
+    } else {
+      result.description = result.category !== 'Otros' 
+        ? `Gasto de ${result.category.toLowerCase()}` 
+        : 'Gasto escaneado desde comprobante';
+    }
+
+    console.log(`✅ [GoogleVision] Parsing completado - Confianza: ${result.confidence}%`);
+    return result;
+  }
+
   private async convertImageToBase64(imageUri: string): Promise<string | null> {
     try {
       console.log('🔍 [GoogleVision] Descargando imagen desde URI...');
-      console.log('🔍 [GoogleVision] URI:', imageUri.substring(0, 80) + '...');
       
       const response = await fetch(imageUri);
-      
-      console.log(`🔍 [GoogleVision] Respuesta de descarga: ${response.status} ${response.statusText}`);
       
       if (!response.ok) {
         console.error('❌ [GoogleVision] Error descargando imagen:', response.status);
@@ -222,8 +408,6 @@ class GoogleVisionOCR {
       }
       
       const blob = await response.blob();
-      
-      console.log(`🔍 [GoogleVision] Blob obtenido - tamaño: ${blob.size} bytes, tipo: ${blob.type}`);
       
       if (blob.size === 0) {
         console.error('❌ [GoogleVision] Blob está vacío');
@@ -238,15 +422,12 @@ class GoogleVisionOCR {
             const base64data = reader.result as string;
             
             if (!base64data || typeof base64data !== 'string') {
-              console.error('❌ [GoogleVision] FileReader no devolvió datos válidos');
               reject(new Error('FileReader no devolvió datos válidos'));
               return;
             }
             
-            // Remover el prefijo data:image/...;base64,
             const base64Parts = base64data.split(',');
             if (base64Parts.length < 2) {
-              console.error('❌ [GoogleVision] Formato base64 inválido');
               reject(new Error('Formato base64 inválido'));
               return;
             }
@@ -255,152 +436,18 @@ class GoogleVisionOCR {
             console.log(`✅ [GoogleVision] Base64 convertido exitosamente - longitud: ${base64.length}`);
             resolve(base64);
           } catch (error) {
-            console.error('❌ [GoogleVision] Error procesando base64:', error);
             reject(error);
           }
         };
         
-        reader.onerror = (error) => {
-          console.error('❌ [GoogleVision] Error en FileReader:', error);
-          reject(error);
-        };
-        
-        console.log('🔍 [GoogleVision] Iniciando conversión a base64...');
+        reader.onerror = reject;
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error('💥 [GoogleVision] Error general convirtiendo imagen a base64:', error);
+      console.error('💥 [GoogleVision] Error convirtiendo imagen a base64:', error);
       return null;
     }
   }
-
-  /**
-   * Parser de texto mejorado - similar al servicio OCR principal
-   */
-  private parseReceiptText(text: string): ExtractedReceiptData {
-    console.log('🔍 [GoogleVision] Iniciando parsing de texto...');
-    
-    // Patrones regex para identificar diferentes tipos de datos
-    const patterns = {
-      amount: [
-        /S\/\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/gi,
-        /(?:total|subtotal|importe|monto)[:\s]*S\/?\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/gi,
-        /(\d{1,3}(?:,\d{3})*(?:\.\d{2}))\s*(?:soles|S\/)/gi,
-      ],
-      date: [
-        /(\d{1,2}\/\d{1,2}\/\d{4})/g,
-        /(\d{1,2}-\d{1,2}-\d{4})/g,
-        /(\d{4}-\d{1,2}-\d{1,2})/g,
-      ],
-      merchant: [
-        /^([A-Z\s]{3,}(?:S\.A\.C?|S\.R\.L?|E\.I\.R\.L?)?)/m,
-        /RUC[:\s]*\d{11}[^\r\n]*([A-Z][A-Za-z\s]{3,})/gi,
-      ],
-    };
-
-    const categoryKeywords = {
-      'Comida': ['restaurant', 'comida', 'food', 'burger', 'pizza', 'pollo', 'menu'],
-      'Transporte': ['taxi', 'uber', 'bus', 'combustible', 'gasolina', 'grifo'],
-      'Super': ['supermercado', 'market', 'plaza vea', 'wong', 'tottus', 'metro'],
-      'Salud': ['farmacia', 'clinica', 'hospital', 'medico', 'medicamento'],
-      'Hogar': ['ferreteria', 'sodimac', 'maestro', 'promart', 'decoracion'],
-      'Teléfono': ['claro', 'movistar', 'entel', 'bitel', 'telefono', 'internet'],
-      'Otros': ['tienda', 'compra', 'venta', 'servicio'],
-    };
-
-    const result: ExtractedReceiptData = {
-      confidence: 0,
-    };
-
-    // Extraer monto
-    console.log('🔍 [GoogleVision] Buscando montos...');
-    for (const pattern of patterns.amount) {
-      const matches = Array.from(text.matchAll(pattern));
-      if (matches.length > 0) {
-        let maxAmount = 0;
-        for (const match of matches) {
-          const amountStr = match[1].replace(/,/g, '');
-          const amount = parseFloat(amountStr);
-          if (!isNaN(amount) && amount > maxAmount) {
-            maxAmount = amount;
-          }
-        }
-        if (maxAmount > 0) {
-          result.amount = maxAmount;
-          result.confidence += 40;
-          console.log(`✅ [GoogleVision] Monto encontrado: S/ ${maxAmount}`);
-          break;
-        }
-      }
-    }
-
-    // Extraer comercio
-    console.log('🔍 [GoogleVision] Buscando nombre de comercio...');
-    for (const pattern of patterns.merchant) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        result.merchantName = match[1].trim();
-        result.description = `Compra en ${result.merchantName}`;
-        result.confidence += 30;
-        console.log(`✅ [GoogleVision] Comercio encontrado: ${result.merchantName}`);
-        break;
-      }
-    }
-
-    // Extraer fecha
-    console.log('🔍 [GoogleVision] Buscando fecha...');
-    for (const pattern of patterns.date) {
-      const match = text.match(pattern);
-      if (match && match[1]) {
-        try {
-          const dateStr = match[1];
-          const date = new Date(dateStr.replace(/\//g, '-'));
-          if (!isNaN(date.getTime())) {
-            result.date = date.toISOString();
-            result.confidence += 20;
-            console.log(`✅ [GoogleVision] Fecha encontrada: ${dateStr}`);
-            break;
-          }
-        } catch (error) {
-          console.log('⚠️ [GoogleVision] Error parseando fecha:', error);
-        }
-      }
-    }
-
-    // Determinar categoría
-    console.log('🔍 [GoogleVision] Determinando categoría...');
-    const lowerText = text.toLowerCase();
-    for (const [category, keywords] of Object.entries(categoryKeywords)) {
-      for (const keyword of keywords) {
-        if (lowerText.includes(keyword.toLowerCase())) {
-          result.category = category;
-          result.confidence += 10;
-          console.log(`✅ [GoogleVision] Categoría encontrada: ${category} (keyword: ${keyword})`);
-          break;
-        }
-      }
-      if (result.category) break;
-    }
-
-    // Asignar categoría por defecto
-    if (!result.category) {
-      result.category = 'Otros';
-      console.log('📝 [GoogleVision] Asignando categoría por defecto: Otros');
-    }
-
-    // Generar descripción si no existe
-    if (!result.description) {
-      result.description = result.merchantName 
-        ? `Gasto en ${result.merchantName}`
-        : 'Gasto escaneado desde comprobante';
-      console.log(`📝 [GoogleVision] Descripción generada: ${result.description}`);
-    }
-
-    console.log(`✅ [GoogleVision] Parsing completado - Confianza: ${result.confidence}%`);
-
-    return result;
-  }
 }
 
-// Exportar instancia singleton
 export const googleVisionOCR = new GoogleVisionOCR();

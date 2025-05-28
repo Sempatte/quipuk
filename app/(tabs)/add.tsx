@@ -702,3 +702,5 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
+
+// To Do: Incluir hora en la fecha de pago / fecha de vencimiento
