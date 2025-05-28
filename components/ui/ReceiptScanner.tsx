@@ -25,8 +25,7 @@ interface ReceiptScannerProps {
 }
 
 /**
- * Componente de cámara para escanear comprobantes
- * VERSIÓN CORREGIDA - Callbacks y cierre de modal optimizados
+ * Componente de cámara para escanear comprobantes - VERSIÓN CORREGIDA
  */
 const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   visible,
@@ -35,7 +34,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
 }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
-  const [debugMode, setDebugMode] = useState(__DEV__); // Solo en desarrollo
+  const [debugMode, setDebugMode] = useState(__DEV__);
   const cameraRef = useRef<CameraView>(null);
   
   const {
@@ -53,88 +52,113 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     }
   }, [visible, permissions.camera, requestPermissions]);
 
-  // Log inicial cuando se abre el modal
-  useEffect(() => {
-    if (visible) {
-      console.log('📷 [Scanner] ============ MODAL ABIERTO ============');
-      console.log('📷 [Scanner] Estado inicial:', {
-        hasPermissions: hasAllPermissions,
-        cameraPermission: permissions.camera,
-        mediaLibraryPermission: permissions.mediaLibrary,
-        isProcessing,
-        flashMode
-      });
-      
-      // Test del servicio OCR al abrir
-      if (debugMode) {
-        integratedOCRService.testOCRService().then(result => {
-          console.log('🧪 [Scanner] Test OCR Service:', result);
-        });
-      }
-    }
-  }, [visible, hasAllPermissions, permissions, isProcessing, flashMode, debugMode]);
-
   /**
-   * FUNCIÓN CRÍTICA - Procesa los datos y cierra el modal correctamente
+   * FUNCIÓN CORREGIDA - Procesa los datos y cierra el modal
    */
   const handleDataProcessingComplete = useCallback(
     (data: ExtractedReceiptData) => {
       console.log('✅ [Scanner] ============ PROCESAMIENTO COMPLETADO ============');
-      console.log('✅ [Scanner] Datos a enviar al componente padre:', data);
+      console.log('✅ [Scanner] Datos extraídos:', data);
       
-      // CRÍTICO: Enviar los datos ANTES de cerrar el modal
-      // Usando setTimeout para asegurar que el callback se ejecute
-      setTimeout(() => {
-        try {
-          console.log('📤 [Scanner] Enviando datos al componente padre...');
-          onDataExtracted(data);
-          
-          console.log('📤 [Scanner] Datos enviados exitosamente');
-          
-          // Cerrar el modal DESPUÉS de enviar los datos
-          setTimeout(() => {
-            console.log('🚪 [Scanner] Cerrando modal...');
-            onClose();
-          }, 100); // Pequeño delay para asegurar que el callback se procese
-          
-        } catch (error) {
-          console.error('💥 [Scanner] Error enviando datos:', error);
-          // Aún así cerrar el modal
-          onClose();
-        }
-      }, 50);
+      try {
+        // CRÍTICO: Llamar al callback INMEDIATAMENTE
+        console.log('📤 [Scanner] Enviando datos al componente padre...');
+        onDataExtracted(data);
+        console.log('📤 [Scanner] Datos enviados exitosamente');
+        
+        // Cerrar el modal DESPUÉS de enviar los datos
+        console.log('🚪 [Scanner] Cerrando modal...');
+        onClose();
+        
+      } catch (error) {
+        console.error('💥 [Scanner] Error enviando datos:', error);
+        // Aún así cerrar el modal
+        onClose();
+      }
     },
     [onDataExtracted, onClose]
   );
 
   /**
-   * Toma una foto y procesa el comprobante
+   * Procesa una imagen usando OCR
+   */
+  const processImage = async (imageUri: string): Promise<void> => {
+    console.log('🔍 [Scanner] ============ INICIANDO PROCESAMIENTO OCR ============');
+    console.log('🔍 [Scanner] URI:', imageUri.substring(0, 80) + '...');
+    
+    try {
+      setIsProcessing(true);
+      
+      // Procesar la imagen con OCR
+      const result = await integratedOCRService.processReceiptImage(imageUri);
+      
+      console.log('🔍 [Scanner] Resultado OCR:', {
+        success: result.success,
+        hasData: !!result.data,
+        error: result.error,
+        processingTime: result.processingTime
+      });
+
+      if (result.success && result.data) {
+        // Validar que los datos son útiles
+        const hasUsefulData = !!(
+          result.data.amount || 
+          result.data.merchantName || 
+          (result.data.category && result.data.category !== 'Otros') ||
+          (result.data.description && result.data.description !== 'Gasto escaneado desde comprobante')
+        );
+
+        if (hasUsefulData) {
+          console.log('✅ [Scanner] Datos útiles encontrados');
+          showExtractedDataConfirmation(result.data);
+        } else {
+          console.log('⚠️ [Scanner] Datos extraídos no son útiles');
+          Alert.alert(
+            'Datos insuficientes',
+            'Se detectó texto pero no se pudieron extraer datos útiles del comprobante.',
+            [
+              { text: 'Reintentar' },
+              { text: 'Cancelar', onPress: () => onClose() }
+            ]
+          );
+        }
+      } else {
+        console.error('❌ [Scanner] OCR falló:', result.error);
+        Alert.alert(
+          'Error de procesamiento',
+          result.error || 'No se pudieron extraer datos del comprobante.',
+          [
+            { text: 'Reintentar' },
+            { text: 'Cancelar', onPress: () => onClose() }
+          ]
+        );
+      }
+    } catch (error) {
+      console.error('💥 [Scanner] Error general:', error);
+      Alert.alert(
+        'Error',
+        `Hubo un problema al procesar la imagen: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+        [{ text: 'Entendido', onPress: () => onClose() }]
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  /**
+   * Toma una foto y procesa el comprobante - SIMPLIFICADO
    */
   const takePicture = async (): Promise<void> => {
     console.log('📷 [Scanner] ============ INICIANDO CAPTURA ============');
     
-    if (!cameraRef.current) {
-      console.error('❌ [Scanner] Camera ref no disponible');
-      Alert.alert('Error', 'Cámara no disponible');
-      return;
-    }
-
-    if (isProcessing) {
-      console.log('⚠️ [Scanner] Ya hay un procesamiento en curso');
+    if (!cameraRef.current || isProcessing) {
+      console.log('⚠️ [Scanner] Cámara no disponible o procesando');
       return;
     }
 
     try {
-      console.log('📸 [Scanner] Iniciando captura de foto...');
-      console.log('📸 [Scanner] Estado de la cámara:', {
-        hasRef: !!cameraRef.current,
-        flashMode,
-        timestamp: new Date().toISOString()
-      });
+      console.log('📸 [Scanner] Capturando foto...');
       
-      setIsProcessing(true);
-
-      // Tomar la foto con configuración optimizada
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: false,
@@ -145,141 +169,27 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       console.log('📸 [Scanner] Foto capturada:', {
         hasPhoto: !!photo,
         hasUri: !!photo?.uri,
-        uri: photo?.uri?.substring(0, 80) + '...',
-        width: photo?.width,
-        height: photo?.height,
-        timestamp: new Date().toISOString()
       });
 
       if (!photo || !photo.uri) {
-        throw new Error('No se pudo tomar la foto - URI vacía');
+        throw new Error('No se pudo tomar la foto');
       }
 
-      // Verificar que el archivo existe y es válido
-      console.log('📸 [Scanner] Verificando archivo de imagen...');
-      try {
-        const response = await fetch(photo.uri);
-        const contentLength = response.headers.get('content-length');
-        const contentType = response.headers.get('content-type');
-        
-        console.log('📸 [Scanner] Verificación de archivo:', {
-          status: response.status,
-          ok: response.ok,
-          size: contentLength,
-          type: contentType,
-          hasResponse: !!response
-        });
-
-        if (!response.ok) {
-          throw new Error(`Error verificando archivo: ${response.status}`);
-        }
-
-        if (contentLength && parseInt(contentLength) === 0) {
-          throw new Error('El archivo de imagen está vacío');
-        }
-      } catch (fetchError) {
-        console.error('❌ [Scanner] Error verificando archivo:', fetchError);
-        throw new Error(`No se pudo verificar el archivo de imagen: ${fetchError instanceof Error ? fetchError.message : 'Error desconocido'}`);
-      }
-
-      console.log('🔍 [Scanner] ============ INICIANDO OCR ============');
-      console.log('🔍 [Scanner] Enviando a OCR service...');
+      // Procesar la imagen
+      await processImage(photo.uri);
       
-      // Procesar la imagen con OCR
-      const result = await integratedOCRService.processReceiptImage(photo.uri);
-
-      console.log('🔍 [Scanner] ============ RESULTADO OCR ============');
-      console.log('🔍 [Scanner] Resultado OCR completo:', {
-        success: result.success,
-        hasData: !!result.data,
-        hasRawText: !!result.rawText,
-        error: result.error,
-        processingTime: result.processingTime,
-        dataDetails: result.data ? {
-          amount: result.data.amount,
-          merchantName: result.data.merchantName,
-          category: result.data.category,
-          confidence: result.data.confidence,
-          hasDescription: !!result.data.description,
-          hasDate: !!result.data.date
-        } : null,
-        rawTextLength: result.rawText?.length || 0
-      });
-
-      if (result.success && result.data) {
-        console.log('✅ [Scanner] OCR exitoso, mostrando confirmación...');
-        
-        // Validar que los datos son útiles
-        const hasUsefulData = !!(
-          result.data.amount || 
-          result.data.merchantName || 
-          (result.data.category && result.data.category !== 'Otros') ||
-          (result.data.description && result.data.description !== 'Gasto escaneado desde comprobante')
-        );
-
-        if (!hasUsefulData) {
-          console.log('⚠️ [Scanner] Datos extraídos no son útiles');
-          Alert.alert(
-            'Datos insuficientes',
-            'Se detectó texto pero no se pudieron extraer datos útiles del comprobante. ¿Deseas intentar con otra imagen?',
-            [
-              { text: 'Reintentar' },
-              { 
-                text: 'Ver detalles', 
-                onPress: () => showDebugInfo(result)
-              },
-              { text: 'Cancelar', onPress: onClose }
-            ]
-          );
-        } else {
-          console.log('✅ [Scanner] Datos útiles encontrados, mostrando confirmación');
-          showExtractedDataConfirmation(result.data);
-        }
-      } else {
-        console.error('❌ [Scanner] OCR falló:', result.error);
-        
-        // Mostrar información de debug en desarrollo
-        if (debugMode && result.rawText) {
-          Alert.alert(
-            'Error de procesamiento',
-            `${result.error || 'No se pudieron extraer datos del comprobante'}\n\n¿Deseas ver los detalles técnicos?`,
-            [
-              { text: 'Reintentar' },
-              { 
-                text: 'Ver detalles', 
-                onPress: () => showDebugInfo(result)
-              },
-              { text: 'Cancelar', onPress: onClose }
-            ]
-          );
-        } else {
-          Alert.alert(
-            'Error de procesamiento',
-            result.error || 'No se pudieron extraer datos del comprobante. Intenta con mejor iluminación.',
-            [
-              { text: 'Reintentar' },
-              { text: 'Cancelar', onPress: onClose }
-            ]
-          );
-        }
-      }
     } catch (error) {
-      console.error('💥 [Scanner] Error general tomando foto:', error);
-      console.error('💥 [Scanner] Stack trace:', error instanceof Error ? error.stack : 'No stack');
-      
+      console.error('💥 [Scanner] Error capturando foto:', error);
       Alert.alert(
         'Error',
-        `Hubo un problema al procesar la imagen: ${error instanceof Error ? error.message : 'Error desconocido'}`,
+        `Error al tomar la foto: ${error instanceof Error ? error.message : 'Error desconocido'}`,
         [{ text: 'Entendido' }]
       );
-    } finally {
-      console.log('🔄 [Scanner] ============ FINALIZANDO CAPTURA ============');
-      setIsProcessing(false);
     }
   };
 
   /**
-   * Permite seleccionar una imagen de la galería
+   * Selecciona imagen de galería - SIMPLIFICADO
    */
   const selectFromGallery = async (): Promise<void> => {
     console.log('📷 [Scanner] ============ SELECCIONANDO DE GALERÍA ============');
@@ -292,57 +202,21 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         quality: 0.8,
       });
 
-      console.log('📷 [Scanner] Resultado de galería:', {
-        canceled: result.canceled,
-        hasAssets: !!(result.assets && result.assets.length > 0),
-        firstAssetUri: result.assets?.[0]?.uri?.substring(0, 80) + '...'
-      });
-
       if (!result.canceled && result.assets[0]) {
         console.log('🔍 [Scanner] Procesando imagen de galería...');
-        setIsProcessing(true);
-        
-        const ocrResult = await integratedOCRService.processReceiptImage(result.assets[0].uri);
-
-        console.log('🔍 [Scanner] Resultado OCR de galería:', {
-          success: ocrResult.success,
-          hasData: !!ocrResult.data,
-          error: ocrResult.error
-        });
-
-        if (ocrResult.success && ocrResult.data) {
-          showExtractedDataConfirmation(ocrResult.data);
-        } else {
-          Alert.alert(
-            'Error de procesamiento',
-            ocrResult.error || 'No se pudieron extraer datos de la imagen seleccionada.',
-            [
-              { text: 'Entendido' },
-              debugMode ? { 
-                text: 'Ver detalles', 
-                onPress: () => showDebugInfo(ocrResult)
-              } : null
-            ].filter(Boolean) as any[]
-          );
-        }
+        await processImage(result.assets[0].uri);
       }
     } catch (error) {
       console.error('💥 [Scanner] Error seleccionando imagen:', error);
-      Alert.alert(
-        'Error',
-        'Hubo un problema al procesar la imagen seleccionada.',
-        [{ text: 'Entendido' }]
-      );
-    } finally {
-      setIsProcessing(false);
+      Alert.alert('Error', 'Error al seleccionar imagen de la galería');
     }
   };
 
   /**
-   * FUNCIÓN CORREGIDA - Muestra los datos extraídos para confirmación del usuario
+   * FUNCIÓN CORREGIDA - Muestra confirmación de datos extraídos
    */
   const showExtractedDataConfirmation = (data: ExtractedReceiptData): void => {
-    console.log('✅ [Scanner] Mostrando confirmación de datos:', data);
+    console.log('✅ [Scanner] Mostrando confirmación de datos');
     
     const details = [
       data.amount && `Monto: S/ ${data.amount.toFixed(2)}`,
@@ -352,70 +226,39 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     ].filter(Boolean).join('\n');
 
     const message = details.length > 0 
-      ? `Se han extraído los siguientes datos:\n\n${details}\n\nConfianza: ${data.confidence}%\n\n¿Deseas usar estos datos?`
-      : `Se detectaron algunos datos del comprobante.\n\nConfianza: ${data.confidence}%\n\n¿Deseas usar estos datos?`;
-
-    Alert.alert(
+      ? `Se extrajeron los siguientes datos:\n\n${details}\n\nConfianza: ${data.confidence}%\n\n¿Usar estos datos?`
+      : `Se detectaron algunos datos.\nConfianza: ${data.confidence}%\n\n¿Usar estos datos?`;
+    handleDataProcessingComplete(data);
+    /* Alert.alert(
       'Datos extraídos',
       message,
       [
-        { text: 'Cancelar', style: 'cancel' },
+        { 
+          text: 'Cancelar', 
+          style: 'cancel',
+          onPress: () => onClose()
+        },
         { 
           text: 'Usar datos', 
           onPress: () => {
-            console.log('✅ [Scanner] Usuario aceptó datos, procesando...');
-            // AQUÍ ES DONDE USO LA FUNCIÓN CORREGIDA
+            console.log('✅ [Scanner] Usuario confirmó datos');
             handleDataProcessingComplete(data);
           }
-        },
-        debugMode ? {
-          text: 'Ver detalles',
-          onPress: () => showDebugInfo({ success: true, data, processingTime: 0 })
-        } : null
-      ].filter(Boolean) as any[]
-    );
+        }
+      ]
+    ); */
   };
 
   /**
-   * Muestra información de debug (solo en desarrollo)
-   */
-  const showDebugInfo = (result: any): void => {
-    if (!debugMode) return;
-    
-    console.log('🔍 [Scanner] Mostrando debug info:', result);
-    
-    const debugText = [
-      `Éxito: ${result.success ? 'Sí' : 'No'}`,
-      result.error && `Error: ${result.error}`,
-      result.processingTime && `Tiempo: ${result.processingTime}ms`,
-      result.data && `Datos encontrados: ${Object.keys(result.data).length}`,
-      result.data?.amount && `Monto: S/ ${result.data.amount}`,
-      result.data?.merchantName && `Comercio: ${result.data.merchantName}`,
-      result.data?.category && `Categoría: ${result.data.category}`,
-      result.data?.confidence && `Confianza: ${result.data.confidence}%`,
-      result.rawText && `Texto detectado: ${result.rawText.length} caracteres`,
-      result.rawText && `Primeros 200 caracteres: ${result.rawText.substring(0, 200)}...`
-    ].filter(Boolean).join('\n\n');
-
-    Alert.alert(
-      'Debug OCR',
-      debugText,
-      [{ text: 'Cerrar' }]
-    );
-  };
-
-  /**
-   * Alterna el flash de la cámara
+   * Alterna el flash
    */
   const toggleFlash = (): void => {
     const newMode = flashMode === 'off' ? 'on' : 'off';
-    console.log(`📷 [Scanner] Cambiando flash: ${flashMode} -> ${newMode}`);
     setFlashMode(newMode);
   };
 
-  // Renderizar modal de carga de permisos
+  // Renderizar estados de carga y permisos
   if (permissionsLoading) {
-    console.log('📷 [Scanner] Mostrando loader de permisos...');
     return (
       <Modal visible={visible} animationType="slide">
         <View style={styles.loadingContainer}>
@@ -426,9 +269,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     );
   }
 
-  // Renderizar modal de solicitud de permisos
   if (!permissions.camera) {
-    console.log('📷 [Scanner] Mostrando solicitud de permisos...');
     return (
       <Modal visible={visible} animationType="slide">
         <View style={styles.permissionContainer}>
@@ -448,15 +289,17 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     );
   }
 
-  console.log('📷 [Scanner] Renderizando cámara principal');
-
   return (
     <Modal visible={visible} animationType="slide">
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity style={styles.headerButton} onPress={onClose}>
+          <TouchableOpacity 
+            style={styles.headerButton} 
+            onPress={onClose}
+            disabled={isProcessing}
+          >
             <Ionicons name="close" size={24} color="#FFF" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Escanear Comprobante</Text>
@@ -477,7 +320,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             facing="back"
             flash={flashMode}
           >
-            {/* Overlay con guías para el comprobante */}
+            {/* Overlay con guías */}
             <View style={styles.overlay}>
               <View style={styles.scanArea}>
                 <View style={[styles.corner, styles.topLeft]} />
@@ -522,7 +365,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             )}
           </TouchableOpacity>
 
-          {/* Botón de debug (solo en desarrollo) */}
           {debugMode ? (
             <TouchableOpacity 
               style={styles.debugButton} 
@@ -535,17 +377,16 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
                   confidence: 85,
                   date: new Date().toISOString(),
                 };
-                console.log('🧪 [Scanner] TEST: Simulando datos extraídos');
+                console.log('🧪 [Scanner] TEST: Simulando datos');
                 showExtractedDataConfirmation(mockData);
               }}
+              disabled={isProcessing}
             >
               <Ionicons name="bug" size={20} color="#FFF" />
               <Text style={styles.debugButtonText}>TEST</Text>
             </TouchableOpacity>
           ) : (
-            <View style={styles.galleryButton}>
-              {/* Espacio para equilibrar el layout */}
-            </View>
+            <View style={styles.galleryButton} />
           )}
         </View>
       </View>
