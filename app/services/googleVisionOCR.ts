@@ -7,14 +7,16 @@ const GOOGLE_VISION_URL = `https://vision.googleapis.com/v1/images:annotate?key=
 
 /**
  * Servicio OCR real usando Google Vision API
- * Solo para uso en producción con API key válida
+ * Con logging detallado para debugging
  */
 class GoogleVisionOCR {
   /**
    * Verifica si la API está configurada correctamente
    */
   public isConfigured(): boolean {
-    return !!GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY.length > 0;
+    const isConfigured = !!GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY.length > 10;
+    console.log(`🔍 [GoogleVision] isConfigured: ${isConfigured}, keyLength: ${GOOGLE_VISION_API_KEY?.length || 0}`);
+    return isConfigured;
   }
 
   /**
@@ -23,7 +25,10 @@ class GoogleVisionOCR {
   public async processReceiptImage(imageUri: string): Promise<OCRResult> {
     const startTime = Date.now();
     
+    console.log('🔍 [GoogleVision] Iniciando procesamiento de imagen:', imageUri.substring(0, 80) + '...');
+    
     if (!this.isConfigured()) {
+      console.log('❌ [GoogleVision] API no configurada');
       return {
         success: false,
         error: 'Google Vision API no está configurada. Usando simulación OCR.',
@@ -32,16 +37,21 @@ class GoogleVisionOCR {
     }
 
     try {
+      console.log('🔍 [GoogleVision] Convirtiendo imagen a base64...');
+      
       // Convertir imagen a base64
       const base64Image = await this.convertImageToBase64(imageUri);
       
       if (!base64Image) {
+        console.error('❌ [GoogleVision] No se pudo convertir imagen a base64');
         return {
           success: false,
           error: 'No se pudo convertir la imagen a base64',
           processingTime: Date.now() - startTime,
         };
       }
+
+      console.log(`🔍 [GoogleVision] Base64 generado exitosamente, tamaño: ${base64Image.length} caracteres`);
 
       // Preparar request para Google Vision API
       const requestBody = {
@@ -60,46 +70,131 @@ class GoogleVisionOCR {
         ],
       };
 
+      console.log('🔍 [GoogleVision] Enviando request a Google Vision API...');
+      console.log('🔍 [GoogleVision] URL:', GOOGLE_VISION_URL.replace(GOOGLE_VISION_API_KEY, '***API_KEY***'));
+
       // Realizar llamada a la API
       const response = await fetch(GOOGLE_VISION_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify(requestBody),
       });
 
+      console.log(`🔍 [GoogleVision] Respuesta recibida: ${response.status} ${response.statusText}`);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        console.error('❌ [GoogleVision] Error en API:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText.substring(0, 300) + (errorText.length > 300 ? '...' : '')
+        });
+
+        // Mensajes de error específicos
+        let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        
+        switch (response.status) {
+          case 403:
+            errorMessage = 'API Key inválida o sin permisos. Verifica que Cloud Vision API esté habilitada.';
+            break;
+          case 400:
+            errorMessage = 'Solicitud inválida. Verifica el formato de la imagen.';
+            break;
+          case 429:
+            errorMessage = 'Límite de cuota excedido. Intenta más tarde.';
+            break;
+          case 401:
+            errorMessage = 'API Key no válida o faltante.';
+            break;
+        }
+        
+        throw new Error(errorMessage);
       }
 
+      console.log('🔍 [GoogleVision] Parseando respuesta JSON...');
       const result = await response.json();
       const endTime = Date.now();
 
+      console.log('🔍 [GoogleVision] Respuesta parseada exitosamente');
+      console.log('🔍 [GoogleVision] Estructura de respuesta:', {
+        hasResponses: !!result.responses,
+        responsesLength: result.responses?.length || 0,
+        hasFirstResponse: !!(result.responses && result.responses[0]),
+        hasTextAnnotations: !!(result.responses && result.responses[0] && result.responses[0].textAnnotations),
+        textAnnotationsLength: result.responses?.[0]?.textAnnotations?.length || 0
+      });
+
+      // Verificar si hay errores en la respuesta
+      if (result.error) {
+        console.error('❌ [GoogleVision] Error en respuesta de API:', result.error);
+        return {
+          success: false,
+          error: `Google Vision Error: ${result.error.message || 'Error desconocido'}`,
+          processingTime: endTime - startTime,
+        };
+      }
+
       // Procesar respuesta
-      if (result.responses && result.responses[0] && result.responses[0].textAnnotations) {
-        const detectedText = result.responses[0].textAnnotations[0].description;
+      if (result.responses && result.responses[0]) {
+        const apiResponse = result.responses[0];
         
-        if (detectedText) {
-          // Usar el parser existente para extraer datos estructurados
-          const extractedData = this.parseReceiptText(detectedText);
-          
+        if (apiResponse.error) {
+          console.error('❌ [GoogleVision] Error en respuesta individual:', apiResponse.error);
           return {
-            success: true,
-            data: extractedData,
-            rawText: detectedText,
+            success: false,
+            error: `Vision API Error: ${apiResponse.error.message}`,
             processingTime: endTime - startTime,
           };
         }
+
+        if (apiResponse.textAnnotations && apiResponse.textAnnotations[0]) {
+          const detectedText = apiResponse.textAnnotations[0].description;
+          
+          console.log(`✅ [GoogleVision] Texto detectado exitosamente:`);
+          console.log(`📄 [GoogleVision] Longitud del texto: ${detectedText?.length || 0} caracteres`);
+          console.log(`📄 [GoogleVision] Primeros 200 caracteres:`, detectedText?.substring(0, 200) + '...');
+          
+          if (detectedText && detectedText.trim().length > 0) {
+            console.log('🔍 [GoogleVision] Iniciando parsing de texto...');
+            // Usar el parser existente para extraer datos estructurados
+            const extractedData = this.parseReceiptText(detectedText);
+            
+            console.log('✅ [GoogleVision] Datos extraídos:', {
+              amount: extractedData.amount,
+              merchantName: extractedData.merchantName,
+              category: extractedData.category,
+              confidence: extractedData.confidence,
+              hasDescription: !!extractedData.description,
+              hasDate: !!extractedData.date
+            });
+            
+            return {
+              success: true,
+              data: extractedData,
+              rawText: detectedText,
+              processingTime: endTime - startTime,
+            };
+          } else {
+            console.log('⚠️ [GoogleVision] Texto detectado está vacío');
+          }
+        } else {
+          console.log('⚠️ [GoogleVision] No hay textAnnotations en la respuesta');
+        }
+      } else {
+        console.log('⚠️ [GoogleVision] No hay responses en el resultado');
       }
 
+      console.log('❌ [GoogleVision] No se detectó texto válido en la imagen');
       return {
         success: false,
         error: 'No se detectó texto en la imagen',
         processingTime: endTime - startTime,
       };
     } catch (error) {
-      console.error('Error con Google Vision API:', error);
+      console.error('💥 [GoogleVision] Error general:', error);
       
       return {
         success: false,
@@ -110,35 +205,81 @@ class GoogleVisionOCR {
   }
 
   /**
-   * Convierte imagen a base64 para envío a la API
+   * Convierte imagen a base64 para envío a la API - MEJORADA
    */
   private async convertImageToBase64(imageUri: string): Promise<string | null> {
     try {
+      console.log('🔍 [GoogleVision] Descargando imagen desde URI...');
+      console.log('🔍 [GoogleVision] URI:', imageUri.substring(0, 80) + '...');
+      
       const response = await fetch(imageUri);
+      
+      console.log(`🔍 [GoogleVision] Respuesta de descarga: ${response.status} ${response.statusText}`);
+      
+      if (!response.ok) {
+        console.error('❌ [GoogleVision] Error descargando imagen:', response.status);
+        return null;
+      }
+      
       const blob = await response.blob();
+      
+      console.log(`🔍 [GoogleVision] Blob obtenido - tamaño: ${blob.size} bytes, tipo: ${blob.type}`);
+      
+      if (blob.size === 0) {
+        console.error('❌ [GoogleVision] Blob está vacío');
+        return null;
+      }
       
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
+        
         reader.onloadend = () => {
-          const base64data = reader.result as string;
-          // Remover el prefijo data:image/...;base64,
-          const base64 = base64data.split(',')[1];
-          resolve(base64);
+          try {
+            const base64data = reader.result as string;
+            
+            if (!base64data || typeof base64data !== 'string') {
+              console.error('❌ [GoogleVision] FileReader no devolvió datos válidos');
+              reject(new Error('FileReader no devolvió datos válidos'));
+              return;
+            }
+            
+            // Remover el prefijo data:image/...;base64,
+            const base64Parts = base64data.split(',');
+            if (base64Parts.length < 2) {
+              console.error('❌ [GoogleVision] Formato base64 inválido');
+              reject(new Error('Formato base64 inválido'));
+              return;
+            }
+            
+            const base64 = base64Parts[1];
+            console.log(`✅ [GoogleVision] Base64 convertido exitosamente - longitud: ${base64.length}`);
+            resolve(base64);
+          } catch (error) {
+            console.error('❌ [GoogleVision] Error procesando base64:', error);
+            reject(error);
+          }
         };
-        reader.onerror = reject;
+        
+        reader.onerror = (error) => {
+          console.error('❌ [GoogleVision] Error en FileReader:', error);
+          reject(error);
+        };
+        
+        console.log('🔍 [GoogleVision] Iniciando conversión a base64...');
         reader.readAsDataURL(blob);
       });
     } catch (error) {
-      console.error('Error convirtiendo imagen a base64:', error);
+      console.error('💥 [GoogleVision] Error general convirtiendo imagen a base64:', error);
       return null;
     }
   }
 
   /**
-   * Parser de texto similar al servicio OCR principal
-   * Reutiliza la lógica de extracción de datos
+   * Parser de texto mejorado - similar al servicio OCR principal
    */
   private parseReceiptText(text: string): ExtractedReceiptData {
+    console.log('🔍 [GoogleVision] Iniciando parsing de texto...');
+    
     // Patrones regex para identificar diferentes tipos de datos
     const patterns = {
       amount: [
@@ -172,6 +313,7 @@ class GoogleVisionOCR {
     };
 
     // Extraer monto
+    console.log('🔍 [GoogleVision] Buscando montos...');
     for (const pattern of patterns.amount) {
       const matches = Array.from(text.matchAll(pattern));
       if (matches.length > 0) {
@@ -186,23 +328,27 @@ class GoogleVisionOCR {
         if (maxAmount > 0) {
           result.amount = maxAmount;
           result.confidence += 40;
+          console.log(`✅ [GoogleVision] Monto encontrado: S/ ${maxAmount}`);
           break;
         }
       }
     }
 
     // Extraer comercio
+    console.log('🔍 [GoogleVision] Buscando nombre de comercio...');
     for (const pattern of patterns.merchant) {
       const match = text.match(pattern);
       if (match && match[1]) {
         result.merchantName = match[1].trim();
         result.description = `Compra en ${result.merchantName}`;
         result.confidence += 30;
+        console.log(`✅ [GoogleVision] Comercio encontrado: ${result.merchantName}`);
         break;
       }
     }
 
     // Extraer fecha
+    console.log('🔍 [GoogleVision] Buscando fecha...');
     for (const pattern of patterns.date) {
       const match = text.match(pattern);
       if (match && match[1]) {
@@ -212,21 +358,24 @@ class GoogleVisionOCR {
           if (!isNaN(date.getTime())) {
             result.date = date.toISOString();
             result.confidence += 20;
+            console.log(`✅ [GoogleVision] Fecha encontrada: ${dateStr}`);
             break;
           }
         } catch (error) {
-          // Continuar con el siguiente patrón
+          console.log('⚠️ [GoogleVision] Error parseando fecha:', error);
         }
       }
     }
 
     // Determinar categoría
+    console.log('🔍 [GoogleVision] Determinando categoría...');
     const lowerText = text.toLowerCase();
     for (const [category, keywords] of Object.entries(categoryKeywords)) {
       for (const keyword of keywords) {
         if (lowerText.includes(keyword.toLowerCase())) {
           result.category = category;
           result.confidence += 10;
+          console.log(`✅ [GoogleVision] Categoría encontrada: ${category} (keyword: ${keyword})`);
           break;
         }
       }
@@ -236,6 +385,7 @@ class GoogleVisionOCR {
     // Asignar categoría por defecto
     if (!result.category) {
       result.category = 'Otros';
+      console.log('📝 [GoogleVision] Asignando categoría por defecto: Otros');
     }
 
     // Generar descripción si no existe
@@ -243,7 +393,10 @@ class GoogleVisionOCR {
       result.description = result.merchantName 
         ? `Gasto en ${result.merchantName}`
         : 'Gasto escaneado desde comprobante';
+      console.log(`📝 [GoogleVision] Descripción generada: ${result.description}`);
     }
+
+    console.log(`✅ [GoogleVision] Parsing completado - Confianza: ${result.confidence}%`);
 
     return result;
   }

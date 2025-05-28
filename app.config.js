@@ -1,38 +1,65 @@
 // app.config.js
 import 'dotenv/config';
 
-// Función auxiliar para obtener variables de entorno con fallback
-const getEnvVar = (name, defaultValue) => {
-  // Primero busca en EXPO_PUBLIC_* que es la forma recomendada para Expo
+/**
+ * @typedef {Object} EnvVars
+ * @property {string} apiUrl
+ * @property {string} graphqlUrl
+ * @property {string} environment
+ * @property {string|null} googleVisionApiKey
+ * @property {boolean} ocrEnabled
+ */
+
+/**
+ * Función auxiliar para obtener variables de entorno con fallback
+ * @param {string} name - Nombre de la variable
+ * @param {string} [defaultValue=''] - Valor por defecto
+ * @returns {string}
+ */
+const getEnvVar = (name, defaultValue = '') => {
+  // Buscar con prefijo EXPO_PUBLIC_
   const expoVar = process.env[`EXPO_PUBLIC_${name}`];
-  if (expoVar !== undefined) return expoVar;
+  if (expoVar !== undefined && expoVar !== null) return expoVar;
   
-  // Luego busca directamente en process.env
+  // Buscar directamente
   const regularVar = process.env[name];
-  if (regularVar !== undefined) return regularVar;
+  if (regularVar !== undefined && regularVar !== null) return regularVar;
   
-  // Finalmente usa el valor por defecto
   return defaultValue;
 };
 
-export default ({config}) => {
-  // Determinar entorno (desarrollo por defecto)
-  const ENV = process.env.EXPO_ENV || 'development';
+/**
+ * Función para obtener variables boolean
+ * @param {string} name - Nombre de la variable
+ * @param {boolean} [defaultValue=false] - Valor por defecto
+ * @returns {boolean}
+ */
+const getBooleanEnvVar = (name, defaultValue = false) => {
+  const value = getEnvVar(name, String(defaultValue));
+  return value === 'true' || value === '1';
+};
+
+/**
+ * @param {Object} params
+ * @param {Object} params.config - Configuración base de Expo
+ * @returns {Object}
+ */
+export default ({ config }) => {
+  // Determinar entorno
+  const ENV = process.env.EXPO_ENV || process.env.ENV || 'development';
   
   // Cargar el archivo .env correcto
   require('dotenv').config({
     path: `.env.${ENV}`
   });
   
-  //console.log(`📦 Building app for ${ENV.toUpperCase()} environment`);
-  
   // Obtener y validar las variables requeridas
   const apiUrl = getEnvVar('API_URL', 'http://172.20.10.10:3000');
   const graphqlUrl = getEnvVar('GRAPHQL_URL', 'http://172.20.10.10:3000/graphql');
-  console.log(`📦 Building app for ${ENV.toUpperCase()} environment`);
-  console.log(`API URL: ${apiUrl}`);
-  console.log(`GraphQL URL: ${graphqlUrl}`);
-  // Validación básica de variables
+  const googleVisionApiKey = getEnvVar('GOOGLE_VISION_API_KEY') || null;
+  const ocrEnabled = getBooleanEnvVar('OCR_ENABLED', false);
+  
+  // Validación básica de variables requeridas
   const missingVars = [];
   if (!apiUrl) missingVars.push('API_URL');
   if (!graphqlUrl) missingVars.push('GRAPHQL_URL');
@@ -42,31 +69,31 @@ export default ({config}) => {
     console.warn(`⚠️ Check your .env.${ENV} file or environment variables`);
   }
   
-  // Configuración para la app
+  // Logs informativos
+  console.log(`📦 Building app for ${ENV.toUpperCase()} environment`);
+  console.log(`API URL: ${apiUrl}`);
+  console.log(`GraphQL URL: ${graphqlUrl}`);
+  console.log(`OCR Enabled: ${ocrEnabled}`);
+  console.log(`Google Vision API Key: ${googleVisionApiKey ? 'CONFIGURED' : 'NOT_SET'}`);
+  
   return {
     ...config, // Preservar configuración existente
-    // Estas propiedades sobreescriben app.json
     extra: {
       // Variables de entorno específicas
       apiUrl,
       graphqlUrl,
+      googleVisionApiKey,
+      ocrEnabled,
       // Metadatos de entorno
       environment: ENV,
       timestamp: new Date().toISOString(),
     },
-    // Extensión que permite a Expo exponer variables al client-side
-    // (Esto es una práctica recomendada para SDK 48+)
-    plugins: [
-      ...(config.plugins || []),
-    ],
     // Configuración específica por entorno
     android: {
       ...(config.android || {}),
-      // Aquí puedes modificar config.android según el entorno
     },
     ios: {
       ...(config.ios || {}),
-      // Aquí puedes modificar config.ios según el entorno
     },
   };
 };

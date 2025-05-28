@@ -1,34 +1,64 @@
 // app/config/env.ts
 import Constants from 'expo-constants';
 
-// TypeScript Interface para mejor tipado
+// TypeScript interfaces para mejor tipado
 interface EnvConfig {
   API_URL: string;
   GRAPHQL_URL: string;
   ENV: string;
   isDevelopment: boolean; 
   isProduction: boolean;
-  isStaging?: boolean;
-  // Nuevas configuraciones para OCR
-  GOOGLE_VISION_API_KEY?: string;
+  isStaging: boolean;
+  GOOGLE_VISION_API_KEY: string | null;
   OCR_ENABLED: boolean;
 }
 
-// Obtener variables del entorno con mayor seguridad
-const extra = Constants.expoConfig?.extra || {};
+interface ExpoExtraConfig {
+  apiUrl?: string;
+  graphqlUrl?: string;
+  environment?: string;
+  googleVisionApiKey?: string;
+  ocrEnabled?: boolean;
+}
 
-// Configuración con valores por defecto como fallback
+// Función helper tipada para obtener variables con fallback
+const getEnvVar = (key: string, fallback: string = ''): string => {
+  // Primero intenta desde process.env con prefijo EXPO_PUBLIC_
+  const publicVar = process.env[`EXPO_PUBLIC_${key}`];
+  if (publicVar !== undefined && publicVar !== null) return publicVar;
+  
+  // Luego desde extra (app.config.js)
+  const extra = Constants.expoConfig?.extra as ExpoExtraConfig | undefined;
+  const extraKey = key.toLowerCase().replace('_', '');
+  const extraVar = extra?.[extraKey as keyof ExpoExtraConfig];
+  if (extraVar !== undefined && extraVar !== null) return String(extraVar);
+  
+  return fallback;
+};
+
+// Función helper para obtener variables boolean
+const getBooleanEnvVar = (key: string, fallback: boolean = false): boolean => {
+  const value = getEnvVar(key, String(fallback));
+  return value === 'true' || value === '1';
+};
+
+// Función helper para obtener variables opcionales
+const getOptionalEnvVar = (key: string): string | null => {
+  const value = getEnvVar(key, '');
+  return value === '' ? null : value;
+};
+
 const env: EnvConfig = {
-  API_URL: extra.apiUrl || 'http://192.168.1.33:3000',
-  GRAPHQL_URL: extra.graphqlUrl || 'http://192.168.1.33:3000/graphql',
-  ENV: extra.environment || 'development',
-  isDevelopment: (extra.environment || 'development') === 'development',
-  isProduction: (extra.environment || 'development') === 'production',
-  isStaging: (extra.environment || 'development') === 'staging',
+  API_URL: getEnvVar('API_URL', 'http://192.168.1.33:3000'),
+  GRAPHQL_URL: getEnvVar('GRAPHQL_URL', 'http://192.168.1.33:3000/graphql'),
+  ENV: getEnvVar('ENV', 'development'),
+  isDevelopment: getEnvVar('ENV', 'development') === 'development',
+  isProduction: getEnvVar('ENV', 'development') === 'production',
+  isStaging: getEnvVar('ENV', 'development') === 'staging',
   
   // Configuraciones OCR
-  GOOGLE_VISION_API_KEY: extra.googleVisionApiKey || undefined,
-  OCR_ENABLED: extra.ocrEnabled || false,
+  GOOGLE_VISION_API_KEY: getOptionalEnvVar('GOOGLE_VISION_API_KEY'),
+  OCR_ENABLED: getBooleanEnvVar('OCR_ENABLED', false),
 };
 
 // Log en desarrollo para facilitar debugging
