@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { Ionicons } from '@expo/vector-icons';
 
 // Importaciones de componentes
 import AgregarSlides from "@/components/ui/AddSlider";
@@ -28,6 +29,8 @@ import TransactionOptions from "@/components/ui/TransactionOptions";
 import CategorySelector from "@/components/ui/CategorySelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
 import DateSelector from "@/components/ui/DateSelector";
+import ReceiptScanner from "@/components/ui/ReceiptScanner";
+import OCRStatusIndicator from "@/components/ui/OCRStatusIndicator";
 
 // Importaciones de GraphQL
 import {
@@ -50,6 +53,7 @@ import { getTransactionIcon } from "../contants/iconDictionary";
 import { useToast } from "@/app/providers/ToastProvider";
 import { RootStackParamList } from "../interfaces/navigation";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { ExtractedReceiptData } from "../services/integratedOCRService";
 
 // Definir la interfaz para los parámetros de la ruta
 interface AddTransactionRouteParams {
@@ -80,6 +84,9 @@ export default function AddTransaction() {
   // Obtener parámetros de la ruta de navegación con tipos seguros
   const params = route.params || {};
   const { forcePaymentStatus, statusReadOnly, preselectedTab } = params;
+
+  // Estado para controlar el scanner de comprobantes
+  const [showScanner, setShowScanner] = useState(false);
 
   // Estado del formulario
   const [formState, setFormState] = useState({
@@ -315,6 +322,50 @@ export default function AddTransaction() {
     [updateFormState]
   );
 
+  /**
+   * Maneja los datos extraídos del comprobante escaneado
+   */
+  const handleReceiptDataExtracted = useCallback(
+    (data: ExtractedReceiptData) => {
+      // Crear objeto de actualizaciones
+      const updates: Partial<typeof formState> = {};
+
+      // Aplicar monto si está disponible
+      if (data.amount && data.amount > 0) {
+        updates.amount = data.amount.toString();
+      }
+
+      // Aplicar descripción si está disponible
+      if (data.description) {
+        updates.description = data.description;
+      }
+
+      // Aplicar categoría si está disponible y es válida
+      if (data.category) {
+        updates.category = data.category;
+      }
+
+      // Aplicar fecha si está disponible
+      if (data.date) {
+        updates.date = data.date;
+        if (!formState.isPaid) {
+          updates.dueDate = data.date;
+        }
+      }
+
+      // Actualizar el formulario con los datos extraídos
+      updateFormState(updates);
+
+      // Mostrar mensaje de éxito
+      showToast(
+        "success",
+        "Datos extraídos",
+        `Se han completado automáticamente ${Object.keys(updates).length} campos del formulario.`
+      );
+    },
+    [updateFormState, formState.isPaid, showToast]
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -330,6 +381,25 @@ export default function AddTransaction() {
                 colors={TRANSACTION_COLORS}
                 onChange={handleSliderChange}
               />
+            </View>
+
+            {/* Botón de escaneo de comprobantes */}
+            <View style={styles.scanButtonContainer}>
+              <TouchableOpacity
+                style={styles.scanButton}
+                onPress={() => setShowScanner(true)}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="scan" size={24} color="#FFF" />
+                <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
+              </TouchableOpacity>
+              
+              {/* Indicador de estado OCR (solo en desarrollo) */}
+              {__DEV__ && (
+                <View style={styles.ocrStatusContainer}>
+                  <OCRStatusIndicator showDetails={false} />
+                </View>
+              )}
             </View>
 
             {/* Carrusel que ahora se oculta cuando está vacío */}
@@ -424,6 +494,13 @@ export default function AddTransaction() {
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
+
+      {/* Modal del scanner de comprobantes */}
+      <ReceiptScanner
+        visible={showScanner}
+        onClose={() => setShowScanner(false)}
+        onDataExtracted={handleReceiptDataExtracted}
+      />
     </SafeAreaView>
   );
 }
@@ -457,6 +534,33 @@ const styles = StyleSheet.create({
   },
   sliderContainer: {
     marginBottom: 10,
+  },
+  scanButtonContainer: {
+    marginVertical: 15,
+    alignItems: "center",
+    position: "relative",
+  },
+  scanButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+  },
+  scanButtonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontFamily: "Outfit_500Medium",
+    marginLeft: 8,
+  },
+  ocrStatusContainer: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    zIndex: 10,
   },
   containerCarousel: {
     marginVertical: 15,

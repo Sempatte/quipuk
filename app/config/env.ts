@@ -9,6 +9,9 @@ interface EnvConfig {
   isDevelopment: boolean; 
   isProduction: boolean;
   isStaging?: boolean;
+  // Nuevas configuraciones para OCR
+  GOOGLE_VISION_API_KEY?: string;
+  OCR_ENABLED: boolean;
 }
 
 // Obtener variables del entorno con mayor seguridad
@@ -22,11 +25,19 @@ const env: EnvConfig = {
   isDevelopment: (extra.environment || 'development') === 'development',
   isProduction: (extra.environment || 'development') === 'production',
   isStaging: (extra.environment || 'development') === 'staging',
+  
+  // Configuraciones OCR
+  GOOGLE_VISION_API_KEY: extra.googleVisionApiKey || undefined,
+  OCR_ENABLED: extra.ocrEnabled || false,
 };
 
 // Log en desarrollo para facilitar debugging
 if (__DEV__) {
-  console.log('🔧 Environment Config:', JSON.stringify(env, null, 2));
+  console.log('🔧 Environment Config:', {
+    ...env,
+    // No mostrar API keys en logs por seguridad
+    GOOGLE_VISION_API_KEY: env.GOOGLE_VISION_API_KEY ? '***CONFIGURED***' : 'NOT_SET'
+  });
 }
 
 export default env;
