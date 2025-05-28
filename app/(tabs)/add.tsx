@@ -342,6 +342,8 @@ export default function AddTransaction() {
         "📄 [AddTransaction] ============ DATOS RECIBIDOS DEL OCR ============"
       );
       console.log("📄 [AddTransaction] Datos extraídos:", data);
+
+      // Cerrar scanner
       setShowScanner(false);
       console.log("📄 [AddTransaction] Cerrando scanner...");
 
@@ -366,23 +368,27 @@ export default function AddTransaction() {
         );
       }
 
-      // Aplicar categoría si está disponible y es válida
+      // 🔧 CORRECCIÓN: Aplicar categoría si está disponible y es válida
       if (data.category && data.category.trim().length > 0) {
         updates.category = data.category.trim();
         fieldsUpdated++;
         console.log("🏷️ [AddTransaction] Categoría aplicada:", data.category);
       }
 
-      // Aplicar fecha si está disponible
+      // 🔧 CORRECCIÓN: Aplicar fecha si está disponible
       if (data.date) {
-        updates.date = data.date;
-        fieldsUpdated++;
-        console.log("📅 [AddTransaction] Fecha aplicada:", data.date);
-
-        // Si es pendiente, también actualizar la fecha de vencimiento
-        if (!formState.isPaid) {
+        // Aplicar a la fecha correcta según el estado de pago
+        if (formState.isPaid) {
+          updates.date = data.date;
+          console.log("📅 [AddTransaction] Fecha de pago aplicada:", data.date);
+        } else {
           updates.dueDate = data.date;
+          console.log(
+            "📅 [AddTransaction] Fecha de vencimiento aplicada:",
+            data.date
+          );
         }
+        fieldsUpdated++;
       }
 
       // Aplicar nombre del comercio a la descripción si no hay descripción específica
@@ -398,7 +404,7 @@ export default function AddTransaction() {
       console.log("🔄 [AddTransaction] Actualizaciones a aplicar:", updates);
       console.log("📊 [AddTransaction] Campos a actualizar:", fieldsUpdated);
 
-      // Actualizar el formulario con todos los datos
+      // 🔧 CORRECCIÓN: Actualizar el formulario con todos los datos
       if (fieldsUpdated > 0) {
         updateFormState(updates);
 
@@ -512,6 +518,8 @@ export default function AddTransaction() {
             <CategorySelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
               onSelect={(category) => updateFormState({ category })}
+              selectedCategory={formState.category} // 🆕 Prop para controlar selección
+              initialCategory={undefined} // Se maneja via selectedCategory
             />
           </View>
 
@@ -538,10 +546,10 @@ export default function AddTransaction() {
                 }
               }}
               title={formState.isPaid ? "Fecha" : "Fecha de vencimiento"}
-              isPaid={formState.isPaid} // Pasamos el estado de pago al selector de fecha
+              isPaid={formState.isPaid}
+              initialDate={undefined} // Se maneja via selectedDate
             />
           </View>
-
           <View style={styles.addButtonContainer}>
             <TouchableOpacity
               style={[

@@ -2,53 +2,75 @@ import { TRANSACTION_COLORS, TransactionType } from "@/app/interfaces/transactio
 import React, { useMemo, useState, useEffect } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
 import { Calendar } from "react-native-calendars";
-import { format, addYears } from "date-fns";
+import { format, addYears, isToday, isYesterday, isTomorrow } from "date-fns";
 import { es } from "date-fns/locale";
 
 interface DateSelectorProps {
   type: TransactionType;
   selectedDate: string;
   onSelectDate: (date: string) => void;
-  title?: string; // Título personalizable
-  isPaid?: boolean; // Nuevo prop para determinar si es pagado o pendiente
+  title?: string;
+  isPaid?: boolean;
+  initialDate?: string; // 🆕 Nueva prop para fecha inicial del OCR
 }
 
-// Opciones de fecha dinámicas según el estado del pago
 const PAID_DATE_OPTIONS = ["Hoy", "Ayer", "Otros..."] as const;
 const PENDING_DATE_OPTIONS = ["Hoy", "Mañana", "Otros..."] as const;
 
-// Mapeo de tipos de transacción a opciones de UI
 const TYPE_TO_OPTION_MAP = {
   "gasto": "Gastos",
   "ingreso": "Ingresos",
   "ahorro": "Ahorros"
 } as const;
 
-/**
- * Componente para seleccionar fecha de la transacción
- * Utiliza Calendar de react-native-calendars para selección de fechas personalizadas
- */
 const DateSelector: React.FC<DateSelectorProps> = ({
   type,
   selectedDate,
   onSelectDate,
-  title = "Fecha", // Valor por defecto
-  isPaid = true // Por defecto asumimos que está pagado
+  title = "Fecha",
+  isPaid = true,
+  initialDate // 🆕 Recibir fecha inicial del OCR
 }) => {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string>("Hoy");
   const [customDate, setCustomDate] = useState<string | null>(null);
   
-  // Determinar qué opciones de fecha mostrar según el estado de pago
   const dateOptions = isPaid ? PAID_DATE_OPTIONS : PENDING_DATE_OPTIONS;
   
+  // 🔧 CORRECCIÓN: Aplicar fecha inicial del OCR
+  useEffect(() => {
+    if (initialDate) {
+      console.log('📅 [DateSelector] Aplicando fecha inicial del OCR:', initialDate);
+      const ocrDate = new Date(initialDate);
+      const today = new Date();
+      
+      // Determinar qué opción corresponde a la fecha del OCR
+      if (isToday(ocrDate)) {
+        setSelectedOption("Hoy");
+        setCustomDate(null);
+      } else if (isYesterday(ocrDate) && isPaid) {
+        setSelectedOption("Ayer");
+        setCustomDate(null);
+      } else if (isTomorrow(ocrDate) && !isPaid) {
+        setSelectedOption("Mañana");
+        setCustomDate(null);
+      } else {
+        // Fecha personalizada
+        const formattedDate = format(ocrDate, "dd MMM yyyy", { locale: es });
+        setCustomDate(formattedDate);
+        setSelectedOption("custom");
+      }
+      
+      // Aplicar la fecha
+      onSelectDate(initialDate);
+    }
+  }, [initialDate, isPaid, onSelectDate]);
+
   // Calcular las fechas máximas y mínimas
   const maxDate = useMemo(() => {
     if (isPaid) {
-      // Si está pagado, la fecha máxima es hoy
       return format(new Date(), "yyyy-MM-dd");
     } else {
-      // Si es pendiente, la fecha máxima es un año a partir de hoy
       return format(addYears(new Date(), 1), "yyyy-MM-dd");
     }
   }, [isPaid]);
@@ -59,34 +81,51 @@ const DateSelector: React.FC<DateSelectorProps> = ({
     return TRANSACTION_COLORS[option];
   }, [type]);
 
+  // 🔧 CORRECCIÓN: Sincronizar cuando cambia selectedDate externamente
+  useEffect(() => {
+    if (selectedDate && !initialDate) {
+      const date = new Date(selectedDate);
+      const today = new Date();
+      
+      if (isToday(date)) {
+        setSelectedOption("Hoy");
+        setCustomDate(null);
+      } else if (isYesterday(date) && isPaid) {
+        setSelectedOption("Ayer");
+        setCustomDate(null);
+      } else if (isTomorrow(date) && !isPaid) {
+        setSelectedOption("Mañana");
+        setCustomDate(null);
+      } else {
+        const formattedDate = format(date, "dd MMM yyyy", { locale: es });
+        setCustomDate(formattedDate);
+        setSelectedOption("custom");
+      }
+    }
+  }, [selectedDate, isPaid, initialDate]);
+
   // Actualizar la fecha seleccionada si cambia el estado de pago
   useEffect(() => {
-    // Si cambia el estado de pago, actualizar la opción seleccionada y la fecha
     const today = new Date();
     const selectedDateObj = new Date(selectedDate);
     
     if (isPaid) {
-      // Si cambia a pagado y la fecha seleccionada es posterior a hoy, resetear a hoy
       if (selectedDateObj > today) {
         onSelectDate(today.toISOString());
         setSelectedOption("Hoy");
         setCustomDate(null);
-      } else if (selectedDateObj.getDate() === today.getDate() - 1) {
-        // Si es el día anterior, seleccionar "Ayer"
+      } else if (isYesterday(selectedDateObj)) {
         setSelectedOption("Ayer");
         setCustomDate(null);
       }
     } else {
-      // Si cambia a pendiente, revisar si la fecha actual corresponde a alguna de las opciones
-      if (selectedDateObj.getDate() === today.getDate() + 1) {
-        // Si es el día siguiente, seleccionar "Mañana"
+      if (isTomorrow(selectedDateObj)) {
         setSelectedOption("Mañana");
         setCustomDate(null);
       }
     }
   }, [isPaid, selectedDate, onSelectDate]);
 
-  // Manejador para cuando se selecciona una opción
   const handleSelectOption = (option: string) => {
     if (option === "Otros...") {
       setIsCalendarVisible(true);
@@ -106,7 +145,6 @@ const DateSelector: React.FC<DateSelectorProps> = ({
     onSelectDate(date.toISOString());
   };
 
-  // Manejador para selección de fecha en el calendario
   const handleCalendarDayPress = (day: { dateString: string }) => {
     const newDate = new Date(day.dateString);
     const formattedDate = format(newDate, "dd MMM yyyy", { locale: es });
@@ -117,7 +155,6 @@ const DateSelector: React.FC<DateSelectorProps> = ({
     onSelectDate(newDate.toISOString());
   };
 
-  // Determinar si un botón está seleccionado
   const isOptionSelected = (option: string) => {
     if (customDate && option === "Otros...") {
       return true;
@@ -151,7 +188,6 @@ const DateSelector: React.FC<DateSelectorProps> = ({
         ))}
       </View>
 
-      {/* Modal del Calendario */}
       <Modal
         transparent={true}
         visible={isCalendarVisible}
@@ -161,7 +197,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
           <View style={styles.calendarContainer}>
             <Calendar
               style={styles.calendar}
-              maxDate={maxDate} // Aplicar la fecha máxima calculada
+              maxDate={maxDate}
               onDayPress={handleCalendarDayPress}
               markedDates={{
                 [format(new Date(selectedDate), "yyyy-MM-dd")]: {
@@ -217,7 +253,6 @@ const styles = StyleSheet.create({
   selectedText: { 
     color: "#FFFFFF" 
   },
-  // Estilos para el modal del calendario
   modalContainer: {
     flex: 1,
     justifyContent: "center",

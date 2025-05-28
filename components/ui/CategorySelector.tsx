@@ -1,11 +1,14 @@
+// components/ui/CategorySelector.tsx - CORREGIDO
 import { gastosIcons, ingresosIcons } from "@/app/contants/iconDictionary";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 
 // Definir los tipos de propiedades
 interface CategorySelectorProps {
   type: "gasto" | "ingreso" | "ahorro";
   onSelect: (category: string) => void;
+  initialCategory?: string; // 🆕 Nueva prop para categoría inicial
+  selectedCategory?: string; // 🆕 Nueva prop para categoría controlada
 }
 
 const categoryData = {
@@ -33,22 +36,51 @@ const truncateText = (text: string, maxLength: number) => {
 
 const MAX_LENGTH_FOR_SUBCATEGORY = 16;
 
-const CategorySelector: React.FC<CategorySelectorProps> = ({ type, onSelect }) => {
+const CategorySelector: React.FC<CategorySelectorProps> = ({ 
+  type, 
+  onSelect, 
+  initialCategory,
+  selectedCategory 
+}) => {
   // Si es tipo ahorro, no mostrar el componente
   if (type === "ahorro") {
     return null;
   }
 
-  const [selectedCategory, setSelectedCategory] = useState("");
+  // 🔧 CORRECCIÓN: Usar categoría controlada o inicial
+  const [internalSelectedCategory, setInternalSelectedCategory] = useState(
+    selectedCategory || initialCategory || ""
+  );
+
+  // 🔧 CORRECCIÓN: Sincronizar con prop externa
+  useEffect(() => {
+    if (selectedCategory !== undefined && selectedCategory !== internalSelectedCategory) {
+      console.log('🏷️ [CategorySelector] Sincronizando categoría externa:', selectedCategory);
+      setInternalSelectedCategory(selectedCategory);
+    }
+  }, [selectedCategory, internalSelectedCategory]);
+
+  // 🔧 CORRECCIÓN: Aplicar categoría inicial al montar
+  useEffect(() => {
+    if (initialCategory && !internalSelectedCategory) {
+      console.log('🏷️ [CategorySelector] Aplicando categoría inicial:', initialCategory);
+      setInternalSelectedCategory(initialCategory);
+      onSelect(initialCategory);
+    }
+  }, [initialCategory, internalSelectedCategory, onSelect]);
 
   const subCategories = categoryData[type].subCategories;
   const iconSet = type === "gasto" ? gastosIcons : ingresosIcons;
   const selectedColor = categoryData[type].selectedColor;
 
   const handleSelectCategory = (category: string) => {
-    setSelectedCategory(category);
+    console.log('🏷️ [CategorySelector] Categoría seleccionada:', category);
+    setInternalSelectedCategory(category);
     onSelect(category);
   };
+
+  // 🔧 CORRECCIÓN: Usar estado interno actualizado
+  const currentSelection = selectedCategory || internalSelectedCategory;
 
   return (
     <View style={styles.container}>
@@ -56,7 +88,7 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({ type, onSelect }) =
 
       <View style={styles.subCategoryContainer}>
         {subCategories.map((category) => {
-          const isSelected = selectedCategory === category;
+          const isSelected = currentSelection === category;
           
           return (
             <View key={category} style={styles.categoryWrapper}>
@@ -76,7 +108,10 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({ type, onSelect }) =
                   </View>
                 )}
               </TouchableOpacity>
-              <Text style={styles.subCategoryText}>
+              <Text style={[
+                styles.subCategoryText,
+                isSelected && styles.selectedCategoryText
+              ]}>
                 {truncateText(category, MAX_LENGTH_FOR_SUBCATEGORY)}
               </Text>
             </View>
@@ -126,6 +161,10 @@ const styles = StyleSheet.create({
     color: "#000",
     fontFamily: "Outfit_400Regular",
     textAlign: "center",
+  },
+  selectedCategoryText: {
+    color: "#000",
+    fontFamily: "Outfit_500Medium",
   },
   icon: {
     width: "80%",
