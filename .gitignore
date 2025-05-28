@@ -33,8 +33,11 @@ yarn-error.*
 .env*.local
 .env.local
 
+
 # API Keys y configuración sensible
 .env.secrets
+.env.production
+.env.development
 google-services.json
 GoogleService-Info.plist
 

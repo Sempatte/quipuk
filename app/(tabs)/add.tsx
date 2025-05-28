@@ -121,16 +121,22 @@ export default function AddTransaction() {
       const defaultDueDate = new Date();
       defaultDueDate.setDate(defaultDueDate.getDate() + 7);
 
-      updateFormState({
+      setFormState(prev => ({
+        ...prev,
         isPaid: false,
         dueDate: defaultDueDate.toISOString(),
-      });
+      }));
     }
   }, [forcePaymentStatus]);
 
-  // Actualización del estado
+  // Actualización del estado - MEJORADA para manejar múltiples updates
   const updateFormState = useCallback((updates: Partial<typeof formState>) => {
-    setFormState((prev) => ({ ...prev, ...updates }));
+    console.log('🔄 [AddTransaction] Actualizando estado del formulario:', updates);
+    setFormState((prev) => {
+      const newState = { ...prev, ...updates };
+      console.log('✅ [AddTransaction] Nuevo estado:', newState);
+      return newState;
+    });
   }, []);
 
   // Cambio de slider
@@ -185,7 +191,8 @@ export default function AddTransaction() {
       ],
       onCompleted: () => {
         // Resetear formulario
-        updateFormState({
+        setFormState({
+          selectedOption: "Gastos",
           amount: "",
           description: "",
           category: "",
@@ -323,48 +330,85 @@ export default function AddTransaction() {
   );
 
   /**
-   * Maneja los datos extraídos del comprobante escaneado
+   * FUNCIÓN CORREGIDA - Maneja los datos extraídos del comprobante escaneado
    */
   const handleReceiptDataExtracted = useCallback(
     (data: ExtractedReceiptData) => {
-      // Crear objeto de actualizaciones
+      console.log('📄 [AddTransaction] ============ DATOS RECIBIDOS DEL OCR ============');
+      console.log('📄 [AddTransaction] Datos extraídos:', data);
+
+      // Crear objeto de actualizaciones de UNA SOLA VEZ
       const updates: Partial<typeof formState> = {};
 
       // Aplicar monto si está disponible
       if (data.amount && data.amount > 0) {
         updates.amount = data.amount.toString();
+        console.log('💰 [AddTransaction] Monto aplicado:', data.amount);
       }
 
       // Aplicar descripción si está disponible
-      if (data.description) {
-        updates.description = data.description;
+      if (data.description && data.description.trim().length > 0) {
+        updates.description = data.description.trim();
+        console.log('📝 [AddTransaction] Descripción aplicada:', data.description);
       }
 
       // Aplicar categoría si está disponible y es válida
-      if (data.category) {
-        updates.category = data.category;
+      if (data.category && data.category.trim().length > 0) {
+        updates.category = data.category.trim();
+        console.log('🏷️ [AddTransaction] Categoría aplicada:', data.category);
       }
 
       // Aplicar fecha si está disponible
       if (data.date) {
         updates.date = data.date;
+        console.log('📅 [AddTransaction] Fecha aplicada:', data.date);
+        
+        // Si es pendiente, también actualizar la fecha de vencimiento
         if (!formState.isPaid) {
           updates.dueDate = data.date;
+          console.log('📅 [AddTransaction] Fecha de vencimiento aplicada:', data.date);
         }
       }
 
-      // Actualizar el formulario con los datos extraídos
-      updateFormState(updates);
+      // Aplicar nombre del comercio a la descripción si no hay descripción específica
+      if (data.merchantName && !updates.description) {
+        updates.description = `Compra en ${data.merchantName}`;
+        console.log('🏪 [AddTransaction] Descripción desde comercio:', updates.description);
+      }
 
-      // Mostrar mensaje de éxito
-      showToast(
-        "success",
-        "Datos extraídos",
-        `Se han completado automáticamente ${Object.keys(updates).length} campos del formulario.`
-      );
+      console.log('🔄 [AddTransaction] Actualizaciones a aplicar:', updates);
+
+      // CRÍTICO: Actualizar el formulario con todos los datos de UNA SOLA VEZ
+      if (Object.keys(updates).length > 0) {
+        updateFormState(updates);
+        
+        // Mostrar mensaje de éxito
+        showToast(
+          "success",
+          "Datos extraídos",
+          `Se han completado automáticamente ${Object.keys(updates).length} campos del formulario.`
+        );
+        
+        console.log('✅ [AddTransaction] Formulario actualizado exitosamente');
+      } else {
+        console.log('⚠️ [AddTransaction] No se encontraron datos válidos para aplicar');
+        showToast(
+          "info",
+          "OCR completado",
+          "Se procesó el comprobante pero no se encontraron datos válidos para llenar automáticamente."
+        );
+      }
     },
     [updateFormState, formState.isPaid, showToast]
   );
+
+  /**
+   * FUNCIÓN CORREGIDA - Cierra el scanner y procesa los datos
+   */
+  const handleScannerClose = useCallback(() => {
+    console.log('📷 [AddTransaction] Cerrando scanner...');
+    setShowScanner(false);
+  }, []);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -387,7 +431,10 @@ export default function AddTransaction() {
             <View style={styles.scanButtonContainer}>
               <TouchableOpacity
                 style={styles.scanButton}
-                onPress={() => setShowScanner(true)}
+                onPress={() => {
+                  console.log('📷 [AddTransaction] Abriendo scanner...');
+                  setShowScanner(true);
+                }}
                 activeOpacity={0.8}
               >
                 <Ionicons name="scan" size={24} color="#FFF" />
@@ -495,10 +542,10 @@ export default function AddTransaction() {
         </ScrollView>
       </TouchableWithoutFeedback>
 
-      {/* Modal del scanner de comprobantes */}
+      {/* Modal del scanner de comprobantes - CALLBACKS CORREGIDOS */}
       <ReceiptScanner
         visible={showScanner}
-        onClose={() => setShowScanner(false)}
+        onClose={handleScannerClose}
         onDataExtracted={handleReceiptDataExtracted}
       />
     </SafeAreaView>

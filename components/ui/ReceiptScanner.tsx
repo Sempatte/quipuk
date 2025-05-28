@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -26,8 +26,7 @@ interface ReceiptScannerProps {
 
 /**
  * Componente de cámara para escanear comprobantes
- * Incluye funcionalidad de OCR y extracción de datos
- * Con debugging detallado para identificar problemas
+ * VERSIÓN CORREGIDA - Callbacks y cierre de modal optimizados
  */
 const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   visible,
@@ -74,6 +73,39 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       }
     }
   }, [visible, hasAllPermissions, permissions, isProcessing, flashMode, debugMode]);
+
+  /**
+   * FUNCIÓN CRÍTICA - Procesa los datos y cierra el modal correctamente
+   */
+  const handleDataProcessingComplete = useCallback(
+    (data: ExtractedReceiptData) => {
+      console.log('✅ [Scanner] ============ PROCESAMIENTO COMPLETADO ============');
+      console.log('✅ [Scanner] Datos a enviar al componente padre:', data);
+      
+      // CRÍTICO: Enviar los datos ANTES de cerrar el modal
+      // Usando setTimeout para asegurar que el callback se ejecute
+      setTimeout(() => {
+        try {
+          console.log('📤 [Scanner] Enviando datos al componente padre...');
+          onDataExtracted(data);
+          
+          console.log('📤 [Scanner] Datos enviados exitosamente');
+          
+          // Cerrar el modal DESPUÉS de enviar los datos
+          setTimeout(() => {
+            console.log('🚪 [Scanner] Cerrando modal...');
+            onClose();
+          }, 100); // Pequeño delay para asegurar que el callback se procese
+          
+        } catch (error) {
+          console.error('💥 [Scanner] Error enviando datos:', error);
+          // Aún así cerrar el modal
+          onClose();
+        }
+      }, 50);
+    },
+    [onDataExtracted, onClose]
+  );
 
   /**
    * Toma una foto y procesa el comprobante
@@ -307,7 +339,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   };
 
   /**
-   * Muestra los datos extraídos para confirmación del usuario
+   * FUNCIÓN CORREGIDA - Muestra los datos extraídos para confirmación del usuario
    */
   const showExtractedDataConfirmation = (data: ExtractedReceiptData): void => {
     console.log('✅ [Scanner] Mostrando confirmación de datos:', data);
@@ -331,9 +363,9 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         { 
           text: 'Usar datos', 
           onPress: () => {
-            console.log('✅ [Scanner] Usuario aceptó datos, enviando callback...');
-            onDataExtracted(data);
-            onClose();
+            console.log('✅ [Scanner] Usuario aceptó datos, procesando...');
+            // AQUÍ ES DONDE USO LA FUNCIÓN CORREGIDA
+            handleDataProcessingComplete(data);
           }
         },
         debugMode ? {
