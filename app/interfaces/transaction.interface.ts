@@ -30,6 +30,7 @@ export interface Transaction {
   dueDate?: string;
   createdAt: string;
   updatedAt: string;
+  paymentMethod: string;
 }
 
 export interface GetTransactionsData {
@@ -61,6 +62,7 @@ export interface CreateTransactionInput {
   category: string;
   status?: TransactionStatus;
   dueDate?: Date;
+  paymentMethod: string;
 }
 
 export interface CreateTransactionResponse {

@@ -7,12 +7,16 @@ interface PaymentMethodSelectorProps {
   type: TransactionType;
   onSelect: (method: string) => void;
   isPending?: boolean; // Agregado para distinguir entre gastos pagados y pendientes
+  initialPaymentMethod?: string; // 🆕 Nueva prop para método inicial del OCR
 }
 
+// 🆕 MÉTODOS DE PAGO ACTUALIZADOS CON TARJETAS
 const paymentMethods = [
   { id: "Efectivo", label: "Efectivo" },
   { id: "Yape", label: "Yape" },
   { id: "Banco", label: "Cuenta Bancaria" },
+  { id: "Tarjeta de Crédito", label: "Tarjeta de Crédito" },
+  { id: "Tarjeta de Débito", label: "Tarjeta de Débito" },
 ];
 
 // Mapeo de tipos de transacción a opciones de UI
@@ -39,22 +43,34 @@ const getTitleForType = (type: TransactionType, isPending: boolean): string => {
  * @param type - Tipo de transacción (gasto/ingreso/ahorro)
  * @param onSelect - Función para manejar la selección del método
  * @param isPending - Indica si el gasto está pendiente
+ * @param initialPaymentMethod - Método de pago inicial del OCR
  */
 const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ 
   type, 
   onSelect, 
-  isPending = false // Valor predeterminado: false (no pendiente)
+  isPending = false,
+  initialPaymentMethod
 }) => {
-  const [selectedMethod, setSelectedMethod] = useState("Efectivo");
+  // 🔧 CORRECCIÓN: Usar método inicial si está disponible, sino usar "Efectivo"
+  const [selectedMethod, setSelectedMethod] = useState(initialPaymentMethod || "Efectivo");
   const [showMoreOptions, setShowMoreOptions] = useState(false);
+
+  // 🔧 CORRECCIÓN: Aplicar método inicial del OCR cuando esté disponible
+  React.useEffect(() => {
+    if (initialPaymentMethod && initialPaymentMethod !== selectedMethod) {
+      console.log('💳 [PaymentMethodSelector] Aplicando método inicial del OCR:', initialPaymentMethod);
+      setSelectedMethod(initialPaymentMethod);
+      onSelect(initialPaymentMethod);
+    }
+  }, [initialPaymentMethod, selectedMethod, onSelect]);
 
   // Obtener el título según el tipo de transacción y estado pendiente
   const selectorTitle = getTitleForType(type, isPending);
 
   // Obtener el color basado en el tipo de transacción
   const themeColor = useMemo(() => {
-    const option = TYPE_TO_OPTION_MAP[type] || "Gastos"; // Valor por defecto si el tipo no está en el mapeo
-    return TRANSACTION_COLORS[option] || "#00C1D5"; // Color por defecto si la opción no tiene color
+    const option = TYPE_TO_OPTION_MAP[type] || "Gastos";
+    return TRANSACTION_COLORS[option] || "#00C1D5";
   }, [type]);
 
   // Estilos dinámicos basados en el tipo
@@ -69,6 +85,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
   }), [themeColor]);
 
   const handleSelect = (method: string) => {
+    console.log('💳 [PaymentMethodSelector] Método seleccionado:', method);
     setSelectedMethod(method);
     onSelect(method);
     if (showMoreOptions) {
@@ -99,6 +116,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
                 styles.methodText, 
                 selectedMethod === method.id && styles.selectedMethodText
               ]}
+              numberOfLines={2}
             >
               {method.label}
             </Text>
@@ -152,13 +170,13 @@ const styles = StyleSheet.create({
     flexWrap: "wrap"
   },
   methodButton: {
-    width: 100,
+    width: 85, // Ajustado para acomodar 5 métodos en 2 filas
     height: 90,
     borderRadius: 12,
     backgroundColor: "#FFF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 8,
     marginBottom: 10,
     borderWidth: 1,
     borderColor: "#E0E0E0",
@@ -167,9 +185,11 @@ const styles = StyleSheet.create({
     marginBottom: 5 
   },
   methodText: { 
-    fontSize: 14, 
+    fontSize: 12, // Reducido para texto de 2 líneas
     color: "#777",
-    fontFamily: "Outfit_400Regular"
+    fontFamily: "Outfit_400Regular",
+    textAlign: "center",
+    lineHeight: 14,
   },
   selectedMethodText: { 
     color: "#FFF",

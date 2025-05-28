@@ -20,6 +20,7 @@ import CardIcon from "@/assets/images/icons/payment_methods/card.svg";
 // Importando el PNG directamente
 import YapeIcon from "@/assets/images/icons/yape_bn.png";
 import { Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 
 // 📌 Mapeo de iconos por categoría y tipo de transacción
 export const gastosIcons: Record<string, JSX.Element> = {
@@ -47,10 +48,13 @@ export const ingresosIcons: Record<string, JSX.Element> = {
   "Otros Ingresos": <OtrosIngresosIcon width={30} height={30} />,
 };
 
+// 🆕 MÉTODOS DE PAGO ACTUALIZADOS CON TARJETAS
 export const constPaymentMethodsIcons: Record<string, JSX.Element> = {
-  Efectivo: <FluentMoneyIcon  width={30} height={30} />,
+  Efectivo: <FluentMoneyIcon width={30} height={30} />,
   Yape: <Image source={YapeIcon} style={{ width: 30, height: 30 }} />,
   Banco: <CardIcon width={30} height={30} />,
+  "Tarjeta de Crédito": <Ionicons name="card" size={30} color="#4A90E2" />,
+  "Tarjeta de Débito": <Ionicons name="card-outline" size={30} color="#4A90E2" />,
 };
 
 // 📌 Función para obtener el ícono correcto según tipo y categoría

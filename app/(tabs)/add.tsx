@@ -95,11 +95,11 @@ export default function AddTransaction() {
     amount: "",
     description: "",
     category: "",
-    paymentMethod: "Efectivo",
-    date: new Date().toISOString(), // Fecha de creación
-    dueDate: new Date().toISOString(), // Fecha de vencimiento (misma por defecto)
+    paymentMethod: "Efectivo", // Valor por defecto
+    date: new Date().toISOString(),
+    dueDate: new Date().toISOString(),
     frequent: false,
-    isPaid: forcePaymentStatus === "pending" ? false : true, // Usar el parámetro si existe
+    isPaid: forcePaymentStatus === "pending" ? false : true,
   });
 
   // Configurar el slider si viene preseleccionado
@@ -264,6 +264,7 @@ export default function AddTransaction() {
         amount: parseFloat(formState.amount),
         type: TRANSACTION_MAPPING[formState.selectedOption],
         frequent: formState.frequent,
+        paymentMethod: formState.paymentMethod,
         category: formState.category,
         status: formState.isPaid ? "completed" : "pending",
         // Ajuste para manejar correctamente la zona horaria
@@ -343,11 +344,8 @@ export default function AddTransaction() {
       );
       console.log("📄 [AddTransaction] Datos extraídos:", data);
 
-      // Cerrar scanner
       setShowScanner(false);
-      console.log("📄 [AddTransaction] Cerrando scanner...");
 
-      // Crear objeto de actualizaciones
       const updates: Partial<typeof formState> = {};
       let fieldsUpdated = 0;
 
@@ -368,16 +366,25 @@ export default function AddTransaction() {
         );
       }
 
-      // 🔧 CORRECCIÓN: Aplicar categoría si está disponible y es válida
+      // Aplicar categoría si está disponible y es válida
       if (data.category && data.category.trim().length > 0) {
         updates.category = data.category.trim();
         fieldsUpdated++;
         console.log("🏷️ [AddTransaction] Categoría aplicada:", data.category);
       }
 
-      // 🔧 CORRECCIÓN: Aplicar fecha si está disponible
+      // 🆕 APLICAR MÉTODO DE PAGO SI ESTÁ DISPONIBLE
+      if (data.paymentMethod && data.paymentMethod.trim().length > 0) {
+        updates.paymentMethod = data.paymentMethod.trim();
+        fieldsUpdated++;
+        console.log(
+          "💳 [AddTransaction] Método de pago aplicado:",
+          data.paymentMethod
+        );
+      }
+
+      // Aplicar fecha si está disponible
       if (data.date) {
-        // Aplicar a la fecha correcta según el estado de pago
         if (formState.isPaid) {
           updates.date = data.date;
           console.log("📅 [AddTransaction] Fecha de pago aplicada:", data.date);
@@ -404,11 +411,10 @@ export default function AddTransaction() {
       console.log("🔄 [AddTransaction] Actualizaciones a aplicar:", updates);
       console.log("📊 [AddTransaction] Campos a actualizar:", fieldsUpdated);
 
-      // 🔧 CORRECCIÓN: Actualizar el formulario con todos los datos
+      // Actualizar el formulario con todos los datos
       if (fieldsUpdated > 0) {
         updateFormState(updates);
 
-        // Mostrar toast de éxito
         showToast(
           "success",
           "¡Datos extraídos!",
@@ -527,7 +533,8 @@ export default function AddTransaction() {
             <PaymentMethodSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
               onSelect={(paymentMethod) => updateFormState({ paymentMethod })}
-              isPending={formState.isPaid}
+              isPending={!formState.isPaid}
+              initialPaymentMethod={undefined} // Se maneja vía onSelect
             />
           </View>
 

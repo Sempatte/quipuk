@@ -1,12 +1,33 @@
-// app/services/googleVisionOCR.ts - PARSING DE FECHAS MEJORADO
+// app/services/googleVisionOCR.ts - CON DETECCIÓN DE MÉTODOS DE PAGO
 import env from '@/app/config/env';
 import { ExtractedReceiptData, OCRResult } from './ocrService';
-import { DateParsingUtils } from '@/app/utils/dateValidation';
 
 const GOOGLE_VISION_API_KEY = env.GOOGLE_VISION_API_KEY || '';
 const GOOGLE_VISION_URL = `https://vision.googleapis.com/v1/images:annotate?key=${GOOGLE_VISION_API_KEY}`;
 
 class GoogleVisionOCR {
+  // 🆕 KEYWORDS PARA MÉTODOS DE PAGO
+  private readonly paymentMethodKeywords = {
+    "Tarjeta de Crédito": [
+      "tarjeta credito", "tarjeta crédito", "credit card", "credito", "crédito",
+      "visa", "mastercard", "amex", "american express", "tc", "t/c", "credit"
+    ],
+    "Tarjeta de Débito": [
+      "tarjeta debito", "tarjeta débito", "debit card", "debito", "débito",
+      "td", "t/d", "tarjeta de debito", "debit"
+    ],
+    "Efectivo": [
+      "efectivo", "cash", "contado", "dinero efectivo", "pago efectivo"
+    ],
+    "Yape": [
+      "yape", "app yape", "billetera yape", "pago yape"
+    ],
+    "Banco": [
+      "transferencia", "cuenta bancaria", "banco", "transferencia bancaria",
+      "pago banco", "deposito", "depósito", "transfer"
+    ]
+  };
+
   public isConfigured(): boolean {
     const isConfigured = !!GOOGLE_VISION_API_KEY && GOOGLE_VISION_API_KEY.length > 10;
     console.log(`🔍 [GoogleVision] isConfigured: ${isConfigured}, keyLength: ${GOOGLE_VISION_API_KEY?.length || 0}`);
@@ -43,7 +64,6 @@ class GoogleVisionOCR {
 
       console.log(`🔍 [GoogleVision] Base64 generado exitosamente, tamaño: ${base64Image.length} caracteres`);
 
-      // Request optimizado para comprobantes
       const requestBody = {
         requests: [
           {
@@ -55,15 +75,13 @@ class GoogleVisionOCR {
                 type: 'TEXT_DETECTION',
                 maxResults: 1,
               },
-              // Añadir detección de documentos para mejor OCR
               {
                 type: 'DOCUMENT_TEXT_DETECTION',
                 maxResults: 1,
               }
             ],
-            // Configuración de imagen para mejor procesamiento
             imageContext: {
-              languageHints: ['es', 'en'] // Español e inglés para comprobantes peruanos
+              languageHints: ['es', 'en']
             }
           },
         ],
@@ -136,7 +154,6 @@ class GoogleVisionOCR {
           };
         }
 
-        // Priorizar DOCUMENT_TEXT_DETECTION si está disponible
         let detectedText = '';
         
         if (apiResponse.fullTextAnnotation && apiResponse.fullTextAnnotation.text) {
@@ -158,10 +175,10 @@ class GoogleVisionOCR {
             amount: extractedData.amount,
             merchantName: extractedData.merchantName,
             category: extractedData.category,
+            paymentMethod: extractedData.paymentMethod, // 🆕 NUEVO LOG
             confidence: extractedData.confidence,
             hasDescription: !!extractedData.description,
             hasDate: !!extractedData.date,
-            extractedDate: extractedData.date
           });
           
           return {
@@ -193,61 +210,54 @@ class GoogleVisionOCR {
   }
 
   /**
-   * Parser optimizado para comprobantes peruanos - CON MEJORAS EN FECHAS
+   * Parser optimizado para comprobantes peruanos con detección de métodos de pago
    */
   private parseReceiptTextOptimized(text: string): ExtractedReceiptData {
     console.log('🔍 [GoogleVision] Iniciando parsing optimizado...');
     
-    // Patrones mejorados para comprobantes peruanos
     const patterns = {
-      // Patrones de monto más específicos y ordenados por prioridad
       amount: [
-        // Buscar "TOTAL" primero (más confiable)
         /(?:total|subtotal|importe final|monto total)[:\s]*s\/?\s*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
-        // Buscar montos con formato peruano
         /s\/\s*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
-        // Buscar números al final de líneas (probablemente totales)
         /(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2}))\s*$/gm,
-        // Buscar montos cerca de palabras clave
         /(?:pagar|cobrar|debe|total)[:\s]*(\d{1,3}(?:[,\.]\d{3})*(?:[,\.]\d{2})?)/gi,
       ],
       
-      // 🚀 PATRONES DE FECHA COMPLETAMENTE MEJORADOS
       date: [
-        // Formato específico peruano DD/MM/YYYY HH:MM (más común en comprobantes)
         /(\d{1,2}\/\d{1,2}\/\d{4})\s+(\d{1,2}:\d{2})/g,
-        // Formato DD/MM/YYYY sin hora
         /(\d{1,2}\/\d{1,2}\/\d{4})/g,
-        // Formato con texto "Fecha:" seguido de fecha
         /(?:fecha|date)[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})(?:\s+(\d{1,2}:\d{2}))?/gi,
-        // Formato DD-MM-YYYY (alternativo)
         /(\d{1,2}-\d{1,2}-\d{4})/g,
-        // Formato YYYY-MM-DD (ISO)
         /(\d{4}-\d{1,2}-\d{1,2})/g,
-        // Formato con palabras en español
         /(\d{1,2})\s+(?:de\s+)?(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)\s+(?:de\s+)?(\d{4})/gi,
-        // Búsqueda por contexto cerca de números que parecen fechas
         /(?:emitido|emision|compra|venta|operacion)[:\s]*(\d{1,2}\/\d{1,2}\/\d{4})/gi,
       ],
       
-      // Patrones de comercio mejorados para Perú
       merchant: [
-        // Líneas que empiezan con mayúsculas (nombres de empresa)
         /^([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]{2,}(?:S\.A\.C?|S\.R\.L?|E\.I\.R\.L?|S\.A\.|LTDA\.)?)/m,
-        // Después de RUC
         /RUC[:\s]*\d{11}[^\r\n]*\n([A-ZÁÉÍÓÚÑ][A-Za-záéíóúñ\s]{3,})/gi,
-        // Patrones específicos de cadenas peruanas
         /(PLAZA VEA|WONG|TOTTUS|METRO|VIVANDA|KFC|POPEYES|BEMBOS|NORKY'S|PARDOS|OXXO|TAMBO)/gi,
+      ],
+
+      // 🆕 PATRONES PARA MÉTODOS DE PAGO
+      paymentMethod: [
+        /(?:medio\s+de\s+pago|metodo\s+de\s+pago|forma\s+de\s+pago)[:\s]*([^\r\n]+)/gi,
+        /(?:pago\s+con|pagado\s+con)[:\s]*([^\r\n]+)/gi,
+        /(?:tarjeta\s+(?:de\s+)?(?:credito|crédito|credit))/gi,
+        /(?:tarjeta\s+(?:de\s+)?(?:debito|débito|debit))/gi,
+        /(?:visa|mastercard|amex|american\s+express)/gi,
+        /(?:efectivo|cash|contado)/gi,
+        /(?:yape|plin|tunki)/gi,
+        /(?:transferencia|banco|cuenta\s+bancaria)/gi,
+        /(?:^|\n)([A-Z\s]+(?:CREDITO|DEBITO|EFECTIVO|YAPE|TRANSFERENCIA))\s*S\/?\s*\d/gm,
       ],
     };
 
     // Keywords expandidos para categorización peruana
     const categoryKeywords = {
       'Comida': [
-        // Restaurantes y comida rápida
         'restaurant', 'comida', 'food', 'burger', 'pizza', 'pollo', 'menu', 'almuerzo', 'cena', 'desayuno',
         'cafe', 'bar', 'polleria', 'sangucheria', 'chifa', 'cevicheria', 'parrilla', 'anticucheria',
-        // Cadenas peruanas conocidas
         'bembos', 'norky', 'pardos', 'kfc', 'popeyes', 'papa john', 'domino', 'chin wok', 'mr. pollo',
         'la lucha', 'segundo muelle', 'madam tusan', 'tanta', 'pardo chicken', 'rokys'
       ],
@@ -286,7 +296,7 @@ class GoogleVisionOCR {
       confidence: 0,
     };
 
-    // 1. Extraer monto con algoritmo mejorado
+    // 1. Extraer monto
     console.log('🔍 [GoogleVision] Buscando montos...');
     const amounts: number[] = [];
     
@@ -294,31 +304,28 @@ class GoogleVisionOCR {
       const matches = Array.from(text.matchAll(pattern));
       for (const match of matches) {
         let amountStr = match[1];
-        // Normalizar formato peruano (coma como separador de miles, punto como decimal)
-        amountStr = amountStr.replace(/,(\d{3})/g, '$1'); // Remover comas de miles
-        amountStr = amountStr.replace(',', '.'); // Convertir coma decimal a punto
+        amountStr = amountStr.replace(/,(\d{3})/g, '$1');
+        amountStr = amountStr.replace(',', '.');
         
         const amount = parseFloat(amountStr);
-        if (!isNaN(amount) && amount > 0 && amount < 100000) { // Filtro realista
+        if (!isNaN(amount) && amount > 0 && amount < 100000) {
           amounts.push(amount);
         }
       }
     }
     
     if (amounts.length > 0) {
-      // Tomar el monto más grande (probablemente el total)
       result.amount = Math.max(...amounts);
       result.confidence += 40;
       console.log(`✅ [GoogleVision] Monto encontrado: S/ ${result.amount} (de ${amounts.length} candidatos)`);
     }
 
-    // 2. Extraer comercio con priorización
+    // 2. Extraer comercio
     console.log('🔍 [GoogleVision] Buscando nombre de comercio...');
     for (const pattern of patterns.merchant) {
       const match = text.match(pattern);
       if (match && match[1]) {
         let merchantName = match[1].trim();
-        // Limpiar nombre del comercio
         merchantName = merchantName.replace(/[^\w\s\.\-áéíóúñÁÉÍÓÚÑ]/g, ' ').trim();
         
         if (merchantName.length >= 3) {
@@ -330,69 +337,35 @@ class GoogleVisionOCR {
       }
     }
 
-    // 3. 🚀 EXTRAER FECHA CON ALGORITMO COMPLETAMENTE MEJORADO
+    // 3. Extraer fecha (código existente simplificado)
     console.log('🔍 [GoogleVision] Buscando fecha...');
-    console.log('📄 [GoogleVision] Texto completo para análisis de fecha:', text);
-    
-    // Buscar todas las posibles fechas en el texto
     const foundDates: { date: Date; confidence: number; source: string }[] = [];
     
     for (const pattern of patterns.date) {
       const matches = Array.from(text.matchAll(pattern));
-      console.log(`🔍 [GoogleVision] Patrón ${pattern.source} encontró ${matches.length} coincidencias`);
       
       for (const match of matches) {
-        console.log(`🔍 [GoogleVision] Analizando coincidencia: "${match[0]}"`);
-        
         try {
-          let dateStr = '';
-          let timeStr = '';
+          let dateStr = match[1] || match[0];
+          let timeStr = match[2];
           
-          // Verificar si tenemos fecha y hora separadas
-          if (match[1] && match[2]) {
-            dateStr = match[1];
-            timeStr = match[2];
-            console.log(`🔍 [GoogleVision] Fecha con hora detectada: ${dateStr} ${timeStr}`);
-          } else if (match[1]) {
-            dateStr = match[1];
-            console.log(`🔍 [GoogleVision] Solo fecha detectada: ${dateStr}`);
-          } else {
-            dateStr = match[0];
-            console.log(`🔍 [GoogleVision] Fecha completa: ${dateStr}`);
-          }
-          
-          // Parsear fecha según el formato
           let parsedDate: Date | null = null;
           let confidence = 0;
           
           if (dateStr.includes('/')) {
-            // Formato DD/MM/YYYY o MM/DD/YYYY
             const parts = dateStr.split('/');
             if (parts.length === 3) {
               const [part1, part2, year] = parts.map(p => parseInt(p, 10));
               
-              // Validar año
               if (year >= 2020 && year <= 2030) {
-                // Asumir formato peruano DD/MM/YYYY si el primer número > 12
                 if (part1 > 12) {
                   parsedDate = new Date(year, part2 - 1, part1);
-                  confidence = 90; // Alta confianza para formato peruano
-                  console.log(`✅ [GoogleVision] Formato DD/MM/YYYY confirmado: ${part1}/${part2}/${year}`);
-                } 
-                // Si ambos son <= 12, priorizar formato DD/MM/YYYY (Perú)
-                else if (part2 <= 12) {
+                  confidence = 90;
+                } else if (part2 <= 12) {
                   parsedDate = new Date(year, part2 - 1, part1);
-                  confidence = 80; // Buena confianza
-                  console.log(`✅ [GoogleVision] Asumiendo formato DD/MM/YYYY: ${part1}/${part2}/${year}`);
-                }
-                // Último recurso: MM/DD/YYYY
-                else {
-                  parsedDate = new Date(year, part1 - 1, part2);
-                  confidence = 60; // Menor confianza
-                  console.log(`⚠️ [GoogleVision] Formato MM/DD/YYYY como último recurso: ${part1}/${part2}/${year}`);
+                  confidence = 80;
                 }
                 
-                // Si tenemos hora, aplicarla
                 if (timeStr && parsedDate) {
                   const timeParts = timeStr.split(':');
                   if (timeParts.length >= 2) {
@@ -400,36 +373,15 @@ class GoogleVisionOCR {
                     const minutes = parseInt(timeParts[1], 10);
                     if (hours >= 0 && hours <= 23 && minutes >= 0 && minutes <= 59) {
                       parsedDate.setHours(hours, minutes, 0, 0);
-                      confidence += 10; // Bonus por tener hora válida
-                      console.log(`✅ [GoogleVision] Hora aplicada: ${hours}:${minutes}`);
+                      confidence += 10;
                     }
                   }
                 }
               }
             }
-          } else if (dateStr.includes('-')) {
-            // Formato YYYY-MM-DD o DD-MM-YYYY
-            const parts = dateStr.split('-');
-            if (parts.length === 3) {
-              const [part1, part2, part3] = parts.map(p => parseInt(p, 10));
-              
-              if (part1 > 2000) {
-                // Formato YYYY-MM-DD
-                parsedDate = new Date(part1, part2 - 1, part3);
-                confidence = 85;
-                console.log(`✅ [GoogleVision] Formato YYYY-MM-DD: ${part1}-${part2}-${part3}`);
-              } else if (part3 > 2000) {
-                // Formato DD-MM-YYYY
-                parsedDate = new Date(part3, part2 - 1, part1);
-                confidence = 85;
-                console.log(`✅ [GoogleVision] Formato DD-MM-YYYY: ${part1}-${part2}-${part3}`);
-              }
-            }
           }
           
-          // Validar fecha parseada
           if (parsedDate && !isNaN(parsedDate.getTime())) {
-            // Verificar que la fecha sea razonable (no muy antigua ni muy futura)
             const now = new Date();
             const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate());
             const oneYearFromNow = new Date(now.getFullYear() + 1, now.getMonth(), now.getDate());
@@ -440,12 +392,7 @@ class GoogleVisionOCR {
                 confidence,
                 source: match[0]
               });
-              console.log(`✅ [GoogleVision] Fecha válida encontrada: ${parsedDate.toLocaleDateString('es-PE')} (confianza: ${confidence})`);
-            } else {
-              console.log(`⚠️ [GoogleVision] Fecha fuera de rango válido: ${parsedDate.toLocaleDateString('es-PE')}`);
             }
-          } else {
-            console.log(`❌ [GoogleVision] No se pudo parsear la fecha: ${dateStr}`);
           }
         } catch (error) {
           console.log('⚠️ [GoogleVision] Error parseando fecha:', error);
@@ -453,22 +400,25 @@ class GoogleVisionOCR {
       }
     }
     
-    // Seleccionar la mejor fecha encontrada
     if (foundDates.length > 0) {
-      // Ordenar por confianza (mayor a menor)
       foundDates.sort((a, b) => b.confidence - a.confidence);
-      
       const bestDate = foundDates[0];
       result.date = bestDate.date.toISOString();
-      result.confidence += 25; // Bonus por tener fecha
+      result.confidence += 25;
       
-      console.log(`✅ [GoogleVision] Mejor fecha seleccionada: ${bestDate.date.toLocaleDateString('es-PE')} ${bestDate.date.toLocaleTimeString('es-PE')} (confianza: ${bestDate.confidence}) desde "${bestDate.source}"`);
-      console.log(`📅 [GoogleVision] Fecha ISO resultante: ${result.date}`);
-    } else {
-      console.log('❌ [GoogleVision] No se encontraron fechas válidas');
+      console.log(`✅ [GoogleVision] Mejor fecha seleccionada: ${bestDate.date.toLocaleDateString('es-PE')}`);
     }
 
-    // 4. Determinar categoría con scoring
+    // 4. 🆕 EXTRAER MÉTODO DE PAGO
+    console.log('💳 [GoogleVision] Buscando método de pago...');
+    const paymentMethod = this.extractPaymentMethodFromText(text);
+    if (paymentMethod) {
+      result.paymentMethod = paymentMethod;
+      result.confidence += 15;
+      console.log(`✅ [GoogleVision] Método de pago encontrado: ${paymentMethod}`);
+    }
+
+    // 5. Determinar categoría con scoring
     console.log('🔍 [GoogleVision] Determinando categoría...');
     const lowerText = text.toLowerCase();
     const categoryScores: {[key: string]: number} = {};
@@ -487,7 +437,6 @@ class GoogleVisionOCR {
       }
     }
     
-    // Seleccionar categoría con mayor score
     if (Object.keys(categoryScores).length > 0) {
       const bestCategory = Object.keys(categoryScores).reduce((a, b) => 
         categoryScores[a] > categoryScores[b] ? a : b
@@ -500,7 +449,7 @@ class GoogleVisionOCR {
       console.log('📝 [GoogleVision] Asignando categoría por defecto: Otros');
     }
 
-    // 5. Generar descripción inteligente
+    // 6. Generar descripción inteligente
     if (result.merchantName) {
       result.description = `Compra en ${result.merchantName}`;
       if (result.category && result.category !== 'Otros') {
@@ -514,6 +463,156 @@ class GoogleVisionOCR {
 
     console.log(`✅ [GoogleVision] Parsing completado - Confianza: ${result.confidence}%`);
     return result;
+  }
+
+  /**
+   * 🆕 NUEVA FUNCIÓN: Extrae el método de pago del texto
+   */
+  private extractPaymentMethodFromText(text: string): string | undefined {
+    console.log('💳 [GoogleVision] Iniciando detección de método de pago...');
+    
+    const lowerText = text.toLowerCase();
+    const foundMethods: { method: string; confidence: number; match: string }[] = [];
+
+    // 1. Búsqueda por keywords específicos
+    for (const [method, keywords] of Object.entries(this.paymentMethodKeywords)) {
+      for (const keyword of keywords) {
+        if (lowerText.includes(keyword.toLowerCase())) {
+          // Calcular confianza basada en especificidad del keyword
+          let confidence = 70;
+          if (keyword.length > 10) confidence = 85; // Keywords más específicos
+          if (keyword.includes('tarjeta')) confidence = 90; // Keywords de tarjeta
+          if (keyword === 'yape') confidence = 95; // Yape es muy específico
+          
+          foundMethods.push({
+            method,
+            confidence,
+            match: keyword
+          });
+          
+          console.log(`💳 [GoogleVision] Keyword encontrado: "${keyword}" -> ${method} (${confidence}%)`);
+        }
+      }
+    }
+
+    // 2. Búsqueda por patrones contextuales
+    const contextPatterns = [
+      /(?:medio\s+de\s+pago|metodo\s+de\s+pago|forma\s+de\s+pago)[:\s]*([^\r\n]+)/gi,
+      /(?:pago\s+con|pagado\s+con)[:\s]*([^\r\n]+)/gi,
+      /(?:tipo\s+de\s+pago)[:\s]*([^\r\n]+)/gi,
+    ];
+
+    for (const pattern of contextPatterns) {
+      const matches = Array.from(text.matchAll(pattern));
+      
+      for (const match of matches) {
+        const paymentInfo = match[1]?.toLowerCase().trim();
+        
+        if (paymentInfo) {
+          console.log(`💳 [GoogleVision] Información de pago contextual: "${paymentInfo}"`);
+          
+          // Analizar el contexto extraído
+          if (paymentInfo.includes('credito') || paymentInfo.includes('crédito') || 
+              paymentInfo.includes('credit') || paymentInfo.includes('visa') || 
+              paymentInfo.includes('mastercard')) {
+            foundMethods.push({
+              method: 'Tarjeta de Crédito',
+              confidence: 85,
+              match: paymentInfo
+            });
+          } else if (paymentInfo.includes('debito') || paymentInfo.includes('débito') || 
+                     paymentInfo.includes('debit')) {
+            foundMethods.push({
+              method: 'Tarjeta de Débito',
+              confidence: 85,
+              match: paymentInfo
+            });
+          } else if (paymentInfo.includes('yape')) {
+            foundMethods.push({
+              method: 'Yape',
+              confidence: 95,
+              match: paymentInfo
+            });
+          } else if (paymentInfo.includes('efectivo') || paymentInfo.includes('cash')) {
+            foundMethods.push({
+              method: 'Efectivo',
+              confidence: 80,
+              match: paymentInfo
+            });
+          } else if (paymentInfo.includes('transferencia') || paymentInfo.includes('banco')) {
+            foundMethods.push({
+              method: 'Banco',
+              confidence: 75,
+              match: paymentInfo
+            });
+          }
+        }
+      }
+    }
+
+    // 3. Búsqueda por patrones de línea final (formato común en comprobantes)
+    const finalLinePattern = /(?:^|\n)([A-Z\s]+(?:CREDITO|DEBITO|EFECTIVO|YAPE|TRANSFERENCIA))\s*S\/?\s*\d/gm;
+    const finalLineMatches = Array.from(text.matchAll(finalLinePattern));
+    
+    for (const match of finalLineMatches) {
+      const lineText = match[1].toLowerCase().trim();
+      console.log(`💳 [GoogleVision] Línea final de pago: "${lineText}"`);
+      
+      if (lineText.includes('credito') || lineText.includes('crédito')) {
+        foundMethods.push({
+          method: 'Tarjeta de Crédito',
+          confidence: 90,
+          match: lineText
+        });
+      } else if (lineText.includes('debito') || lineText.includes('débito')) {
+        foundMethods.push({
+          method: 'Tarjeta de Débito',
+          confidence: 90,
+          match: lineText
+        });
+      } else if (lineText.includes('efectivo')) {
+        foundMethods.push({
+          method: 'Efectivo',
+          confidence: 85,
+          match: lineText
+        });
+      } else if (lineText.includes('yape')) {
+        foundMethods.push({
+          method: 'Yape',
+          confidence: 95,
+          match: lineText
+        });
+      } else if (lineText.includes('transferencia')) {
+        foundMethods.push({
+          method: 'Banco',
+          confidence: 80,
+          match: lineText
+        });
+      }
+    }
+
+    // 4. Seleccionar el mejor método encontrado
+    if (foundMethods.length > 0) {
+      // Eliminar duplicados y mantener el de mayor confianza
+      const uniqueMethods = foundMethods.reduce((acc, current) => {
+        const existing = acc.find(item => item.method === current.method);
+        if (!existing || current.confidence > existing.confidence) {
+          return acc.filter(item => item.method !== current.method).concat(current);
+        }
+        return acc;
+      }, [] as typeof foundMethods);
+
+      // Ordenar por confianza (mayor a menor)
+      uniqueMethods.sort((a, b) => b.confidence - a.confidence);
+      
+      const bestMethod = uniqueMethods[0];
+      console.log(`✅ [GoogleVision] Mejor método detectado: ${bestMethod.method} (${bestMethod.confidence}%) desde "${bestMethod.match}"`);
+      
+      return bestMethod.method;
+    }
+
+    console.log('❌ [GoogleVision] No se detectó método de pago específico');
+    return undefined; // No forzar un método por defecto
   }
 
   private async convertImageToBase64(imageUri: string): Promise<string | null> {
