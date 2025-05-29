@@ -1,4 +1,4 @@
-// RegisterScreen.tsx
+// RegisterScreen.tsx - Actualizado con verificación de email
 import React, { useState } from "react";
 import {
   View,
@@ -6,21 +6,19 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Image,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
   ScrollView,
+  ActivityIndicator,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./interfaces/navigation";
-import { REGISTER_MUTATION } from "./graphql/mutations.graphql";
-import { useMutation } from "@apollo/client";
+import { emailVerificationService } from "./services/emailVerificationService";
 import { useToast } from "./providers/ToastProvider";
-import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
-
+import QuipukLogo from "@/assets/images/Logo.svg";
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -38,35 +36,62 @@ export default function RegisterScreen() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [acceptedTerms, setAcceptedTerms] = useState(false);
-
-  const [registerUser, { loading }] = useMutation(REGISTER_MUTATION, {
-    onCompleted: () => {
-      showToast("success", "Registro exitoso", "Cuenta creada correctamente.");
-      navigation.navigate("LoginScreen");
-    },
-    onError: (error) => {
-      console.error("Error en registro:", error);
-      showToast("error", "Error en registro", error.message);
-    },
-  });
+  const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
     if (!fullName || !email || !phoneNumber || !username || !password) {
       showToast("error", "Error", "Todos los campos son obligatorios.");
       return;
     }
+    
     if (!acceptedTerms) {
       showToast("error", "Error", "Debes aceptar los Términos y Condiciones.");
       return;
     }
 
+    // Validación básica de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast("error", "Error", "Por favor ingresa un email válido.");
+      return;
+    }
+
+    // Validación de contraseña
+    if (password.length < 6) {
+      showToast("error", "Error", "La contraseña debe tener al menos 6 caracteres.");
+      return;
+    }
+
+    setLoading(true);
+
     try {
-      await registerUser({
-        variables: { fullName, email, phoneNumber, username, password },
+      console.log('📝 Registrando usuario con datos:', { fullName, email, username, phoneNumber });
+
+      const result = await emailVerificationService.registerWithEmailVerification({
+        fullName,
+        email,
+        phoneNumber,
+        username,
+        password,
       });
+
+      if (result.success) {
+        showToast("success", "¡Registro exitoso!", result.message);
+        
+        // Navegar a la pantalla de verificación
+        navigation.navigate("EmailVerificationScreen", {
+          email: email,
+          userId: result.userId,
+          fromRegistration: true,
+        });
+      } else {
+        showToast("error", "Error en registro", result.message);
+      }
     } catch (error: any) {
       console.error("Error en el registro:", error);
-      showToast("error", "Error", error.message);
+      showToast("error", "Error", error.message || "Hubo un problema en el registro.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -76,7 +101,7 @@ export default function RegisterScreen() {
       style={styles.container}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={styles.inner}>
+        <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
           {/* Logo + Header */}
           <View style={styles.logoContainer}>
             <TouchableOpacity
@@ -99,15 +124,20 @@ export default function RegisterScreen() {
               placeholderTextColor="#888"
               value={fullName}
               onChangeText={setFullName}
+              editable={!loading}
             />
+            
             <TextInput
               style={styles.input}
               placeholder="Correo electrónico"
               placeholderTextColor="#888"
               keyboardType="email-address"
+              autoCapitalize="none"
               value={email}
               onChangeText={setEmail}
+              editable={!loading}
             />
+            
             <TextInput
               style={styles.input}
               placeholder="Número de celular"
@@ -115,14 +145,19 @@ export default function RegisterScreen() {
               keyboardType="phone-pad"
               value={phoneNumber}
               onChangeText={setPhoneNumber}
+              editable={!loading}
             />
+            
             <TextInput
               style={styles.input}
               placeholder="Usuario"
               placeholderTextColor="#888"
+              autoCapitalize="none"
               value={username}
               onChangeText={setUsername}
+              editable={!loading}
             />
+            
             <TextInput
               style={styles.input}
               placeholder="Contraseña"
@@ -130,12 +165,14 @@ export default function RegisterScreen() {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+              editable={!loading}
             />
 
             {/* Checkbox Términos y Condiciones */}
             <TouchableOpacity
               style={styles.checkboxContainer}
-              onPress={() => setAcceptedTerms(!acceptedTerms)}
+              onPress={() => !loading && setAcceptedTerms(!acceptedTerms)}
+              disabled={loading}
             >
               <View style={styles.checkbox}>
                 {acceptedTerms && <View style={styles.checked} />}
@@ -146,14 +183,38 @@ export default function RegisterScreen() {
               </Text>
             </TouchableOpacity>
 
+            {/* Información adicional sobre verificación */}
+            <View style={styles.infoContainer}>
+              <Text style={styles.infoText}>
+                📧  Después del registro, enviaremos un código de verificación a tu email para confirmar tu cuenta.
+              </Text>
+            </View>
+
             {/* Botón Registrarse */}
             <TouchableOpacity
-              style={styles.registerButton}
+              style={[
+                styles.registerButton,
+                loading && styles.registerButtonDisabled
+              ]}
               onPress={handleRegister}
               disabled={loading}
             >
-              <Text style={styles.registerButtonText}>
-                {loading ? "Registrando..." : "Registrarme"}
+              {loading ? (
+                <ActivityIndicator color="#FFF" />
+              ) : (
+                <Text style={styles.registerButtonText}>Registrarme</Text>
+              )}
+            </TouchableOpacity>
+
+            {/* Link para volver al login */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("LoginScreen")}
+              disabled={loading}
+              style={styles.loginLinkContainer}
+            >
+              <Text style={styles.loginLinkText}>
+                ¿Ya tienes cuenta?{" "}
+                <Text style={styles.loginLink}>Inicia sesión</Text>
               </Text>
             </TouchableOpacity>
           </View>
@@ -230,6 +291,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
+    marginBottom: 15,
   },
   checkbox: {
     width: 20,
@@ -250,10 +312,25 @@ const styles = StyleSheet.create({
   checkboxText: {
     fontSize: 14,
     color: "#000",
+    flex: 1,
   },
   termsText: {
     fontWeight: "bold",
     textDecorationLine: "underline",
+  },
+  infoContainer: {
+    backgroundColor: "#E8F5E8",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 20,
+    borderLeftWidth: 4,
+    borderLeftColor: "#00c450",
+  },
+  infoText: {
+    fontSize: 14,
+    color: "#2D5016",
+    lineHeight: 20,
+    fontFamily: "Outfit_400Regular",
   },
   registerButton: {
     backgroundColor: "#00c450",
@@ -261,11 +338,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 20,
+    marginBottom: 20,
+  },
+  registerButtonDisabled: {
+    backgroundColor: "#CCC",
   },
   registerButtonText: {
     fontSize: 18,
     color: "#FFF",
+    fontWeight: "bold",
+  },
+  loginLinkContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  loginLinkText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  loginLink: {
+    color: "#00c450",
     fontWeight: "bold",
   },
 });

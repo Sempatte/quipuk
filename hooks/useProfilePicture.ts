@@ -70,8 +70,9 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
       const result = await imageUploadService.selectAndUploadProfilePicture();
 
       setUploadProgress(80);
+      console.log('📤 [useProfilePicture] Resultado de la subida:', result);
 
-      if (result.success && result.profilePictureUrl) {
+      if (result.success) {
         console.log('✅ [useProfilePicture] Imagen subida exitosamente:', result.profilePictureUrl);
         
         setUploadProgress(100);
@@ -81,7 +82,7 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
         
         showToast('success', 'Éxito', 'Foto de perfil actualizada correctamente');
       } else {
-        console.error('❌ [useProfilePicture] Error en la subida:', result.error);
+        console.error('❌ [useProfilePicture] Error en la subida:', result);
         showToast('error', 'Error', result.error || 'No se pudo subir la imagen');
       }
     } catch (error) {

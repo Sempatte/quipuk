@@ -6,6 +6,11 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 export type RootStackParamList = {
   LoginScreen: undefined;
   RegisterScreen: undefined;
+  EmailVerificationScreen: {
+    email: string;
+    userId?: number;
+    fromRegistration?: boolean;
+  };
   "(tabs)": undefined;
   movements: undefined;
   index: undefined;

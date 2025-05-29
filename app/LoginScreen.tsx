@@ -5,11 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Image,
   KeyboardAvoidingView,
   Platform,
   TouchableWithoutFeedback,
   Keyboard,
+  ActivityIndicator,
 } from "react-native";
 import { useMutation } from "@apollo/client";
 import { useNavigation } from "@react-navigation/native";
@@ -18,8 +18,7 @@ import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "./interfaces/navigation";
 import { useToast } from "./providers/ToastProvider";
-import QuipukLogo from "@/assets/images/Logo.svg"; // Asumiendo que tienes o crearás este SVG
-
+import QuipukLogo from "@/assets/images/Logo.svg";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -28,12 +27,11 @@ type LoginScreenNavigationProp = NativeStackNavigationProp<
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const { showToast } = useToast();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
-
-  const { showToast } = useToast();
 
   const [login, { loading }] = useMutation(LOGIN_MUTATION, {
     onCompleted: async (data) => {
@@ -41,12 +39,46 @@ export default function LoginScreen() {
       if (token) {
         await AsyncStorage.setItem("token", token);
         await AsyncStorage.setItem("userId", data.login.user.id.toString());
+        showToast("success", "¡Bienvenido!", "Has iniciado sesión correctamente");
         navigation.navigate("(tabs)");
       }
     },
     onError: (error) => {
       console.log("Error al iniciar sesión:", error);
-      showToast("error", "Error en inicio de sesión", error.message);
+      
+      // ✅ NUEVO: Manejo específico de errores de verificación
+      if (error.message.includes('EMAIL_NOT_VERIFIED')) {
+        try {
+          // Intentar extraer información adicional del error
+          const errorData = JSON.parse(error.message);
+          
+          showToast(
+            "info", 
+            "Email no verificado", 
+            "Necesitas verificar tu email antes de iniciar sesión"
+          );
+          
+          // Navegar a la pantalla de verificación
+          navigation.navigate("EmailVerificationScreen", {
+            email: email,
+            userId: errorData.userId,
+            fromRegistration: false,
+          });
+        } catch (parseError) {
+          // Si no se puede parsear el error, mostrar mensaje genérico
+          showToast(
+            "info",
+            "Email no verificado",
+            "Por favor verifica tu email antes de iniciar sesión"
+          );
+        }
+      } else if (error.message.includes('Usuario no encontrado')) {
+        showToast("error", "Usuario no encontrado", "Verifica tu email o regístrate");
+      } else if (error.message.includes('Contraseña incorrecta')) {
+        showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
+      } else {
+        showToast("error", "Error en inicio de sesión", error.message);
+      }
     },
   });
 
@@ -55,6 +87,14 @@ export default function LoginScreen() {
       showToast("error", "Error", "Todos los campos son obligatorios.");
       return;
     }
+
+    // Validación básica de email
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast("error", "Error", "Por favor ingresa un email válido.");
+      return;
+    }
+
     login({ variables: { email, password } });
   };
 
@@ -66,7 +106,7 @@ export default function LoginScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.inner}>
           <View style={styles.logoContainer}>
-          <QuipukLogo width={170} height={90} style={styles.logo} />
+            <QuipukLogo width={170} height={90} style={styles.logo} />
           </View>
 
           <View style={styles.formContainer}>
@@ -75,8 +115,11 @@ export default function LoginScreen() {
               style={styles.input}
               placeholder="Ingrese su correo"
               placeholderTextColor="#888"
+              keyboardType="email-address"
+              autoCapitalize="none"
               value={email}
               onChangeText={setEmail}
+              editable={!loading}
             />
 
             <Text style={styles.label}>Contraseña</Text>
@@ -87,41 +130,62 @@ export default function LoginScreen() {
               secureTextEntry
               value={password}
               onChangeText={setPassword}
+              editable={!loading}
             />
 
             <View style={styles.optionsContainer}>
-              <TouchableOpacity onPress={() => setRememberMe(!rememberMe)}>
+              <TouchableOpacity 
+                onPress={() => !loading && setRememberMe(!rememberMe)}
+                disabled={loading}
+              >
                 <View style={styles.checkbox}>
                   {rememberMe && <View style={styles.checked} />}
                 </View>
               </TouchableOpacity>
               <Text style={styles.optionText}>Recordarme</Text>
-              <TouchableOpacity>
-                <Text style={[styles.optionText, styles.forgotPassword]}>
+              <TouchableOpacity disabled={loading}>
+                <Text style={[
+                  styles.optionText, 
+                  styles.forgotPassword,
+                  loading && styles.disabledText
+                ]}>
                   ¿Olvidaste tu contraseña?
                 </Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={styles.loginButton}
+              style={[
+                styles.loginButton,
+                loading && styles.loginButtonDisabled
+              ]}
               onPress={handleLogin}
               disabled={loading}
             >
-              <Text style={styles.loginButtonText}>
-                {loading ? "Ingresando..." : "Ingresar"}
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#FFF" />
+                  <Text style={styles.loadingText}>Ingresando...</Text>
+                </View>
+              ) : (
+                <Text style={styles.loginButtonText}>Ingresar</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => navigation.push("RegisterScreen")}
+              disabled={loading}
+              style={styles.registerContainer}
+            >
+              <Text style={[
+                styles.registerText,
+                loading && styles.disabledText
+              ]}>
+                ¿Aún no tienes una cuenta?{" "}
+                <Text style={styles.registerLink}>Regístrate</Text>
               </Text>
             </TouchableOpacity>
 
-            <Text style={styles.registerText}>
-              ¿Aún no tienes una cuenta?{" "}
-              <Text
-                style={styles.registerLink}
-                onPress={() => navigation.push("RegisterScreen")}
-              >
-                Regístrate
-              </Text>
-            </Text>
           </View>
         </View>
       </TouchableWithoutFeedback>
@@ -134,21 +198,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F5F5F5",
     justifyContent: "flex-start",
-    width: "100%", // Se asegura que no tenga restricciones de ancho
-    maxWidth: "100%", // Evita cualquier restricción de tamaño
+    width: "100%",
+    maxWidth: "100%",
   },
   inner: {
     position: "absolute",
     flex: 1,
-    width: "100%", // ✅ Forzar que ocupe el ancho total
-    maxWidth: "100%", // ✅ Evita restricciones
+    width: "100%",
+    maxWidth: "100%",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 0, // ❌ Evita márgenes laterale
-    top: 0, // ✅ Asegura que esté en la parte superior
+    paddingHorizontal: 0,
+    top: 0,
   },
   logoContainer: {
-    alignSelf: "stretch", // ✅ Forzar que la vista ocupe todo el ancho
+    alignSelf: "stretch",
     height: 200,
     backgroundColor: "#000",
     alignItems: "center",
@@ -220,10 +284,27 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 15,
   },
+  loginButtonDisabled: {
+    backgroundColor: "#CCC",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#FFF",
+    fontSize: 16,
+    marginLeft: 10,
+    fontWeight: "bold",
+  },
   loginButtonText: {
     fontSize: 18,
     color: "#FFF",
     fontWeight: "bold",
+  },
+  registerContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
   },
   registerText: {
     textAlign: "center",
@@ -234,4 +315,7 @@ const styles = StyleSheet.create({
     color: "#00c450",
     fontWeight: "bold",
   },
+  disabledText: {
+    opacity: 0.5,
+  }
 });

@@ -154,7 +154,9 @@ export default function Profile() {
                 {/* Tarjeta de información de contacto */}
                 <View style={styles.infoCard}>
                   <View style={styles.infoItem}>
-                    <Ionicons name="call-outline" size={24} color="#00DC5A" style={styles.infoIcon} />
+                    <View style={styles.iconContainer}>
+                      <Ionicons name="call-outline" size={24} color="#00DC5A" />
+                    </View>
                     <View>
                       <Text style={styles.infoLabel}>Teléfono</Text>
                       <Text style={styles.infoValue}>{data.getUserProfile.phoneNumber || 'No especificado'}</Text>
@@ -164,7 +166,9 @@ export default function Profile() {
                   <View style={styles.divider} />
                   
                   <View style={styles.infoItem}>
-                    <Ionicons name="mail-outline" size={24} color="#00DC5A" style={styles.infoIcon} />
+                    <View style={styles.iconContainer}>
+                      <Ionicons name="mail-outline" size={24} color="#00DC5A" />
+                    </View>
                     <View>
                       <Text style={styles.infoLabel}>Correo</Text>
                       <Text style={styles.infoValue}>{data.getUserProfile.email}</Text>
@@ -174,31 +178,41 @@ export default function Profile() {
                 
                 {/* Tarjeta de opciones */}
                 <View style={styles.optionsCard}>
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="settings-outline" size={24} color="#000" style={styles.optionIcon} />
+                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+                    <View style={styles.optionIconContainer}>
+                      <Ionicons name="settings-outline" size={22} color="#333" />
+                    </View>
                     <Text style={styles.optionText}>Configuraciones</Text>
-                    <Ionicons name="chevron-forward" size={24} color="#000" />
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
                   
                   <View style={styles.optionDivider} />
                   
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="shield-outline" size={24} color="#000" style={styles.optionIcon} />
+                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+                    <View style={styles.optionIconContainer}>
+                      <Ionicons name="shield-outline" size={22} color="#333" />
+                    </View>
                     <Text style={styles.optionText}>Privacidad y Seguridad</Text>
-                    <Ionicons name="chevron-forward" size={24} color="#000" />
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
                   
                   <View style={styles.optionDivider} />
                   
-                  <TouchableOpacity style={styles.optionItem}>
-                    <Ionicons name="help-circle-outline" size={24} color="#000" style={styles.optionIcon} />
+                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+                    <View style={styles.optionIconContainer}>
+                      <Ionicons name="help-circle-outline" size={22} color="#333" />
+                    </View>
                     <Text style={styles.optionText}>Ayuda y Soporte</Text>
-                    <Ionicons name="chevron-forward" size={24} color="#000" />
+                    <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
                 </View>
                 
                 {/* Botón de cierre de sesión */}
-                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <TouchableOpacity 
+                  style={styles.logoutButton} 
+                  onPress={handleLogout}
+                  activeOpacity={0.8}
+                >
                   <Text style={styles.logoutText}>Cerrar Sesión</Text>
                 </TouchableOpacity>
               </>
@@ -220,13 +234,15 @@ const styles = StyleSheet.create({
     backgroundColor: "#F8F8F8",
   },
   header: {
-    backgroundColor: "#060606",
-    paddingTop: 60, // Increased for status bar
-    paddingBottom: 20,
+    backgroundColor: "#000000",
+    paddingTop: 60,
+    paddingBottom: 10,
     alignItems: "center",
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 35,
     fontWeight: "bold",
     color: "#FFF",
     fontFamily: "Outfit_600SemiBold",
@@ -236,9 +252,26 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     alignItems: "center",
-    marginTop: -40, // Overlap with header
-    marginBottom: 20,
+    marginTop: 30, // Mayor solapamiento con el header
     zIndex: 1,
+  },
+  avatar: {
+    // Estilos específicos para el Avatar
+    borderWidth: 4,
+    borderColor: '#ffffff',
+  },
+  editIconContainer: {
+    backgroundColor: '#00DC5A',
+    borderRadius: 20,
+    padding: 8,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    bottom: 0,
+    right: 0,
+  },
+  editIcon: {
+    color: '#FFFFFF',
+    fontSize: 18,
   },
   uploadingText: {
     marginTop: 12,
@@ -256,6 +289,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingBottom: 30,
+    marginTop: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -273,28 +307,33 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: "#060606",
     textAlign: "center",
-    marginBottom: 20,
+    marginBottom: 24,
     fontFamily: "Outfit_700Bold",
   },
   infoCard: {
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 15,
-    marginBottom: 20,
+    marginBottom: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   infoItem: {
     flexDirection: "row",
     alignItems: "center",
     paddingVertical: 15,
   },
-  infoIcon: {
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0, 220, 90, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 15,
-    width: 24,
   },
   infoLabel: {
     fontSize: 14,
@@ -310,25 +349,32 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: "#F0F0F0",
+    marginLeft: 55,
   },
   optionsCard: {
     backgroundColor: "#FFF",
     borderRadius: 16,
-    marginBottom: 20,
+    marginBottom: 24,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 3,
+    overflow: 'hidden',
   },
   optionItem: {
     flexDirection: "row",
     alignItems: "center",
     padding: 16,
   },
-  optionIcon: {
+  optionIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5', 
+    justifyContent: 'center',
+    alignItems: 'center',
     marginRight: 15,
-    width: 24,
   },
   optionText: {
     flex: 1,
@@ -339,15 +385,20 @@ const styles = StyleSheet.create({
   optionDivider: {
     height: 1,
     backgroundColor: "#F0F0F0",
-    marginLeft: 55,
+    marginLeft: 65,
   },
   logoutButton: {
     backgroundColor: "#E86F51",
-    paddingVertical: 15,
-    borderRadius: 10,
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 10,
+    shadowColor: "#E86F51",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   logoutText: {
     color: "#FFF",
