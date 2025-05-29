@@ -73,7 +73,7 @@ const SIZES = {
  * Componente Avatar reutilizable con soporte para imágenes, iniciales,
  * estados de carga y funcionalidad de edición
  */
-export const Avatar: React.FC<AvatarProps> = ({ imageUrl, name, size = 'medium' }) => {
+const Avatar: React.FC<AvatarProps> = ({ imageUrl, name, size = 'medium' }) => {
   const [imageError, setImageError] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
 
@@ -192,3 +192,6 @@ const styles = StyleSheet.create({
 function useState(arg0: boolean): [any, any] {
   throw new Error('Function not implemented.');
 }
+
+
+export default Avatar;

@@ -175,7 +175,7 @@ class GoogleVisionOCR {
             amount: extractedData.amount,
             merchantName: extractedData.merchantName,
             category: extractedData.category,
-            paymentMethod: extractedData.paymentMethod, // 🆕 NUEVO LOG
+            paymentMethod: extractedData.paymentmethod, // 🆕 NUEVO LOG
             confidence: extractedData.confidence,
             hasDescription: !!extractedData.description,
             hasDate: !!extractedData.date,
@@ -413,7 +413,7 @@ class GoogleVisionOCR {
     console.log('💳 [GoogleVision] Buscando método de pago...');
     const paymentMethod = this.extractPaymentMethodFromText(text);
     if (paymentMethod) {
-      result.paymentMethod = paymentMethod;
+      result.paymentmethod = paymentMethod;
       result.confidence += 15;
       console.log(`✅ [GoogleVision] Método de pago encontrado: ${paymentMethod}`);
     }
