@@ -19,8 +19,9 @@ export interface ProcessedImage {
 
 class ImageUploadService {
   private readonly MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-  // ✅ URL CORREGIDA para usar el nuevo endpoint
+  // ✅ URLs para ambos endpoints
   private readonly UPLOAD_ENDPOINT = `${env.API_URL}/users/profile-picture`;
+  private readonly UPLOAD_BASE64_ENDPOINT = `${env.API_URL}/users/profile-picture-base64`;
 
   /**
    * 🚀 Solicita permisos para acceder a la galería
@@ -146,7 +147,6 @@ class ImageUploadService {
         throw new Error('Token de autenticación no encontrado');
       }
 
-      // ✅ SOLUCIÓN PRINCIPAL: Crear FormData correctamente para React Native
       console.log('⬆️ [ImageUpload] Imagen procesada:', {
         uri: processedImage.uri,
         width: processedImage.width,
@@ -154,76 +154,135 @@ class ImageUploadService {
         size: processedImage.size,
       });
 
-      // ✅ Crear FormData con la estructura correcta para React Native
+      // ✅ NUEVA SOLUCIÓN: Usar un enfoque diferente - base64 o cambiar a multipart manual
+      console.log('🔄 [ImageUpload] Probando con RNFetchBlob approach...');
+      
+      // ✅ Crear FormData usando una aproximación más directa para React Native
       const formData = new FormData();
       
-      // ✅ CRÍTICO: React Native requiere esta estructura específica
-      formData.append('profilePicture', {
+      // ✅ CRÍTICO: Usar la estructura exacta que React Native espera
+      const fileData = {
         uri: processedImage.uri,
-        name: 'profile-picture.jpg',
         type: 'image/jpeg',
-      } as any);
+        name: 'profile-picture.jpg',
+      };
 
-      console.log('⬆️ [ImageUpload] FormData creado exitosamente');
-      console.log('⬆️ [ImageUpload] Token preview:', token.substring(0, 20) + '...');
+      // ✅ Log detallado del objeto que vamos a enviar
+      console.log('📤 [ImageUpload] Datos del archivo a enviar:', fileData);
 
-      // ✅ Usar XMLHttpRequest en lugar de fetch para mejor compatibilidad
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        
-        xhr.open('POST', this.UPLOAD_ENDPOINT);
-        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        xhr.setRequestHeader('Accept', 'application/json');
-        // ✅ IMPORTANTE: NO establecer Content-Type - dejar que XMLHttpRequest lo maneje
-        
-        xhr.onload = () => {
-          console.log('⬆️ [ImageUpload] XMLHttpRequest completed');
-          console.log('⬆️ [ImageUpload] Status:', xhr.status);
-          console.log('⬆️ [ImageUpload] Response:', xhr.responseText);
-          
-          if (xhr.status === 200 || xhr.status === 201) {
-            try {
-              const response = JSON.parse(xhr.responseText);
-              console.log('✅ [ImageUpload] Upload successful:', response);
-              resolve({
-                success: true,
-                profilePictureUrl: response.profilePictureUrl,
-              });
-            } catch (parseError) {
-              console.error('❌ [ImageUpload] Error parsing response:', parseError);
-              reject(new Error(`Error parsing response: ${xhr.responseText}`));
-            }
-          } else {
-            console.error('❌ [ImageUpload] HTTP Error:', xhr.status, xhr.responseText);
-            reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText}`));
-          }
-        };
-        
-        xhr.onerror = () => {
-          console.error('❌ [ImageUpload] Network error');
-          reject(new Error('Network error occurred'));
-        };
-        
-        xhr.onabort = () => {
-          console.error('❌ [ImageUpload] Request aborted');
-          reject(new Error('Request was aborted'));
-        };
-        
-        xhr.ontimeout = () => {
-          console.error('❌ [ImageUpload] Request timeout');
-          reject(new Error('Request timed out'));
-        };
-        
-        // ✅ Configurar timeout
-        xhr.timeout = 30000; // 30 segundos
-        
-        console.log('⬆️ [ImageUpload] Enviando FormData via XMLHttpRequest...');
-        xhr.send(formData);
+      formData.append('profilePicture', fileData as any);
+
+      // ✅ Log del FormData para debugging
+      console.log('📤 [ImageUpload] FormData creado');
+
+      // ✅ CAMBIO CRÍTICO: Usar fetch con configuración específica para React Native
+      const response = await fetch(this.UPLOAD_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': '*/*',
+          // ✅ IMPORTANTE: NO establecer Content-Type - dejar que React Native lo maneje
+        },
+        body: formData,
       });
+
+      console.log('⬆️ [ImageUpload] Response status:', response.status);
+      console.log('⬆️ [ImageUpload] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      const responseText = await response.text();
+      console.log('⬆️ [ImageUpload] Raw response:', responseText);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${responseText}`);
+      }
+
+      let responseData;
+      try {
+        responseData = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ [ImageUpload] Error parsing JSON:', parseError);
+        throw new Error(`Error parsing response: ${responseText}`);
+      }
+
+      console.log('✅ [ImageUpload] Upload successful:', responseData);
+
+      return {
+        success: true,
+        profilePictureUrl: responseData.profilePictureUrl,
+      };
 
     } catch (error) {
       console.error('💥 [ImageUpload] Error subiendo imagen:', error);
       
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Error desconocido',
+      };
+    }
+  }
+
+  /**
+   * 🔄 MÉTODO ALTERNATIVO: Subida usando base64
+   */
+  async uploadProfilePictureBase64(processedImage: ProcessedImage): Promise<ImageUploadResult> {
+    try {
+      console.log('⬆️ [ImageUpload] Iniciando subida con base64...');
+      
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Token de autenticación no encontrado');
+      }
+
+      // ✅ Convertir imagen a base64
+      console.log('🔄 [ImageUpload] Convirtiendo a base64...');
+      const response = await fetch(processedImage.uri);
+      const blob = await response.blob();
+      
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = reader.result as string;
+          // Remover el prefijo data:image/jpeg;base64,
+          const base64Data = result.split(',')[1];
+          resolve(base64Data);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      console.log('✅ [ImageUpload] Base64 creado, length:', base64.length);
+
+      // ✅ Enviar como JSON con base64
+      const jsonResponse = await fetch(this.UPLOAD_BASE64_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          profilePicture: base64,
+          filename: 'profile-picture.jpg',
+          mimetype: 'image/jpeg',
+        }),
+      });
+
+      console.log('⬆️ [ImageUpload] JSON Response status:', jsonResponse.status);
+      const jsonResponseText = await jsonResponse.text();
+      console.log('⬆️ [ImageUpload] JSON Response:', jsonResponseText);
+
+      if (!jsonResponse.ok) {
+        throw new Error(`HTTP ${jsonResponse.status}: ${jsonResponseText}`);
+      }
+
+      const responseData = JSON.parse(jsonResponseText);
+      return {
+        success: true,
+        profilePictureUrl: responseData.profilePictureUrl,
+      };
+
+    } catch (error) {
+      console.error('💥 [ImageUpload] Error en subida base64:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Error desconocido',
@@ -254,8 +313,17 @@ class ImageUploadService {
         size: processedImage.size,
       });
 
-      // 3. Subir imagen
-      return await this.uploadProfilePicture(processedImage);
+      // 3. Intentar subida con FormData primero
+      console.log('🔄 [ImageUpload] Intentando subida con FormData...');
+      let result = await this.uploadProfilePicture(processedImage);
+      
+      // 4. Si FormData falla, intentar con base64
+      if (!result.success && result.error?.includes('Multipart')) {
+        console.log('🔄 [ImageUpload] FormData falló, intentando con base64...');
+        result = await this.uploadProfilePictureBase64(processedImage);
+      }
+
+      return result;
     } catch (error) {
       console.error('💥 [ImageUpload] Error en flujo completo:', error);
       
