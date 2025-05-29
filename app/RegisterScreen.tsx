@@ -1,4 +1,4 @@
-// RegisterScreen.tsx - Actualizado con verificación de email
+// app/RegisterScreen.tsx - Mejorado con Zod y mejor diseño
 import React, { useState } from "react";
 import {
   View,
@@ -12,75 +12,211 @@ import {
   Keyboard,
   ScrollView,
   ActivityIndicator,
+  Dimensions,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+
 import { RootStackParamList } from "./interfaces/navigation";
 import { emailVerificationService } from "./services/emailVerificationService";
 import { useToast } from "./providers/ToastProvider";
+import { useRegisterForm } from "@/hooks/useRegisterForm";
+import { PhoneInput } from "@/components/ui/PhoneInput";
 import QuipukLogo from "@/assets/images/Logo.svg";
+import { defaultCountry, getCountryByCode } from "./contants/countries";
+
+const { width, height } = Dimensions.get('window');
 
 type RegisterScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "RegisterScreen"
 >;
 
+// Componente para mostrar requisitos de contraseña
+interface PasswordRequirementProps {
+  met: boolean;
+  text: string;
+}
+
+const PasswordRequirement: React.FC<PasswordRequirementProps> = ({ met, text }) => (
+  <View style={styles.requirementItem}>
+    <Ionicons
+      name={met ? "checkmark-circle" : "ellipse-outline"}
+      size={16}
+      color={met ? "#00c450" : "#BDC3C7"}
+    />
+    <Text style={[styles.requirementText, met && styles.requirementTextMet]}>
+      {text}
+    </Text>
+  </View>
+);
+
+// Componente para mostrar progreso del formulario
+interface FormProgressProps {
+  formData: any;
+  errors: any;
+}
+
+const FormProgressIndicator: React.FC<FormProgressProps> = ({ formData, errors }) => {
+  const fields = ['fullName', 'email', 'countryCode', 'phoneNumber', 'username', 'password', 'confirmPassword'];
+  const completedFields = fields.filter(field => {
+    if (field === 'acceptedTerms') return formData[field];
+    if (field === 'countryCode') return formData[field] && formData[field].length > 0;
+    return formData[field]?.length > 0 && !errors[field];
+  });
+  
+  const progress = (completedFields.length / fields.length) * 100;
+  const isComplete = completedFields.length === fields.length && formData.acceptedTerms;
+
+  return (
+    <View style={styles.progressContainer}>
+      <View style={styles.progressHeader}>
+        <Text style={styles.progressText}>
+          Progreso del formulario ({completedFields.length}/{fields.length})
+        </Text>
+        <Text style={[styles.progressPercentage, isComplete && styles.progressComplete]}>
+          {Math.round(progress)}%
+        </Text>
+      </View>
+      <View style={styles.progressBarContainer}>
+        <View 
+          style={[
+            styles.progressBar, 
+            { width: `${progress}%` },
+            isComplete && styles.progressBarComplete
+          ]} 
+        />
+      </View>
+    </View>
+  );
+};
+
+// Componente de Input reutilizable
+interface CustomInputProps {
+  placeholder: string;
+  value: string;
+  onChangeText: (text: string) => void;
+  onBlur?: () => void;
+  error?: string;
+  keyboardType?: 'default' | 'email-address' | 'phone-pad';
+  secureTextEntry?: boolean;
+  autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  iconName?: keyof typeof Ionicons.glyphMap;
+  editable?: boolean;
+  maxLength?: number;
+}
+
+const CustomInput: React.FC<CustomInputProps> = ({
+  placeholder,
+  value,
+  onChangeText,
+  onBlur,
+  error,
+  keyboardType = 'default',
+  secureTextEntry = false,
+  autoCapitalize = 'sentences',
+  iconName,
+  editable = true,
+  maxLength
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <View style={styles.inputContainer}>
+      <Text style={styles.inputLabel}>{placeholder}</Text>
+      <View style={[
+        styles.inputWrapper,
+        isFocused && styles.inputWrapperFocused,
+        error && styles.inputWrapperError,
+        !editable && styles.inputWrapperDisabled
+      ]}>
+        {iconName && (
+          <Ionicons 
+            name={iconName} 
+            size={20} 
+            color={error ? "#E74C3C" : isFocused ? "#00c450" : "#999"} 
+            style={styles.inputIcon}
+          />
+        )}
+        <TextInput
+          style={[styles.input, iconName && styles.inputWithIcon]}
+          placeholder={placeholder}
+          placeholderTextColor="#999"
+          value={value}
+          onChangeText={onChangeText}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => {
+            setIsFocused(false);
+            onBlur?.();
+          }}
+          keyboardType={keyboardType}
+          secureTextEntry={secureTextEntry}
+          autoCapitalize={autoCapitalize}
+          editable={editable}
+          maxLength={maxLength}
+        />
+      </View>
+      {error && (
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={16} color="#E74C3C" />
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
+    </View>
+  );
+};
+
 export default function RegisterScreen() {
   const navigation = useNavigation<RegisterScreenNavigationProp>();
   const { showToast } = useToast();
-
-  // Estados para cada input
-  const [fullName, setFullName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState("");
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const {
+    formData,
+    errors,
+    isValid,
+    updateField,
+    validateField,
+    validateForm,
+    resetForm
+  } = useRegisterForm();
 
   const handleRegister = async () => {
-    if (!fullName || !email || !phoneNumber || !username || !password) {
-      showToast("error", "Error", "Todos los campos son obligatorios.");
-      return;
-    }
-    
-    if (!acceptedTerms) {
-      showToast("error", "Error", "Debes aceptar los Términos y Condiciones.");
-      return;
-    }
-
-    // Validación básica de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      showToast("error", "Error", "Por favor ingresa un email válido.");
-      return;
-    }
-
-    // Validación de contraseña
-    if (password.length < 6) {
-      showToast("error", "Error", "La contraseña debe tener al menos 6 caracteres.");
+    // Validar formulario completo
+    if (!validateForm()) {
+      showToast("error", "Formulario incompleto", "Por favor corrige los errores antes de continuar.");
       return;
     }
 
     setLoading(true);
 
     try {
-      console.log('📝 Registrando usuario con datos:', { fullName, email, username, phoneNumber });
+      console.log('📝 Registrando usuario con datos:', {
+        fullName: formData.fullName,
+        email: formData.email,
+        username: formData.username,
+        phoneNumber: formData.phoneNumber
+      });
 
       const result = await emailVerificationService.registerWithEmailVerification({
-        fullName,
-        email,
-        phoneNumber,
-        username,
-        password,
+        fullName: formData.fullName,
+        email: formData.email,
+        phoneNumber: `${getCountryByCode(formData.countryCode)?.dialCode || '+51'}${formData.phoneNumber}`,
+        username: formData.username,
+        password: formData.password,
       });
 
       if (result.success) {
         showToast("success", "¡Registro exitoso!", result.message);
+        resetForm();
         
         // Navegar a la pantalla de verificación
         navigation.navigate("EmailVerificationScreen", {
-          email: email,
+          email: formData.email,
           userId: result.userId,
           fromRegistration: true,
         });
@@ -95,124 +231,382 @@ export default function RegisterScreen() {
     }
   };
 
+  
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView contentContainerStyle={styles.inner} keyboardShouldPersistTaps="handled">
-          {/* Logo + Header */}
-          <View style={styles.logoContainer}>
+        <ScrollView 
+          contentContainerStyle={styles.scrollContainer} 
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header con gradiente */}
+          <LinearGradient
+            colors={['#000000', '#1a1a1a']}
+            style={styles.header}
+          >
             <TouchableOpacity
               onPress={() => navigation.goBack()}
               style={styles.backButton}
+              disabled={loading}
             >
-              <Text style={styles.backText}>{"←"}</Text>
+              <Ionicons name="arrow-back" size={24} color="#FFF" />
             </TouchableOpacity>
-            <QuipukLogo width={140} height={60} style={styles.logo} />
-            <Text style={styles.headerText}>
-              <Text style={styles.headerHighlight}>Crear</Text> una cuenta
-            </Text>
-          </View>
+            
+            <View style={styles.logoContainer}>
+              <QuipukLogo width={120} height={50} />
+            </View>
+            
+            <View style={styles.headerTextContainer}>
+              <Text style={styles.headerTitle}>
+                <Text style={styles.headerHighlight}>Crear</Text> cuenta
+              </Text>
+              <Text style={styles.headerSubtitle}>
+                Únete a la comunidad financiera
+              </Text>
+            </View>
+          </LinearGradient>
 
           {/* Formulario */}
           <View style={styles.formContainer}>
-            <TextInput
-              style={styles.input}
-              placeholder="Nombres y Apellidos"
-              placeholderTextColor="#888"
-              value={fullName}
-              onChangeText={setFullName}
-              editable={!loading}
+            {/* Indicador de progreso del formulario */}
+            <FormProgressIndicator 
+              formData={formData}
+              errors={errors}
             />
-            
-            <TextInput
-              style={styles.input}
+
+            <CustomInput
+              placeholder="Nombres y Apellidos"
+              value={formData.fullName}
+              onChangeText={(text) => {
+                // Solo permitir letras, espacios y acentos
+                const cleanText = text.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑ\s]/g, '');
+                updateField('fullName', cleanText);
+                // Validar en tiempo real después de 10 caracteres
+                if (cleanText.length >= 10) {
+                  setTimeout(() => validateField('fullName'), 300);
+                }
+              }}
+              onBlur={() => validateField('fullName')}
+              error={errors.fullName}
+              iconName="person-outline"
+              autoCapitalize="words"
+              editable={!loading}
+              maxLength={50}
+            />
+
+            <CustomInput
               placeholder="Correo electrónico"
-              placeholderTextColor="#888"
+              value={formData.email}
+              onChangeText={(text) => {
+                const cleanText = text.toLowerCase().trim();
+                updateField('email', cleanText);
+                // Validar en tiempo real después de que tenga formato de email básico
+                if (cleanText.includes('@') && cleanText.includes('.')) {
+                  setTimeout(() => validateField('email'), 500);
+                }
+              }}
+              onBlur={() => validateField('email')}
+              error={errors.email}
               keyboardType="email-address"
               autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
+              iconName="mail-outline"
               editable={!loading}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Número de celular"
-              placeholderTextColor="#888"
-              keyboardType="phone-pad"
-              value={phoneNumber}
-              onChangeText={setPhoneNumber}
-              editable={!loading}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Usuario"
-              placeholderTextColor="#888"
-              autoCapitalize="none"
-              value={username}
-              onChangeText={setUsername}
-              editable={!loading}
-            />
-            
-            <TextInput
-              style={styles.input}
-              placeholder="Contraseña"
-              placeholderTextColor="#888"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
+              maxLength={100}
             />
 
-            {/* Checkbox Términos y Condiciones */}
+            {/* Phone Input con Country Picker */}
+            <PhoneInput
+              label="Número de celular"
+              placeholder="Número de teléfono"
+              value={formData.phoneNumber}
+              onChangeText={(text) => {
+                updateField('phoneNumber', text);
+                // Validar en tiempo real después de 7 dígitos
+                if (text.replace(/[^0-9]/g, '').length >= 7) {
+                  setTimeout(() => validateField('phoneNumber'), 300);
+                }
+              }}
+              onBlur={() => validateField('phoneNumber')}
+              error={errors.phoneNumber}
+              selectedCountry={getCountryByCode(formData.countryCode) || defaultCountry}
+              onCountryChange={(country) => updateField('countryCode', country.code)}
+              editable={!loading}
+              maxLength={15}
+            />
+
+            <CustomInput
+              placeholder="Nombre de usuario"
+              value={formData.username}
+              onChangeText={(text) => {
+                // Solo permitir letras, números y guión bajo, debe comenzar con letra
+                let cleanText = text.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                // Asegurar que comience con letra
+                if (cleanText.length > 0 && /^\d/.test(cleanText)) {
+                  cleanText = cleanText.substring(1);
+                }
+                updateField('username', cleanText);
+                // Validar en tiempo real después de 6 caracteres
+                if (cleanText.length >= 6) {
+                  setTimeout(() => validateField('username'), 300);
+                }
+              }}
+              onBlur={() => validateField('username')}
+              error={errors.username}
+              autoCapitalize="none"
+              iconName="at-outline"
+              editable={!loading}
+              maxLength={20}
+            />
+
+            {/* Password con toggle y validación visual */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Contraseña</Text>
+              <View style={[
+                styles.inputWrapper,
+                errors.password && styles.inputWrapperError,
+                loading && styles.inputWrapperDisabled
+              ]}>
+                <Ionicons 
+                  name="lock-closed-outline" 
+                  size={20} 
+                  color={errors.password ? "#E74C3C" : "#999"} 
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, styles.inputWithIcon, styles.inputWithToggle]}
+                  placeholder="Contraseña"
+                  placeholderTextColor="#999"
+                  value={formData.password}
+                  onChangeText={(text) => {
+                    updateField('password', text);
+                    // Validar en tiempo real después de 1 carácter
+                    if (text.length > 0) {
+                      setTimeout(() => validateField('password'), 300);
+                    }
+                  }}
+                  onBlur={() => validateField('password')}
+                  secureTextEntry={!showPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                  maxLength={100}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#999"
+                  />
+                </TouchableOpacity>
+              </View>
+              
+              {/* Indicadores de requisitos de contraseña */}
+              {formData.password.length > 0 && (
+                <View style={styles.passwordRequirements}>
+                  <PasswordRequirement
+                    met={formData.password.length >= 8}
+                    text="Mínimo 8 caracteres"
+                  />
+                  <PasswordRequirement
+                    met={/[a-z]/.test(formData.password)}
+                    text="Una letra minúscula"
+                  />
+                  <PasswordRequirement
+                    met={/[A-Z]/.test(formData.password)}
+                    text="Una letra mayúscula"
+                  />
+                  <PasswordRequirement
+                    met={/\d/.test(formData.password)}
+                    text="Un número"
+                  />
+                </View>
+              )}
+              
+              {errors.password && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={16} color="#E74C3C" />
+                  <Text style={styles.errorText}>{errors.password}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Confirm Password con toggle y comparación visual */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Confirmar contraseña</Text>
+              <View style={[
+                styles.inputWrapper,
+                errors.confirmPassword && styles.inputWrapperError,
+                loading && styles.inputWrapperDisabled,
+                // Mostrar verde si las contraseñas coinciden
+                formData.confirmPassword.length > 0 && 
+                formData.password === formData.confirmPassword && 
+                styles.inputWrapperSuccess
+              ]}>
+                <Ionicons 
+                  name="lock-closed-outline" 
+                  size={20} 
+                  color={
+                    errors.confirmPassword 
+                      ? "#E74C3C" 
+                      : (formData.confirmPassword.length > 0 && formData.password === formData.confirmPassword)
+                        ? "#00c450"
+                        : "#999"
+                  } 
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, styles.inputWithIcon, styles.inputWithToggle]}
+                  placeholder="Confirmar contraseña"
+                  placeholderTextColor="#999"
+                  value={formData.confirmPassword}
+                  onChangeText={(text) => {
+                    updateField('confirmPassword', text);
+                    // Validar en tiempo real después de 1 carácter
+                    if (text.length > 0) {
+                      setTimeout(() => validateField('confirmPassword'), 300);
+                    }
+                  }}
+                  onBlur={() => validateField('confirmPassword')}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  editable={!loading}
+                  maxLength={100}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons
+                    name={showConfirmPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#999"
+                  />
+                </TouchableOpacity>
+                
+                {/* Icono de estado de coincidencia */}
+                {formData.confirmPassword.length > 0 && (
+                  <View style={styles.matchIndicator}>
+                    <Ionicons
+                      name={formData.password === formData.confirmPassword ? "checkmark-circle" : "close-circle"}
+                      size={20}
+                      color={formData.password === formData.confirmPassword ? "#00c450" : "#E74C3C"}
+                    />
+                  </View>
+                )}
+              </View>
+              
+              {/* Mensaje de estado de coincidencia */}
+              {formData.confirmPassword.length > 0 && (
+                <View style={[
+                  styles.matchStatus,
+                  formData.password === formData.confirmPassword ? styles.matchSuccess : styles.matchError
+                ]}>
+                  <Ionicons
+                    name={formData.password === formData.confirmPassword ? "checkmark-circle" : "close-circle"}
+                    size={14}
+                    color={formData.password === formData.confirmPassword ? "#00c450" : "#E74C3C"}
+                  />
+                  <Text style={[
+                    styles.matchText,
+                    formData.password === formData.confirmPassword ? styles.matchTextSuccess : styles.matchTextError
+                  ]}>
+                    {formData.password === formData.confirmPassword 
+                      ? "Las contraseñas coinciden" 
+                      : "Las contraseñas no coinciden"}
+                  </Text>
+                </View>
+              )}
+              
+              {errors.confirmPassword && (
+                <View style={styles.errorContainer}>
+                  <Ionicons name="alert-circle" size={16} color="#E74C3C" />
+                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Checkbox mejorado */}
             <TouchableOpacity
               style={styles.checkboxContainer}
-              onPress={() => !loading && setAcceptedTerms(!acceptedTerms)}
+              onPress={() => !loading && updateField('acceptedTerms', !formData.acceptedTerms)}
               disabled={loading}
             >
-              <View style={styles.checkbox}>
-                {acceptedTerms && <View style={styles.checked} />}
+              <View style={[
+                styles.checkbox,
+                formData.acceptedTerms && styles.checkboxChecked,
+                errors.acceptedTerms && styles.checkboxError
+              ]}>
+                {formData.acceptedTerms && (
+                  <Ionicons name="checkmark" size={16} color="#FFF" />
+                )}
               </View>
-              <Text style={styles.checkboxText}>
+              <Text style={[
+                styles.checkboxText,
+                loading && styles.disabledText
+              ]}>
                 Acepto los{" "}
-                <Text style={styles.termsText}>Términos y Condiciones</Text>
+                <Text style={styles.termsLink}>Términos y Condiciones</Text>
               </Text>
             </TouchableOpacity>
+            
+            {errors.acceptedTerms && (
+              <View style={[styles.errorContainer, { marginTop: -15, marginBottom: 15 }]}>
+                <Ionicons name="alert-circle" size={16} color="#E74C3C" />
+                <Text style={styles.errorText}>{errors.acceptedTerms}</Text>
+              </View>
+            )}
 
-            {/* Información adicional sobre verificación */}
+            {/* Información adicional */}
             <View style={styles.infoContainer}>
+              <Ionicons name="mail-outline" size={20} color="#00c450" />
               <Text style={styles.infoText}>
-                📧  Después del registro, enviaremos un código de verificación a tu email para confirmar tu cuenta.
+                Después del registro, enviaremos un código de verificación a tu email para confirmar tu cuenta.
               </Text>
             </View>
 
-            {/* Botón Registrarse */}
+            {/* Botón de registro mejorado */}
             <TouchableOpacity
               style={[
                 styles.registerButton,
-                loading && styles.registerButtonDisabled
+                (!isValid || loading) && styles.registerButtonDisabled
               ]}
               onPress={handleRegister}
-              disabled={loading}
+              disabled={!isValid || loading}
             >
-              {loading ? (
-                <ActivityIndicator color="#FFF" />
-              ) : (
-                <Text style={styles.registerButtonText}>Registrarme</Text>
-              )}
+              <LinearGradient
+                colors={(!isValid || loading) ? ['#CCC', '#AAA'] : ['#00c450', '#00a040']}
+                style={styles.registerButtonGradient}
+              >
+                {loading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator color="#FFF" size="small" />
+                    <Text style={styles.registerButtonText}>Registrando...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.registerButtonText}>Crear Cuenta</Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
-            {/* Link para volver al login */}
+            {/* Link para login */}
             <TouchableOpacity
               onPress={() => navigation.navigate("LoginScreen")}
               disabled={loading}
               style={styles.loginLinkContainer}
             >
-              <Text style={styles.loginLinkText}>
+              <Text style={[
+                styles.loginLinkText,
+                loading && styles.disabledText
+              ]}>
                 ¿Ya tienes cuenta?{" "}
                 <Text style={styles.loginLink}>Inicia sesión</Text>
               </Text>
@@ -227,137 +621,331 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#F8F9FA",
   },
-  inner: {
+  scrollContainer: {
     flexGrow: 1,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingBottom: 20,
   },
-  logoContainer: {
-    alignSelf: "stretch",
-    height: 180,
-    backgroundColor: "#000",
-    justifyContent: "center",
+  header: {
+    paddingTop: Platform.OS === 'ios' ? 50 : 40,
+    paddingBottom: 30,
     paddingHorizontal: 20,
-    paddingTop: 40,
-    borderBottomLeftRadius: 50,
-    overflow: "hidden",
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
   },
   backButton: {
-    position: "absolute",
-    left: 20,
-    top: 40,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    padding: 8,
-    borderRadius: 15,
+    alignSelf: 'flex-start',
+    backgroundColor: "rgba(255,255,255,0.15)",
+    padding: 10,
+    borderRadius: 20,
+    marginBottom: 20,
   },
-  backText: {
-    fontSize: 18,
-    color: "#FFF",
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
   },
-  logo: {
-    width: 120,
-    height: 50,
-    resizeMode: "contain",
-    alignSelf: "center",
+  headerTextContainer: {
+    alignItems: 'center',
   },
-  headerText: {
-    fontSize: 24,
-    fontWeight: "400",
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: "600",
     color: "#FFF",
     textAlign: "center",
-    marginTop: 5,
+    fontFamily: "Outfit_600SemiBold",
   },
   headerHighlight: {
     color: "#00c450",
     fontWeight: "bold",
   },
+  headerSubtitle: {
+    fontSize: 16,
+    color: "rgba(255,255,255,0.8)",
+    textAlign: "center",
+    marginTop: 5,
+    fontFamily: "Outfit_400Regular",
+  },
   formContainer: {
-    width: "90%",
-    marginTop: 20,
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 30,
+    paddingBottom: 30,
+  },
+  // Estilos para indicador de progreso
+  progressContainer: {
+    marginBottom: 25,
+    padding: 15,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#E5E8EB",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressText: {
+    fontSize: 14,
+    color: "#2C3E50",
+    fontFamily: "Outfit_500Medium",
+  },
+  progressPercentage: {
+    fontSize: 14,
+    color: "#7F8C8D",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  progressComplete: {
+    color: "#00c450",
+  },
+  progressBarContainer: {
+    height: 6,
+    backgroundColor: "#E5E8EB",
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  progressBar: {
+    height: '100%',
+    backgroundColor: "#00c450",
+    borderRadius: 3,
+    minWidth: 2,
+  },
+  progressBarComplete: {
+    backgroundColor: "#00c450",
+  },
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2C3E50",
+    marginBottom: 8,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E5E8EB",
+    paddingHorizontal: 15,
+    minHeight: 50,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  inputWrapperFocused: {
+    borderColor: "#00c450",
+    shadowColor: "#00c450",
+    shadowOpacity: 0.1,
+  },
+  inputWrapperError: {
+    borderColor: "#E74C3C",
+    backgroundColor: "#FEF5F5",
+  },
+  inputWrapperDisabled: {
+    backgroundColor: "#F8F9FA",
+    borderColor: "#E5E8EB",
+  },
+  inputWrapperSuccess: {
+    borderColor: "#00c450",
+    backgroundColor: "#F0FFF4",
+  },
+  inputIcon: {
+    marginRight: 12,
   },
   input: {
-    height: 45,
-    borderBottomWidth: 1,
-    borderBottomColor: "#AAA",
+    flex: 1,
     fontSize: 16,
-    marginBottom: 15,
-    paddingHorizontal: 10,
-    color: "#333",
+    color: "#2C3E50",
+    paddingVertical: 12,
+    fontFamily: "Outfit_400Regular",
+  },
+  inputWithIcon: {
+    paddingLeft: 0,
+  },
+  inputWithToggle: {
+    paddingRight: 0,
+  },
+  passwordToggle: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  matchIndicator: {
+    marginLeft: 8,
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+  },
+  errorText: {
+    fontSize: 12,
+    color: "#E74C3C",
+    marginLeft: 5,
+    fontFamily: "Outfit_400Regular",
+  },
+  // Estilos para requisitos de contraseña
+  passwordRequirements: {
+    marginTop: 8,
+    padding: 12,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: "#E5E8EB",
+  },
+  requirementItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  requirementText: {
+    fontSize: 12,
+    color: "#7F8C8D",
+    marginLeft: 8,
+    fontFamily: "Outfit_400Regular",
+  },
+  requirementTextMet: {
+    color: "#00c450",
+    fontFamily: "Outfit_500Medium",
+  },
+  // Estilos para estado de coincidencia de contraseñas
+  matchStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 5,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+  },
+  matchSuccess: {
+    backgroundColor: "#E8F5E8",
+  },
+  matchError: {
+    backgroundColor: "#FEF5F5",
+  },
+  matchText: {
+    fontSize: 12,
+    marginLeft: 6,
+    fontFamily: "Outfit_400Regular",
+  },
+  matchTextSuccess: {
+    color: "#00c450",
+  },
+  matchTextError: {
+    color: "#E74C3C",
   },
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
-    marginBottom: 15,
+    marginBottom: 20,
+    paddingHorizontal: 5,
   },
   checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#AAA",
+    borderColor: "#BDC3C7",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 12,
+    backgroundColor: "#FFF",
   },
-  checked: {
-    width: 12,
-    height: 12,
+  checkboxChecked: {
     backgroundColor: "#00c450",
-    borderRadius: 3,
+    borderColor: "#00c450",
+  },
+  checkboxError: {
+    borderColor: "#E74C3C",
   },
   checkboxText: {
-    fontSize: 14,
-    color: "#000",
     flex: 1,
+    fontSize: 14,
+    color: "#2C3E50",
+    lineHeight: 20,
+    fontFamily: "Outfit_400Regular",
   },
-  termsText: {
-    fontWeight: "bold",
+  termsLink: {
+    color: "#00c450",
+    fontWeight: "600",
     textDecorationLine: "underline",
   },
   infoContainer: {
+    flexDirection: 'row',
     backgroundColor: "#E8F5E8",
     padding: 15,
-    borderRadius: 10,
-    marginBottom: 20,
+    borderRadius: 12,
+    marginBottom: 25,
     borderLeftWidth: 4,
     borderLeftColor: "#00c450",
   },
   infoText: {
+    flex: 1,
     fontSize: 14,
     color: "#2D5016",
     lineHeight: 20,
+    marginLeft: 10,
     fontFamily: "Outfit_400Regular",
   },
   registerButton: {
-    backgroundColor: "#00c450",
-    height: 50,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
     marginBottom: 20,
+    borderRadius: 25,
+    overflow: 'hidden',
+    shadowColor: "#00c450",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   registerButtonDisabled: {
-    backgroundColor: "#CCC",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  registerButtonGradient: {
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 50,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
   registerButtonText: {
     fontSize: 18,
     color: "#FFF",
     fontWeight: "bold",
+    marginLeft: 8,
+    fontFamily: "Outfit_700Bold",
   },
   loginLinkContainer: {
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 15,
   },
   loginLinkText: {
     fontSize: 14,
-    color: "#666",
+    color: "#7F8C8D",
+    fontFamily: "Outfit_400Regular",
   },
   loginLink: {
     color: "#00c450",
-    fontWeight: "bold",
+    fontWeight: "600",
+    fontFamily: "Outfit_600SemiBold",
+  },
+  disabledText: {
+    opacity: 0.6,
   },
 });
+

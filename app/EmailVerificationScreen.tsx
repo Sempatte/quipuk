@@ -1,4 +1,4 @@
-// app/EmailVerificationScreen.tsx
+// app/EmailVerificationScreen.tsx - Corregido
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
@@ -52,8 +52,8 @@ export default function EmailVerificationScreen() {
   const [countdown, setCountdown] = useState(0);
   const [attemptsRemaining, setAttemptsRemaining] = useState(5);
 
-  // Referencias para los inputs
-  const inputRefs = useRef<TextInput[]>([]);
+  // ✅ CORRECCIÓN: Referencias para los inputs usando el tipo correcto
+  const inputRefs = useRef<(TextInput | null)[]>([]);
 
   // Efecto para el countdown del reenvío
   useEffect(() => {
@@ -233,7 +233,10 @@ export default function EmailVerificationScreen() {
               {code.map((digit, index) => (
                 <TextInput
                   key={index}
-                  ref={(ref) => (inputRefs.current[index] = ref!)}
+                  ref={(ref) => {
+                    // ✅ CORRECCIÓN: Asignar correctamente la referencia
+                    inputRefs.current[index] = ref;
+                  }}
                   style={[
                     styles.codeInput,
                     digit ? styles.codeInputFilled : styles.codeInputEmpty
