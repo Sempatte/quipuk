@@ -88,15 +88,17 @@ class ImageUploadService {
 
       let processedImage = imageInfo;
 
-      // Redimensionar si es muy grande (máximo 1024x1024)
-      if (imageInfo.width > 1024 || imageInfo.height > 1024) {
+      // ✅ MEJORA: Redimensionar más agresivamente para reducir tamaño
+      const MAX_SIZE = 800; // Reducido de 1024 a 800 para imágenes más pequeñas
+      
+      if (imageInfo.width > MAX_SIZE || imageInfo.height > MAX_SIZE) {
         console.log('📐 [ImageUpload] Redimensionando imagen...');
         
         processedImage = await ImageManipulator.manipulateAsync(
           imageUri,
-          [{ resize: { width: 1024, height: 1024 } }],
+          [{ resize: { width: MAX_SIZE, height: MAX_SIZE } }],
           { 
-            compress: 0.8, 
+            compress: 0.7, // Reducido de 0.8 a 0.7 para mayor compresión
             format: ImageManipulator.SaveFormat.JPEG 
           }
         );
@@ -106,27 +108,49 @@ class ImageUploadService {
       const response = await fetch(processedImage.uri);
       const blob = await response.blob();
       
-      if (blob.size > this.MAX_IMAGE_SIZE) {
-        console.log('🗜️ [ImageUpload] Comprimiendo imagen...');
+      // ✅ MEJORA: Límite más estricto para evitar problemas
+      const MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB en lugar de 5MB
+      
+      if (blob.size > MAX_FILE_SIZE) {
+        console.log('🗜️ [ImageUpload] Comprimiendo imagen más agresivamente...');
         
         // Comprimir más agresivamente
         processedImage = await ImageManipulator.manipulateAsync(
           processedImage.uri,
-          [],
+          [{ resize: { width: 600, height: 600 } }], // Redimensionar más pequeño
           { 
-            compress: 0.5, 
+            compress: 0.5, // Compresión más agresiva
             format: ImageManipulator.SaveFormat.JPEG 
           }
         );
+        
+        // Verificar nuevamente el tamaño
+        const newResponse = await fetch(processedImage.uri);
+        const newBlob = await newResponse.blob();
+        
+        console.log('🗜️ [ImageUpload] Tamaño después de compresión agresiva:', {
+          originalSize: blob.size,
+          newSize: newBlob.size,
+          reduction: Math.round(((blob.size - newBlob.size) / blob.size) * 100) + '%'
+        });
       }
 
-      console.log('✅ [ImageUpload] Imagen procesada exitosamente');
+      // Verificación final del tamaño
+      const finalResponse = await fetch(processedImage.uri);
+      const finalBlob = await finalResponse.blob();
+      
+      console.log('✅ [ImageUpload] Imagen procesada exitosamente:', {
+        width: processedImage.width,
+        height: processedImage.height,
+        fileSizeKB: Math.round(finalBlob.size / 1024),
+        fileSizeMB: Math.round(finalBlob.size / (1024 * 1024) * 100) / 100,
+      });
       
       return {
         uri: processedImage.uri,
         width: processedImage.width,
         height: processedImage.height,
-        size: blob.size,
+        size: finalBlob.size,
       };
     } catch (error) {
       console.error('💥 [ImageUpload] Error procesando imagen:', error);
