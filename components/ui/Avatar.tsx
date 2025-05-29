@@ -1,5 +1,5 @@
 // components/ui/Avatar.tsx
-import React, { memo } from 'react';
+import React, { memo, useEffect } from 'react';
 import {
   View,
   Image,
@@ -73,208 +73,122 @@ const SIZES = {
  * Componente Avatar reutilizable con soporte para imágenes, iniciales,
  * estados de carga y funcionalidad de edición
  */
-export const Avatar: React.FC<AvatarProps> = memo(({
-  imageUrl,
-  name = '',
-  size = 'medium',
-  editable = false,
-  onPress,
-  onEdit,
-  loading = false,
-  progress = 0,
-  style,
-  showOnlineStatus = false,
-  isOnline = false,
-}) => {
-  const dimensions = SIZES[size];
-  
-  // Extraer iniciales del nombre
-  const getInitials = (fullName: string): string => {
-    if (!fullName?.trim()) return 'U';
-    
-    const names = fullName.trim().split(' ');
-    if (names.length === 1) {
-      return names[0].charAt(0).toUpperCase();
-    }
-    
-    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
-  };
+export const Avatar: React.FC<AvatarProps> = ({ imageUrl, name, size = 'medium' }) => {
+  const [imageError, setImageError] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
 
-  const initials = getInitials(name);
-
-  // Estilos dinámicos
-  const containerStyle: ViewStyle = {
-    width: dimensions.container,
-    height: dimensions.container,
-    borderRadius: dimensions.container / 2,
-  };
-
-  const textStyle: TextStyle = {
-    fontSize: dimensions.text,
-  };
-
-  // Renderizar contenido del avatar
-  const renderAvatarContent = () => {
-    if (loading) {
-      return (
-        <View style={[styles.container, containerStyle, styles.loadingContainer]}>
-          <ActivityIndicator size="small" color="#00DC5A" />
-          {progress > 0 && (
-            <Text style={[styles.progressText, { fontSize: dimensions.text / 3 }]}>
-              {Math.round(progress)}%
-            </Text>
-          )}
-        </View>
-      );
-    }
-
+  // Reset error state when imageUrl changes
+  useEffect(() => {
     if (imageUrl) {
-      return (
-        <View style={[styles.container, containerStyle]}>
-          <Image 
-            source={{ uri: imageUrl }}
-            style={[styles.image, containerStyle] as ImageStyle}
-            onError={(error) => {
-              console.warn('Error loading avatar image:', error.nativeEvent.error);
-            }}
-          />
-        </View>
-      );
+      setImageError(false);
+      setImageLoading(true);
     }
+  }, [imageUrl]);
 
-    // Mostrar iniciales si no hay imagen
+  const handleImageError = (error: any) => {
+    console.log('🖼️ [Avatar] Image load error:', {
+      url: imageUrl,
+      error: error.nativeEvent?.error || error,
+    });
+    setImageError(true);
+    setImageLoading(false);
+  };
+
+  const handleImageLoad = () => {
+    console.log('✅ [Avatar] Image loaded successfully:', imageUrl);
+    setImageLoading(false);
+    setImageError(false);
+  };
+
+  // Si hay error o no hay URL, mostrar placeholder
+  if (!imageUrl || imageError) {
     return (
-      <View style={[styles.container, styles.initialsContainer, containerStyle]}>
-        <Text style={[styles.initialsText, textStyle]}>
-          {initials}
+      <View style={[styles.placeholder, styles[size]]}>
+        <Text style={[styles.placeholderText, styles[`${size}Text`]]}>
+          {name ? name.charAt(0).toUpperCase() : '?'}
         </Text>
       </View>
     );
-  };
-
-  // Renderizar badge de estado online
-  const renderOnlineBadge = () => {
-    if (!showOnlineStatus) return null;
-
-    return (
-      <View 
-        style={[
-          styles.onlineBadge, 
-          {
-            width: dimensions.badge,
-            height: dimensions.badge,
-            borderRadius: dimensions.badge / 2,
-            backgroundColor: isOnline ? '#4CAF50' : '#9E9E9E',
-          }
-        ]} 
-      />
-    );
-  };
-
-  // Renderizar botón de edición
-  const renderEditButton = () => {
-    if (!editable || loading) return null;
-
-    return (
-      <TouchableOpacity
-        style={[
-          styles.editButton,
-          {
-            width: dimensions.editButton,
-            height: dimensions.editButton,
-            borderRadius: dimensions.editButton / 2,
-          }
-        ]}
-        onPress={onEdit}
-        activeOpacity={0.8}
-      >
-        <Ionicons 
-          name="camera" 
-          size={dimensions.editIcon} 
-          color="#FFF" 
-        />
-      </TouchableOpacity>
-    );
-  };
-
-  const AvatarComponent = (
-    <View style={[styles.avatarWrapper, style]}>
-      {renderAvatarContent()}
-      {renderOnlineBadge()}
-      {renderEditButton()}
-    </View>
-  );
-
-  // Si es presionable, envolver en TouchableOpacity
-  if (onPress && !loading) {
-    return (
-      <TouchableOpacity 
-        onPress={onPress} 
-        activeOpacity={0.8}
-        disabled={loading}
-      >
-        {AvatarComponent}
-      </TouchableOpacity>
-    );
   }
 
-  return AvatarComponent;
-});
-
-Avatar.displayName = 'Avatar';
+  return (
+    <View style={[styles.container, styles[size]]}>
+      <Image
+        source={{ uri: imageUrl }}
+        style={[styles.image, styles[size]]}
+        onError={handleImageError}
+        onLoad={handleImageLoad}
+        onLoadStart={() => setImageLoading(true)}
+      />
+      {imageLoading && (
+        <View style={[styles.loadingOverlay, styles[size]]}>
+          <Text style={styles.loadingText}>...</Text>
+        </View>
+      )}
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-  avatarWrapper: {
+  container: {
     position: 'relative',
   },
-  container: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F0F0F0',
-    overflow: 'hidden',
-  },
-  loadingContainer: {
-    backgroundColor: 'rgba(0, 220, 90, 0.1)',
-  },
   image: {
-    width: '100%',
-    height: '100%',
+    borderRadius: 999,
   },
-  initialsContainer: {
+  placeholder: {
     backgroundColor: '#00DC5A',
-  },
-  initialsText: {
-    color: '#FFF',
-    fontFamily: 'Outfit_600SemiBold',
-    textAlign: 'center',
-  },
-  progressText: {
-    color: '#00DC5A',
-    fontFamily: 'Outfit_500Medium',
-    marginTop: 2,
-  },
-  editButton: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    backgroundColor: '#00DC5A',
+    borderRadius: 999,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    elevation: 4,
   },
-  onlineBadge: {
+  placeholderText: {
+    color: '#FFF',
+    fontWeight: 'bold',
+    fontFamily: 'Outfit_600SemiBold',
+  },
+  loadingOverlay: {
     position: 'absolute',
-    top: 0,
-    right: 0,
-    borderWidth: 2,
-    borderColor: '#FFF',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 999,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFF',
+    fontSize: 12,
+  },
+  // Sizes
+  small: {
+    width: 32,
+    height: 32,
+  },
+  medium: {
+    width: 48,
+    height: 48,
+  },
+  large: {
+    width: 64,
+    height: 64,
+  },
+  xlarge: {
+    width: 96,
+    height: 96,
+  },
+  smallText: {
+    fontSize: 14,
+  },
+  mediumText: {
+    fontSize: 18,
+  },
+  largeText: {
+    fontSize: 24,
+  },
+  xlargeText: {
+    fontSize: 36,
   },
 });
 
-export default Avatar;
+function useState(arg0: boolean): [any, any] {
+  throw new Error('Function not implemented.');
+}
