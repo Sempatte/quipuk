@@ -1,3 +1,4 @@
+// app/(tabs)/profile.tsx
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
@@ -7,6 +8,7 @@ import {
   StyleSheet,
   Alert,
   Dimensions,
+  ScrollView,
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -15,6 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { RootStackNavigationProp } from "../interfaces/navigation";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
+import { useProfilePicture } from "@/hooks/useProfilePicture";
+import Avatar from "@/components/ui/Avatar";
 
 const { width } = Dimensions.get('window');
 
@@ -24,20 +28,27 @@ interface UserProfile {
   phone: string;
   email: string;
   phoneNumber: string;
+  profilePictureUrl?: string | null;
 }
 
 export default function Profile() {
   const navigation = useNavigation<RootStackNavigationProp<"(tabs)">>();
 
-  // 📌 Consulta GraphQL solo si userId está disponible
+  // 📌 Consulta GraphQL del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
     GET_USER_PROFILE
   );
 
+  // 📌 Hook personalizado para manejar foto de perfil
+  const { 
+    state: profilePictureState, 
+    selectAndUploadImage, 
+    deleteProfilePicture 
+  } = useProfilePicture();
+
   // 📌 Función de logout con `useCallback` para evitar recreaciones innecesarias
   const handleLogout = useCallback(async () => {
     try {
-      // Mostrar confirmación antes de cerrar sesión
       Alert.alert(
         "Cerrar Sesión",
         "¿Estás seguro que deseas cerrar sesión?",
@@ -59,7 +70,33 @@ export default function Profile() {
     }
   }, [navigation]);
 
-  if (error)
+  // 📌 Manejar acciones del avatar
+  const handleAvatarPress = useCallback(() => {
+    if (profilePictureState.profilePictureUrl) {
+      // Si hay imagen, mostrar opciones
+      Alert.alert(
+        'Foto de perfil',
+        'Selecciona una acción',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { 
+            text: 'Cambiar foto', 
+            onPress: selectAndUploadImage 
+          },
+          { 
+            text: 'Eliminar foto', 
+            onPress: deleteProfilePicture,
+            style: 'destructive' 
+          },
+        ]
+      );
+    } else {
+      // Si no hay imagen, directamente seleccionar
+      selectAndUploadImage();
+    }
+  }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
+
+  if (error) {
     return (
       <View style={styles.container}>
         <View style={styles.errorContainer}>
@@ -72,6 +109,7 @@ export default function Profile() {
         </View>
       </View>
     );
+  }
 
   return (
     <View style={styles.mainContainer}>
@@ -79,79 +117,95 @@ export default function Profile() {
         <Text style={styles.headerTitle}>Mi Perfil</Text>
       </View>
 
-      <View style={styles.avatarContainer}>
-        <View style={styles.avatar}>
-          <Text style={styles.avatarText}>
-            {data?.getUserProfile?.fullName?.charAt(0) || "S"}
-          </Text>
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        {/* Avatar Section */}
+        <View style={styles.avatarContainer}>
+          <Avatar
+            imageUrl={profilePictureState.profilePictureUrl}
+            name={data?.getUserProfile?.fullName}
+            size="xlarge"
+            editable={true}
+            onPress={handleAvatarPress}
+            onEdit={selectAndUploadImage}
+            loading={profilePictureState.isUploading || profilePictureState.isDeleting}
+            progress={profilePictureState.uploadProgress}
+          />
+          
+          {profilePictureState.isUploading && (
+            <Text style={styles.uploadingText}>Subiendo imagen...</Text>
+          )}
+          
+          {profilePictureState.isDeleting && (
+            <Text style={styles.deletingText}>Eliminando imagen...</Text>
+          )}
         </View>
-      </View>
 
-      <View style={styles.contentContainer}>
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#00DC5A" />
-            <Text style={styles.loadingText}>Cargando perfil...</Text>
-          </View>
-        ) : (
-          data?.getUserProfile && (
-            <>
-              <Text style={styles.userName}>{data.getUserProfile.fullName}</Text>
-              
-              {/* Tarjeta de información de contacto */}
-              <View style={styles.infoCard}>
-                <View style={styles.infoItem}>
-                  <Ionicons name="call-outline" size={24} color="#00DC5A" style={styles.infoIcon} />
-                  <View>
-                    <Text style={styles.infoLabel}>Teléfono</Text>
-                    <Text style={styles.infoValue}>{data.getUserProfile.phoneNumber}</Text>
+        <View style={styles.contentContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#00DC5A" />
+              <Text style={styles.loadingText}>Cargando perfil...</Text>
+            </View>
+          ) : (
+            data?.getUserProfile && (
+              <>
+                <Text style={styles.userName}>{data.getUserProfile.fullName}</Text>
+                
+                {/* Tarjeta de información de contacto */}
+                <View style={styles.infoCard}>
+                  <View style={styles.infoItem}>
+                    <Ionicons name="call-outline" size={24} color="#00DC5A" style={styles.infoIcon} />
+                    <View>
+                      <Text style={styles.infoLabel}>Teléfono</Text>
+                      <Text style={styles.infoValue}>{data.getUserProfile.phoneNumber || 'No especificado'}</Text>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.divider} />
+                  
+                  <View style={styles.infoItem}>
+                    <Ionicons name="mail-outline" size={24} color="#00DC5A" style={styles.infoIcon} />
+                    <View>
+                      <Text style={styles.infoLabel}>Correo</Text>
+                      <Text style={styles.infoValue}>{data.getUserProfile.email}</Text>
+                    </View>
                   </View>
                 </View>
                 
-                <View style={styles.divider} />
-                
-                <View style={styles.infoItem}>
-                  <Ionicons name="mail-outline" size={24} color="#00DC5A" style={styles.infoIcon} />
-                  <View>
-                    <Text style={styles.infoLabel}>Correo</Text>
-                    <Text style={styles.infoValue}>{data.getUserProfile.email}</Text>
-                  </View>
+                {/* Tarjeta de opciones */}
+                <View style={styles.optionsCard}>
+                  <TouchableOpacity style={styles.optionItem}>
+                    <Ionicons name="settings-outline" size={24} color="#000" style={styles.optionIcon} />
+                    <Text style={styles.optionText}>Configuraciones</Text>
+                    <Ionicons name="chevron-forward" size={24} color="#000" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.optionDivider} />
+                  
+                  <TouchableOpacity style={styles.optionItem}>
+                    <Ionicons name="shield-outline" size={24} color="#000" style={styles.optionIcon} />
+                    <Text style={styles.optionText}>Privacidad y Seguridad</Text>
+                    <Ionicons name="chevron-forward" size={24} color="#000" />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.optionDivider} />
+                  
+                  <TouchableOpacity style={styles.optionItem}>
+                    <Ionicons name="help-circle-outline" size={24} color="#000" style={styles.optionIcon} />
+                    <Text style={styles.optionText}>Ayuda y Soporte</Text>
+                    <Ionicons name="chevron-forward" size={24} color="#000" />
+                  </TouchableOpacity>
                 </View>
-              </View>
-              
-              {/* Tarjeta de opciones */}
-              <View style={styles.optionsCard}>
-                <TouchableOpacity style={styles.optionItem}>
-                  <Ionicons name="settings-outline" size={24} color="#000" style={styles.optionIcon} />
-                  <Text style={styles.optionText}>Configuraciones</Text>
-                  <Ionicons name="chevron-forward" size={24} color="#000" />
+                
+                {/* Botón de cierre de sesión */}
+                <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                  <Text style={styles.logoutText}>Cerrar Sesión</Text>
                 </TouchableOpacity>
-                
-                <View style={styles.optionDivider} />
-                
-                <TouchableOpacity style={styles.optionItem}>
-                  <Ionicons name="shield-outline" size={24} color="#000" style={styles.optionIcon} />
-                  <Text style={styles.optionText}>Privacidad y Seguridad</Text>
-                  <Ionicons name="chevron-forward" size={24} color="#000" />
-                </TouchableOpacity>
-                
-                <View style={styles.optionDivider} />
-                
-                <TouchableOpacity style={styles.optionItem}>
-                  <Ionicons name="help-circle-outline" size={24} color="#000" style={styles.optionIcon} />
-                  <Text style={styles.optionText}>Ayuda y Soporte</Text>
-                  <Ionicons name="chevron-forward" size={24} color="#000" />
-                </TouchableOpacity>
-              </View>
-              
-              {/* Botón de cierre de sesión */}
-              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-                <Text style={styles.logoutText}>Cerrar Sesión</Text>
-              </TouchableOpacity>
-            </>
-          )
-        )}
-      </View>
+              </>
+            )
+          )}
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -159,55 +213,49 @@ export default function Profile() {
 const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
-    width: width,
     backgroundColor: "#F8F8F8",
   },
   container: {
     flex: 1,
-    width: width,
     backgroundColor: "#F8F8F8",
   },
   header: {
-    width: width,
     backgroundColor: "#060606",
-    paddingTop: 20,
-    paddingBottom: 60,
+    paddingTop: 60, // Increased for status bar
+    paddingBottom: 20,
     alignItems: "center",
   },
   headerTitle: {
     fontSize: 26,
     fontWeight: "bold",
     color: "#FFF",
-    marginTop: 20,
     fontFamily: "Outfit_600SemiBold",
+  },
+  scrollContainer: {
+    flex: 1,
   },
   avatarContainer: {
-    width: width,
     alignItems: "center",
-    marginTop: -40,
+    marginTop: -40, // Overlap with header
+    marginBottom: 20,
     zIndex: 1,
   },
-  avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#00DC5A",
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
-    borderColor: "#FFF",
+  uploadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#00DC5A",
+    fontFamily: "Outfit_500Medium",
   },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#FFF",
-    fontFamily: "Outfit_600SemiBold",
+  deletingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: "#E86F51",
+    fontFamily: "Outfit_500Medium",
   },
   contentContainer: {
-    width: width,
     flex: 1,
-    padding: 20,
-    paddingTop: 10,
+    paddingHorizontal: 20,
+    paddingBottom: 30,
   },
   loadingContainer: {
     flex: 1,
@@ -225,12 +273,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     color: "#060606",
     textAlign: "center",
-    marginTop: 10,
     marginBottom: 20,
     fontFamily: "Outfit_700Bold",
   },
   infoCard: {
-    width: '100%',
     backgroundColor: "#FFF",
     borderRadius: 16,
     padding: 15,
@@ -266,7 +312,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F0F0F0",
   },
   optionsCard: {
-    width: '100%',
     backgroundColor: "#FFF",
     borderRadius: 16,
     marginBottom: 20,
@@ -297,7 +342,6 @@ const styles = StyleSheet.create({
     marginLeft: 55,
   },
   logoutButton: {
-    width: '100%',
     backgroundColor: "#E86F51",
     paddingVertical: 15,
     borderRadius: 10,

@@ -1,136 +1,149 @@
 // hooks/useProfilePicture.ts
 import { useState, useCallback } from 'react';
-import { useMutation } from '@apollo/client';
+import { useMutation, useQuery } from '@apollo/client';
 import { Alert } from 'react-native';
-import { imageUploadService, ImageUploadResult } from '@/app/services/imageUploadService';
-import { DELETE_PROFILE_PICTURE, GET_USER_PROFILE } from '@/app/graphql/users.graphql';
+import { imageUploadService } from '@/app/services/imageUploadService';
+import { GET_USER_PROFILE, DELETE_PROFILE_PICTURE } from '@/app/graphql/users.graphql';
 import { useToast } from '@/app/providers/ToastProvider';
 
-export interface UseProfilePictureReturn {
+export interface ProfilePictureState {
+  profilePictureUrl: string | null;
   isUploading: boolean;
   isDeleting: boolean;
-  uploadProfilePicture: () => Promise<ImageUploadResult>;
+  uploadProgress: number;
+}
+
+export interface UseProfilePictureReturn {
+  state: ProfilePictureState;
+  selectAndUploadImage: () => Promise<void>;
   deleteProfilePicture: () => Promise<void>;
-  showImageOptions: () => void;
+  refetchProfile: () => Promise<void>;
 }
 
 export const useProfilePicture = (): UseProfilePictureReturn => {
+  const { showToast } = useToast();
+  
+  // Estados locales
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { showToast } = useToast();
+  const [uploadProgress, setUploadProgress] = useState(0);
 
-  // Mutación para eliminar foto de perfil
-  const [deleteProfilePictureMutation] = useMutation(DELETE_PROFILE_PICTURE, {
-    refetchQueries: [{ query: GET_USER_PROFILE }],
+  // Query para obtener perfil del usuario
+  const { data, refetch } = useQuery(GET_USER_PROFILE, {
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all'
   });
 
-  /**
-   * 📸 Subir nueva foto de perfil
-   */
-  const uploadProfilePicture = useCallback(async (): Promise<ImageUploadResult> => {
-    if (isUploading) {
-      console.log('⚠️ [useProfilePicture] Ya se está subiendo una imagen');
-      return { success: false, error: 'Ya se está procesando una imagen' };
+  // Mutation para eliminar foto de perfil
+  const [deleteProfilePictureMutation] = useMutation(DELETE_PROFILE_PICTURE, {
+    refetchQueries: [{ query: GET_USER_PROFILE }],
+    onCompleted: () => {
+      showToast('success', 'Éxito', 'Foto de perfil eliminada correctamente');
+    },
+    onError: (error) => {
+      console.error('Error deleting profile picture:', error);
+      showToast('error', 'Error', 'No se pudo eliminar la foto de perfil');
     }
+  });
 
+  // Estado combinado
+  const state: ProfilePictureState = {
+    profilePictureUrl: data?.getUserProfile?.profilePictureUrl || null,
+    isUploading,
+    isDeleting,
+    uploadProgress,
+  };
+
+  /**
+   * 📸 Seleccionar y subir imagen
+   */
+  const selectAndUploadImage = useCallback(async (): Promise<void> => {
     try {
       setIsUploading(true);
-      console.log('🚀 [useProfilePicture] Iniciando subida de foto de perfil...');
+      setUploadProgress(0);
 
+      // Simular progreso durante la selección
+      setUploadProgress(20);
+
+      console.log('🚀 [useProfilePicture] Iniciando selección y subida de imagen...');
+      
       const result = await imageUploadService.selectAndUploadProfilePicture();
 
-      if (result.success) {
-        showToast('success', '¡Foto actualizada!', 'Tu foto de perfil se ha actualizado correctamente.');
-        console.log('✅ [useProfilePicture] Foto subida exitosamente');
-      } else {
-        showToast('error', 'Error', result.error || 'No se pudo actualizar la foto de perfil.');
-        console.error('❌ [useProfilePicture] Error subiendo foto:', result.error);
-      }
+      setUploadProgress(80);
 
-      return result;
+      if (result.success && result.profilePictureUrl) {
+        console.log('✅ [useProfilePicture] Imagen subida exitosamente:', result.profilePictureUrl);
+        
+        setUploadProgress(100);
+        
+        // Refrescar los datos del perfil para obtener la nueva URL
+        await refetch();
+        
+        showToast('success', 'Éxito', 'Foto de perfil actualizada correctamente');
+      } else {
+        console.error('❌ [useProfilePicture] Error en la subida:', result.error);
+        showToast('error', 'Error', result.error || 'No se pudo subir la imagen');
+      }
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Error desconocido';
-      console.error('💥 [useProfilePicture] Error en uploadProfilePicture:', error);
-      
-      showToast('error', 'Error', errorMessage);
-      
-      return {
-        success: false,
-        error: errorMessage,
-      };
+      console.error('💥 [useProfilePicture] Error crítico:', error);
+      showToast('error', 'Error', 'Ocurrió un error inesperado');
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
-  }, [isUploading, showToast]);
+  }, [refetch, showToast]);
 
   /**
    * 🗑️ Eliminar foto de perfil
    */
   const deleteProfilePicture = useCallback(async (): Promise<void> => {
-    if (isDeleting) {
-      console.log('⚠️ [useProfilePicture] Ya se está eliminando la foto');
+    if (!state.profilePictureUrl) {
+      showToast('info', 'Información', 'No hay foto de perfil para eliminar');
       return;
     }
 
-    try {
-      setIsDeleting(true);
-      console.log('🗑️ [useProfilePicture] Eliminando foto de perfil...');
-
-      await deleteProfilePictureMutation();
-      
-      showToast('success', 'Foto eliminada', 'Tu foto de perfil se ha eliminado correctamente.');
-      console.log('✅ [useProfilePicture] Foto eliminada exitosamente');
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Error eliminando foto';
-      console.error('💥 [useProfilePicture] Error eliminando foto:', error);
-      
-      showToast('error', 'Error', errorMessage);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [isDeleting, deleteProfilePictureMutation, showToast]);
+    Alert.alert(
+      'Eliminar foto de perfil',
+      '¿Estás seguro de que deseas eliminar tu foto de perfil?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              console.log('🗑️ [useProfilePicture] Eliminando foto de perfil...');
+              
+              await deleteProfilePictureMutation();
+              
+              console.log('✅ [useProfilePicture] Foto eliminada exitosamente');
+            } catch (error) {
+              console.error('💥 [useProfilePicture] Error eliminando foto:', error);
+            } finally {
+              setIsDeleting(false);
+            }
+          }
+        }
+      ]
+    );
+  }, [state.profilePictureUrl, deleteProfilePictureMutation, showToast]);
 
   /**
-   * 📋 Mostrar opciones de imagen (subir/eliminar)
+   * 🔄 Refrescar perfil
    */
-  const showImageOptions = useCallback(() => {
-    const options = [
-      {
-        text: 'Subir nueva foto',
-        onPress: uploadProfilePicture,
-      },
-      {
-        text: 'Eliminar foto actual',
-        onPress: () => {
-          Alert.alert(
-            'Confirmar eliminación',
-            '¿Estás seguro de que quieres eliminar tu foto de perfil?',
-            [
-              { text: 'Cancelar', style: 'cancel' },
-              { 
-                text: 'Eliminar', 
-                style: 'destructive',
-                onPress: deleteProfilePicture 
-              },
-            ]
-          );
-        },
-        style: 'destructive' as const,
-      },
-      {
-        text: 'Cancelar',
-        style: 'cancel' as const,
-      },
-    ];
-
-    Alert.alert('Foto de perfil', 'Selecciona una opción:', options);
-  }, [uploadProfilePicture, deleteProfilePicture]);
+  const refetchProfile = useCallback(async (): Promise<void> => {
+    try {
+      await refetch();
+    } catch (error) {
+      console.error('Error refetching profile:', error);
+    }
+  }, [refetch]);
 
   return {
-    isUploading,
-    isDeleting,
-    uploadProfilePicture,
+    state,
+    selectAndUploadImage,
     deleteProfilePicture,
-    showImageOptions,
+    refetchProfile,
   };
 };

@@ -1,231 +1,279 @@
 // components/ui/Avatar.tsx
-import React, { useState } from 'react';
+import React, { memo } from 'react';
 import {
   View,
-  Text,
+  Image,
   TouchableOpacity,
+  Text,
   StyleSheet,
   ActivityIndicator,
-  Image,
   ViewStyle,
+  TextStyle,
+  ImageStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-interface AvatarProps {
-  // Datos del usuario
-  fullName?: string;
-  profilePictureUrl?: string | null;
-  
-  // Configuración visual
+export interface AvatarProps {
+  /** URL de la imagen del avatar */
+  imageUrl?: string | null;
+  /** Nombre para mostrar iniciales si no hay imagen */
+  name?: string;
+  /** Tamaño del avatar */
   size?: 'small' | 'medium' | 'large' | 'xlarge';
-  showEditButton?: boolean;
+  /** Si el avatar es editable (muestra botón de cámara) */
+  editable?: boolean;
+  /** Callback cuando se presiona el avatar */
   onPress?: () => void;
-  
-  // Estados
-  isLoading?: boolean;
-  
-  // Estilos personalizados
-  containerStyle?: ViewStyle;
-  
-  // Accesibilidad
-  accessibilityLabel?: string;
+  /** Callback para el botón de editar */
+  onEdit?: () => void;
+  /** Si está cargando */
+  loading?: boolean;
+  /** Progreso de carga (0-100) */
+  progress?: number;
+  /** Estilo personalizado del contenedor */
+  style?: ViewStyle;
+  /** Si debe mostrar un badge online */
+  showOnlineStatus?: boolean;
+  /** Estado online */
+  isOnline?: boolean;
 }
 
 const SIZES = {
-  small: 40,
-  medium: 60,
-  large: 80,
-  xlarge: 120,
-} as const;
-
-const FONT_SIZES = {
-  small: 16,
-  medium: 24,
-  large: 32,
-  xlarge: 48,
-} as const;
-
-export const Avatar: React.FC<AvatarProps> = ({
-  fullName = '',
-  profilePictureUrl,
-  size = 'medium',
-  showEditButton = false,
-  onPress,
-  isLoading = false,
-  containerStyle,
-  accessibilityLabel,
-}) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(false);
-
-  // Calcular las iniciales del nombre
-  const getInitials = (name: string): string => {
-    if (!name || name.trim().length === 0) return 'U';
-    
-    const words = name.trim().split(' ');
-    if (words.length === 1) {
-      return words[0].charAt(0).toUpperCase();
-    }
-    
-    return (words[0].charAt(0) + words[words.length - 1].charAt(0)).toUpperCase();
-  };
-
-  const initials = getInitials(fullName);
-  const avatarSize = SIZES[size];
-  const fontSize = FONT_SIZES[size];
-  const editButtonSize = Math.max(avatarSize * 0.3, 24);
-
-  // Determinar si mostrar imagen o iniciales
-  const shouldShowImage = profilePictureUrl && !imageError;
-  const showActivityIndicator = isLoading || imageLoading;
-
-  // Estilos dinámicos
-  const containerStyles = [
-    styles.container,
-    {
-      width: avatarSize,
-      height: avatarSize,
-      borderRadius: avatarSize / 2,
-    },
-    containerStyle,
-  ];
-
-  const textStyles = [
-    styles.initialsText,
-    { fontSize },
-  ];
-
-  const imageStyles = [
-    styles.image,
-    {
-      width: avatarSize,
-      height: avatarSize,
-      borderRadius: avatarSize / 2,
-    },
-  ];
-
-  const handleImageLoad = () => {
-    setImageLoading(false);
-    setImageError(false);
-  };
-
-  const handleImageError = () => {
-    console.warn('⚠️ [Avatar] Error cargando imagen de perfil');
-    setImageLoading(false);
-    setImageError(true);
-  };
-
-  const handleImageLoadStart = () => {
-    setImageLoading(true);
-  };
-
-  return (
-    <View style={styles.wrapper}>
-      <TouchableOpacity
-        style={containerStyles}
-        onPress={onPress}
-        disabled={!onPress || isLoading}
-        activeOpacity={onPress ? 0.8 : 1}
-        accessibilityRole={onPress ? "button" : "image"}
-        accessibilityLabel={
-          accessibilityLabel || 
-          (onPress ? `Cambiar foto de perfil de ${fullName}` : `Foto de perfil de ${fullName}`)
-        }
-      >
-        {/* Mostrar imagen si está disponible */}
-        {shouldShowImage && (
-          <Image
-            source={{ uri: profilePictureUrl }}
-            style={imageStyles}
-            onLoad={handleImageLoad}
-            onError={handleImageError}
-            onLoadStart={handleImageLoadStart}
-            resizeMode="cover"
-          />
-        )}
-
-        {/* Mostrar iniciales si no hay imagen */}
-        {!shouldShowImage && !showActivityIndicator && (
-          <Text style={textStyles}>{initials}</Text>
-        )}
-
-        {/* Indicador de carga */}
-        {showActivityIndicator && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator 
-              size={size === 'small' ? 'small' : 'large'} 
-              color="#FFF" 
-            />
-          </View>
-        )}
-
-        {/* Botón de edición */}
-        {showEditButton && !isLoading && (
-          <View
-            style={[
-              styles.editButton,
-              {
-                width: editButtonSize,
-                height: editButtonSize,
-                borderRadius: editButtonSize / 2,
-                bottom: -2,
-                right: -2,
-              },
-            ]}
-          >
-            <Ionicons
-              name="camera"
-              size={editButtonSize * 0.5}
-              color="#FFF"
-            />
-          </View>
-        )}
-      </TouchableOpacity>
-    </View>
-  );
+  small: { 
+    container: 40, 
+    text: 16, 
+    editButton: 16,
+    editIcon: 12,
+    badge: 12,
+  },
+  medium: { 
+    container: 60, 
+    text: 24, 
+    editButton: 24,
+    editIcon: 16,
+    badge: 16,
+  },
+  large: { 
+    container: 80, 
+    text: 32, 
+    editButton: 32,
+    editIcon: 20,
+    badge: 20,
+  },
+  xlarge: { 
+    container: 120, 
+    text: 48, 
+    editButton: 40,
+    editIcon: 24,
+    badge: 24,
+  },
 };
 
+/**
+ * Componente Avatar reutilizable con soporte para imágenes, iniciales,
+ * estados de carga y funcionalidad de edición
+ */
+export const Avatar: React.FC<AvatarProps> = memo(({
+  imageUrl,
+  name = '',
+  size = 'medium',
+  editable = false,
+  onPress,
+  onEdit,
+  loading = false,
+  progress = 0,
+  style,
+  showOnlineStatus = false,
+  isOnline = false,
+}) => {
+  const dimensions = SIZES[size];
+  
+  // Extraer iniciales del nombre
+  const getInitials = (fullName: string): string => {
+    if (!fullName?.trim()) return 'U';
+    
+    const names = fullName.trim().split(' ');
+    if (names.length === 1) {
+      return names[0].charAt(0).toUpperCase();
+    }
+    
+    return (names[0].charAt(0) + names[names.length - 1].charAt(0)).toUpperCase();
+  };
+
+  const initials = getInitials(name);
+
+  // Estilos dinámicos
+  const containerStyle: ViewStyle = {
+    width: dimensions.container,
+    height: dimensions.container,
+    borderRadius: dimensions.container / 2,
+  };
+
+  const textStyle: TextStyle = {
+    fontSize: dimensions.text,
+  };
+
+  // Renderizar contenido del avatar
+  const renderAvatarContent = () => {
+    if (loading) {
+      return (
+        <View style={[styles.container, containerStyle, styles.loadingContainer]}>
+          <ActivityIndicator size="small" color="#00DC5A" />
+          {progress > 0 && (
+            <Text style={[styles.progressText, { fontSize: dimensions.text / 3 }]}>
+              {Math.round(progress)}%
+            </Text>
+          )}
+        </View>
+      );
+    }
+
+    if (imageUrl) {
+      return (
+        <View style={[styles.container, containerStyle]}>
+          <Image 
+            source={{ uri: imageUrl }}
+            style={[styles.image, containerStyle] as ImageStyle}
+            onError={(error) => {
+              console.warn('Error loading avatar image:', error.nativeEvent.error);
+            }}
+          />
+        </View>
+      );
+    }
+
+    // Mostrar iniciales si no hay imagen
+    return (
+      <View style={[styles.container, styles.initialsContainer, containerStyle]}>
+        <Text style={[styles.initialsText, textStyle]}>
+          {initials}
+        </Text>
+      </View>
+    );
+  };
+
+  // Renderizar badge de estado online
+  const renderOnlineBadge = () => {
+    if (!showOnlineStatus) return null;
+
+    return (
+      <View 
+        style={[
+          styles.onlineBadge, 
+          {
+            width: dimensions.badge,
+            height: dimensions.badge,
+            borderRadius: dimensions.badge / 2,
+            backgroundColor: isOnline ? '#4CAF50' : '#9E9E9E',
+          }
+        ]} 
+      />
+    );
+  };
+
+  // Renderizar botón de edición
+  const renderEditButton = () => {
+    if (!editable || loading) return null;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.editButton,
+          {
+            width: dimensions.editButton,
+            height: dimensions.editButton,
+            borderRadius: dimensions.editButton / 2,
+          }
+        ]}
+        onPress={onEdit}
+        activeOpacity={0.8}
+      >
+        <Ionicons 
+          name="camera" 
+          size={dimensions.editIcon} 
+          color="#FFF" 
+        />
+      </TouchableOpacity>
+    );
+  };
+
+  const AvatarComponent = (
+    <View style={[styles.avatarWrapper, style]}>
+      {renderAvatarContent()}
+      {renderOnlineBadge()}
+      {renderEditButton()}
+    </View>
+  );
+
+  // Si es presionable, envolver en TouchableOpacity
+  if (onPress && !loading) {
+    return (
+      <TouchableOpacity 
+        onPress={onPress} 
+        activeOpacity={0.8}
+        disabled={loading}
+      >
+        {AvatarComponent}
+      </TouchableOpacity>
+    );
+  }
+
+  return AvatarComponent;
+});
+
+Avatar.displayName = 'Avatar';
+
 const styles = StyleSheet.create({
-  wrapper: {
+  avatarWrapper: {
     position: 'relative',
   },
   container: {
-    backgroundColor: '#00DC5A',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#F0F0F0',
     overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+  },
+  loadingContainer: {
+    backgroundColor: 'rgba(0, 220, 90, 0.1)',
   },
   image: {
-    position: 'absolute',
+    width: '100%',
+    height: '100%',
+  },
+  initialsContainer: {
+    backgroundColor: '#00DC5A',
   },
   initialsText: {
     color: '#FFF',
     fontFamily: 'Outfit_600SemiBold',
     textAlign: 'center',
   },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  progressText: {
+    color: '#00DC5A',
+    fontFamily: 'Outfit_500Medium',
+    marginTop: 2,
   },
   editButton: {
     position: 'absolute',
+    bottom: -2,
+    right: -2,
     backgroundColor: '#00DC5A',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#FFF',
-    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.3,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 4,
+  },
+  onlineBadge: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    borderWidth: 2,
+    borderColor: '#FFF',
   },
 });
 
