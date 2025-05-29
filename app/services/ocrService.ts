@@ -8,7 +8,7 @@ export interface ExtractedReceiptData {
   category?: string;
   description?: string;
   confidence: number; // Nivel de confianza en la extracción (0-100)
-  paymentMethod?: string; // Método de pago (opcional)
+  paymentmethod?: string; // Método de pago (opcional)
 }
 
 // Interfaz para el resultado del procesamiento

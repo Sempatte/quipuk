@@ -95,7 +95,7 @@ export default function AddTransaction() {
     amount: "",
     description: "",
     category: "",
-    paymentMethod: "Efectivo", // Valor por defecto
+    paymentmethod: "Efectivo", // Valor por defecto
     date: new Date().toISOString(),
     dueDate: new Date().toISOString(),
     frequent: false,
@@ -200,7 +200,7 @@ export default function AddTransaction() {
           amount: "",
           description: "",
           category: "",
-          paymentMethod: "Efectivo",
+          paymentmethod: "Efectivo",
           date: new Date().toISOString(),
           dueDate: new Date().toISOString(),
           frequent: false,
@@ -217,7 +217,7 @@ export default function AddTransaction() {
 
   // Validación de formulario
   const isFormValid = useMemo(
-    () => formState.amount && formState.category && formState.paymentMethod,
+    () => formState.amount && formState.category && formState.paymentmethod,
     [formState]
   );
 
@@ -264,7 +264,7 @@ export default function AddTransaction() {
         amount: parseFloat(formState.amount),
         type: TRANSACTION_MAPPING[formState.selectedOption],
         frequent: formState.frequent,
-        paymentMethod: formState.paymentMethod,
+        paymentmethod: formState.paymentmethod,
         category: formState.category,
         status: formState.isPaid ? "completed" : "pending",
         // Ajuste para manejar correctamente la zona horaria
@@ -374,12 +374,12 @@ export default function AddTransaction() {
       }
 
       // 🆕 APLICAR MÉTODO DE PAGO SI ESTÁ DISPONIBLE
-      if (data.paymentMethod && data.paymentMethod.trim().length > 0) {
-        updates.paymentMethod = data.paymentMethod.trim();
+      if (data.paymentmethod && data.paymentmethod.trim().length > 0) {
+        updates.paymentmethod = data.paymentmethod.trim();
         fieldsUpdated++;
         console.log(
           "💳 [AddTransaction] Método de pago aplicado:",
-          data.paymentMethod
+          data.paymentmethod
         );
       }
 
@@ -532,9 +532,9 @@ export default function AddTransaction() {
           <View style={styles.paymentContainer}>
             <PaymentMethodSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
-              onSelect={(paymentMethod) => updateFormState({ paymentMethod })}
+              onSelect={(paymentmethod) => updateFormState({ paymentmethod })}
               isPending={!formState.isPaid}
-              initialPaymentMethod={undefined} // Se maneja vía onSelect
+              selectedPaymentMethod={formState.paymentmethod}
             />
           </View>
 

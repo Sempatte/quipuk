@@ -29,6 +29,7 @@ export const CREATE_TRANSACTION = gql`
       frequent
       category
       userId
+      paymentmethod
       dueDate
     }
   }

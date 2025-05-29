@@ -8,6 +8,7 @@ interface PaymentMethodSelectorProps {
   onSelect: (method: string) => void;
   isPending?: boolean; // Agregado para distinguir entre gastos pagados y pendientes
   initialPaymentMethod?: string; // 🆕 Nueva prop para método inicial del OCR
+  selectedPaymentMethod?: string; // 🆕 Nuevo: método seleccionado controlado
 }
 
 // 🆕 MÉTODOS DE PAGO ACTUALIZADOS CON TARJETAS
@@ -44,25 +45,30 @@ const getTitleForType = (type: TransactionType, isPending: boolean): string => {
  * @param onSelect - Función para manejar la selección del método
  * @param isPending - Indica si el gasto está pendiente
  * @param initialPaymentMethod - Método de pago inicial del OCR
+ * @param selectedPaymentMethod - Método de pago seleccionado controlado
  */
 const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({ 
   type, 
   onSelect, 
   isPending = false,
-  initialPaymentMethod
+  initialPaymentMethod,
+  selectedPaymentMethod
 }) => {
-  // 🔧 CORRECCIÓN: Usar método inicial si está disponible, sino usar "Efectivo"
-  const [selectedMethod, setSelectedMethod] = useState(initialPaymentMethod || "Efectivo");
+  // Si se pasa selectedPaymentMethod, el componente es controlado
+  const isControlled = selectedPaymentMethod !== undefined;
+  const [internalSelectedMethod, setInternalSelectedMethod] = useState(initialPaymentMethod || "Efectivo");
+
+  // El método seleccionado es el controlado o el interno
+  const selectedMethod = isControlled ? selectedPaymentMethod : internalSelectedMethod;
   const [showMoreOptions, setShowMoreOptions] = useState(false);
 
-  // 🔧 CORRECCIÓN: Aplicar método inicial del OCR cuando esté disponible
+  // Si cambia initialPaymentMethod y no es controlado, actualizar el interno
   React.useEffect(() => {
-    if (initialPaymentMethod && initialPaymentMethod !== selectedMethod) {
-      console.log('💳 [PaymentMethodSelector] Aplicando método inicial del OCR:', initialPaymentMethod);
-      setSelectedMethod(initialPaymentMethod);
+    if (!isControlled && initialPaymentMethod && initialPaymentMethod !== internalSelectedMethod) {
+      setInternalSelectedMethod(initialPaymentMethod);
       onSelect(initialPaymentMethod);
     }
-  }, [initialPaymentMethod, selectedMethod, onSelect]);
+  }, [initialPaymentMethod, internalSelectedMethod, onSelect, isControlled]);
 
   // Obtener el título según el tipo de transacción y estado pendiente
   const selectorTitle = getTitleForType(type, isPending);
@@ -85,8 +91,7 @@ const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
   }), [themeColor]);
 
   const handleSelect = (method: string) => {
-    console.log('💳 [PaymentMethodSelector] Método seleccionado:', method);
-    setSelectedMethod(method);
+    if (!isControlled) setInternalSelectedMethod(method);
     onSelect(method);
     if (showMoreOptions) {
       setShowMoreOptions(false);
@@ -163,21 +168,20 @@ const styles = StyleSheet.create({
   },
   methodContainer: { 
     flexDirection: "row", 
-    justifyContent: "flex-start", 
+    flexWrap: "wrap",
+    justifyContent: "space-between",
     backgroundColor: "#F8F8F8", 
     borderRadius: 15, 
     padding: 10,
-    flexWrap: "wrap"
   },
   methodButton: {
-    width: 85, // Ajustado para acomodar 5 métodos en 2 filas
+    flexBasis: "48%",
     height: 90,
     borderRadius: 12,
     backgroundColor: "#FFF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 8,
-    marginBottom: 10,
+    marginBottom: 12,
     borderWidth: 1,
     borderColor: "#E0E0E0",
   },
