@@ -1,6 +1,13 @@
-// components/SkeletonLoader.tsx
+// components/ui/SkeletonLoader.tsx
 import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Animated, Easing } from 'react-native';
+import { View, StyleSheet } from 'react-native';
+import Animated, { 
+  useSharedValue, 
+  useAnimatedStyle, 
+  withRepeat, 
+  withTiming,
+  Easing 
+} from 'react-native-reanimated';
 
 interface SkeletonProps {
   width?: number | string;
@@ -15,32 +22,30 @@ const SkeletonLoader: React.FC<SkeletonProps> = ({
   borderRadius = 4,
   style,
 }) => {
-  const opacity = useRef(new Animated.Value(0.3)).current;
+  // 🔧 USAR useSharedValue en lugar de useRef(new Animated.Value)
+  const opacity = useSharedValue(0.3);
 
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, {
-          toValue: 0.7,
-          duration: 800,
-          easing: Easing.ease,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0.3,
-          duration: 800,
-          easing: Easing.ease,
-          useNativeDriver: true,
-        }),
-      ])
+    // 🔧 CORREGIR: Usar withRepeat con Reanimated 3
+    opacity.value = withRepeat(
+      withTiming(0.7, {
+        duration: 800,
+        easing: Easing.ease,
+      }),
+      -1, // Infinito
+      true // Reverse
     );
-
-    animation.start();
-
+    
+    // 🔧 CLEANUP CORRECTO
     return () => {
-      animation.stop();
+      opacity.value = 0.3;
     };
   }, [opacity]);
+
+  // 🔧 USAR useAnimatedStyle
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
 
   return (
     <Animated.View
@@ -50,8 +55,8 @@ const SkeletonLoader: React.FC<SkeletonProps> = ({
           width,
           height,
           borderRadius,
-          opacity,
         },
+        animatedStyle, // 🔧 Aplicar estilo animado correctamente
         style,
       ]}
     />

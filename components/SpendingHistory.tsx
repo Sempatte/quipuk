@@ -58,27 +58,22 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
   // SOLUCIÓN CRÍTICA 1: Efecto para manejar el refreshTrigger desde componente padre
   useEffect(() => {
     if (refreshTrigger !== undefined) {
-      // Incrementar contador de refrescos
-      refreshCountRef.current += 1;
-      
-      // Mostrar indicador de refresco
       setIsRefreshing(true);
       
-      // Limpiar caché completamente
-      apolloClient.cache.reset().then(() => {
-        // Luego refrescar con política de no-cache
-        refetch({
+      const cleanup = apolloClient.cache.reset().then(() => {
+        return refetch({
           fetchPolicy: 'no-cache'
-        }).finally(() => {
-          setIsRefreshing(false);
-          
-          if (__DEV__) {
-            console.log(`[SpendingHistory] Refrescado #${refreshCountRef.current}, transacciones: ${data?.transactions?.length || 0}`);
-          }
         });
+      }).finally(() => {
+        setIsRefreshing(false);
       });
+  
+      // 🔧 AÑADIR CLEANUP
+      return () => {
+        cleanup.catch(() => {}); // Evitar unhandled promises
+      };
     }
-  }, [refreshTrigger, refetch, apolloClient, data?.transactions?.length]);
+  }, [refreshTrigger, refetch, apolloClient]);
 
   // SOLUCIÓN CRÍTICA 2: Refrescar también al enfocar la pantalla
   useFocusEffect(

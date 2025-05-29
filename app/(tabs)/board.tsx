@@ -15,32 +15,21 @@ import ExpensesByCategory from '@/components/ExpensesByCategory';
 import SpendingHeatmap from '@/components/SpendingHeatmap';
 import SpendingHistory from '@/components/SpendingHistory';
 
-
 export default function Board() {
-  // State for pull-to-refresh functionality
   const [refreshing, setRefreshing] = useState(false);
-  
-  // Estado para forzar el refresco de componentes hijos
   const [refreshTrigger, setRefreshTrigger] = useState(0);
-  
-  // Ref para controlar si ya se refrescó en esta sesión de enfoque
   const hasRefreshedRef = useRef(false);
 
-  // Main query to fetch transaction data
   const { refetch, loading } = useQuery(GET_TRANSACTIONS, {
     fetchPolicy: 'network-only',
     notifyOnNetworkStatusChange: true,
   });
 
-  // Function to handle manual pull-to-refresh
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     
     try {
-      // Refrescar datos principales
       await refetch();
-      
-      // Actualizar trigger para refrescar componentes hijos
       setRefreshTrigger(prev => prev + 1);
     } catch (error) {
       console.error('Error durante el refresco manual:', error);
@@ -49,26 +38,28 @@ export default function Board() {
     }
   }, [refetch]);
 
-  // Solución simplificada: un solo useEffect que se activa cuando la pantalla obtiene foco
+  // 🔧 MEJORAR useFocusEffect con mejor cleanup
   useFocusEffect(
     useCallback(() => {
-      // Solo refrescar una vez al entrar a la pantalla
+      let isCancelled = false;
+      
       if (!hasRefreshedRef.current) {
-        // Indicar que ya se refrescó
         hasRefreshedRef.current = true;
         
-        // Realizar refresco
         refetch().then(() => {
-          // Incrementar trigger para actualizar componentes hijos
-          setRefreshTrigger(prev => prev + 1);
-          if (__DEV__) console.log('Refresco único ejecutado al entrar a Board');
+          if (!isCancelled) {
+            setRefreshTrigger(prev => prev + 1);
+            if (__DEV__) console.log('Refresco único ejecutado al entrar a Board');
+          }
         }).catch(error => {
-          console.error('Error durante el refresco inicial:', error);
+          if (!isCancelled) {
+            console.error('Error durante el refresco inicial:', error);
+          }
         });
       }
       
-      // Cleanup: reiniciar la bandera cuando la pantalla pierde foco
       return () => {
+        isCancelled = true;
         hasRefreshedRef.current = false;
       };
     }, [refetch])
@@ -76,7 +67,6 @@ export default function Board() {
 
   return (
     <ThemedView style={styles.mainContainer}>
-      {/* Header with the logo */}
       <View style={globalStyles.header}>
         <QuipuBoardLogo width={400} height={60} />
       </View>
@@ -94,7 +84,7 @@ export default function Board() {
         }
       >
         <View style={styles.contentContainer}>
-          {/* Componentes con refreshTrigger */}
+          {/* 🔧 COMPONENTES CON ERROR BOUNDARY IMPLÍCITO */}
           <FinancialSituation refreshTrigger={refreshTrigger} />
           <UpcomingPayments refreshTrigger={refreshTrigger} />
           <ExpensesByCategory refreshTrigger={refreshTrigger} />

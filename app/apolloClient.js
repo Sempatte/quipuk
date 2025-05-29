@@ -26,20 +26,18 @@ const authLink = setContext(async (_, { headers }) => {
   }
 });
 
-// Cliente Apollo con mejor manejo de errores de red
+// app/apolloClient.js
 const client = new ApolloClient({
   link: authLink.concat(httpLink),
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {
-      fetchPolicy: 'network-only',
+      fetchPolicy: 'cache-and-network', // Mejor que 'network-only'
       errorPolicy: 'all',
+      notifyOnNetworkStatusChange: true,
     },
     query: {
-      fetchPolicy: 'network-only',
-      errorPolicy: 'all',
-    },
-    mutate: {
+      fetchPolicy: 'cache-first', // Mejor rendimiento
       errorPolicy: 'all',
     },
   },

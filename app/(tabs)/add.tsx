@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   interpolateColor,
+  runOnJS
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@apollo/client";

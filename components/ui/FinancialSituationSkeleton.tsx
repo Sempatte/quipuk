@@ -6,27 +6,30 @@ import { globalStyles } from '@/app/styles/globalStyles';
 
 const { width } = Dimensions.get('window');
 
-/**
- * Componente de skeleton loader específico para FinancialSituation
- * Imita la estructura visual del componente real mientras se cargan los datos
- */
 const FinancialSituationSkeleton: React.FC = () => {
+  const filterOptions: string[] = ['Este mes', '3 M', '6 M', '2025'];
+  const leftLegendItems: number[] = [1, 2, 3];
+  const rightLegendItems: number[] = [1, 2, 3];
+
   return (
     <View style={globalStyles.sectionContainer}>
       {/* Filtros de período */}
       <View style={styles.filterContainer}>
-        {[1, 2, 3, 4].map((_, index) => (
+        {filterOptions.map((option, index) => (
           <SkeletonLoader
             key={`filter-${index}`}
-            width={70}
-            height={30}
+            width={80}
+            height={36}
             borderRadius={20}
-            style={styles.filterSkeleton}
+            style={[
+              styles.filterSkeleton,
+              index === 0 && { opacity: 0.8 }
+            ]}
           />
         ))}
       </View>
 
-      {/* Resumen de gastos e ingresos */}
+      {/* Resumen */}
       <View style={styles.summaryContainer}>
         <View style={styles.summaryItem}>
           <SkeletonLoader
@@ -42,6 +45,7 @@ const FinancialSituationSkeleton: React.FC = () => {
             style={styles.valueSkeleton}
           />
         </View>
+        
         <View style={styles.summaryItem}>
           <SkeletonLoader
             width={80}
@@ -58,9 +62,8 @@ const FinancialSituationSkeleton: React.FC = () => {
         </View>
       </View>
 
-      {/* Gráfico de barras */}
+      {/* Gráfico simplificado */}
       <View style={styles.chartContainer}>
-        {/* Líneas horizontales del gráfico */}
         {[1, 2, 3, 4].map((_, index) => (
           <SkeletonLoader
             key={`line-${index}`}
@@ -73,7 +76,6 @@ const FinancialSituationSkeleton: React.FC = () => {
           />
         ))}
 
-        {/* Barras del gráfico */}
         <View style={styles.barsContainer}>
           {[1, 2, 3].map((_, index) => (
             <View key={`bar-group-${index}`} style={styles.barGroup}>
