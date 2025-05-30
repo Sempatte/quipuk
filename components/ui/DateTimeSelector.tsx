@@ -114,6 +114,41 @@ export default function DateTimeSelector({
     return true;
   }, [isPaid]);
 
+  // 🔥 FUNCIÓN CORREGIDA: Crear fecha con compensación para zona horaria de Perú (UTC-5)
+  const createLocalDateTime = useCallback((date: Date, time?: Date): string => {
+    const year = date.getFullYear().toString();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    
+    let hours = '12';
+    let minutes = '00';
+    
+    if (time) {
+      hours = String(time.getHours()).padStart(2, '0');
+      minutes = String(time.getMinutes()).padStart(2, '0');
+    } else if (date) {
+      hours = String(date.getHours()).padStart(2, '0');
+      minutes = String(date.getMinutes()).padStart(2, '0');
+    }
+    
+    // Crear fecha local usando el constructor de Date con un string ISO
+    const localDate = new Date(`${year}-${month}-${day}T${hours}:${minutes}:00`);
+    
+    // 🔥 SOLUCIÓN: Restar 5 horas para compensar la zona horaria de Perú
+    const adjustedDate = new Date(localDate.getTime() - (5 * 60 * 60 * 1000));
+    const isoString = adjustedDate.toISOString();
+    
+    console.log('📅 [DateTimeSelector] Fecha ajustada para Perú:', {
+      horaSeleccionada: `${hours}:${minutes}`,
+      fechaLocal: localDate.toLocaleString('es-PE'),
+      fechaAjustada: adjustedDate.toLocaleString('es-PE'),
+      paraBackend: isoString,
+      explicacion: 'Se restaron 5 horas para compensar UTC-5'
+    });
+    
+    return isoString;
+  }, []);
+
   // Manejar cambio de fecha
   const handleDateChange = useCallback((event: any, selectedDate?: Date) => {
     if (Platform.OS === 'android') {
@@ -130,10 +165,12 @@ export default function DateTimeSelector({
       setTempDate(newDate);
       
       if (Platform.OS === 'android') {
-        onSelectDate(newDate.toISOString());
+        // 🔥 USAR NUEVA FUNCIÓN LOCAL
+        const localDateTime = createLocalDateTime(newDate);
+        onSelectDate(localDateTime);
       }
     }
-  }, [tempDate, validateDate, onSelectDate]);
+  }, [tempDate, validateDate, onSelectDate, createLocalDateTime]);
 
   // Manejar cambio de hora
   const handleTimeChange = useCallback((event: any, selectedTime?: Date) => {
@@ -152,17 +189,21 @@ export default function DateTimeSelector({
       setTempDate(newDate);
       
       if (Platform.OS === 'android') {
-        onSelectDate(newDate.toISOString());
+        // 🔥 USAR NUEVA FUNCIÓN LOCAL
+        const localDateTime = createLocalDateTime(newDate);
+        onSelectDate(localDateTime);
       }
     }
-  }, [tempDate, onSelectDate]);
+  }, [tempDate, onSelectDate, createLocalDateTime]);
 
   // Confirmar cambios en iOS
   const handleConfirm = useCallback(() => {
-    onSelectDate(tempDate.toISOString());
+    // 🔥 USAR NUEVA FUNCIÓN LOCAL TAMBIÉN EN iOS
+    const localDateTime = createLocalDateTime(tempDate);
+    onSelectDate(localDateTime);
     setShowDatePicker(false);
     setShowTimePicker(false);
-  }, [tempDate, onSelectDate]);
+  }, [tempDate, onSelectDate, createLocalDateTime]);
 
   // Cancelar cambios en iOS
   const handleCancel = useCallback(() => {

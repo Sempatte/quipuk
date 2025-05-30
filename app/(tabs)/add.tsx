@@ -252,18 +252,62 @@ export default function AddTransaction() {
 
       const userId = parseInt(storedUserId, 10);
 
-      // 🔥 MEJORA: Función helper para manejo seguro de fechas
+      // 🔥 FUNCIÓN CORREGIDA: Manejo de fechas para Perú (UTC-5)
       const getAdjustedDate = (dateString: string): Date => {
         try {
+          console.log('📅 [AddTransaction] Procesando fecha:', dateString);
+
+          // Si el dateString es local (sin Z al final), tratarlo como local
+          if (dateString && !dateString.endsWith('Z') && !dateString.includes('+')) {
+            // Crear fecha local parseando manualmente
+            const match = dateString.match(/(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
+            if (match) {
+              const [, year, month, day, hours, minutes, seconds] = match;
+
+              // 🔥 CLAVE: Crear fecha UTC pero con la hora que el usuario seleccionó
+              // Para compensar que el backend agregará UTC-5
+              const localDate = new Date(
+                parseInt(year),
+                parseInt(month) - 1, // Mes es 0-indexado
+                parseInt(day),
+                parseInt(hours),
+                parseInt(minutes),
+                parseInt(seconds)
+              );
+
+              // 🔥 SOLUCIÓN: Restar 5 horas para compensar la zona horaria de Perú
+              // Cuando el backend reciba esto en UTC, al restar las 5 horas quedará en la hora correcta
+              const adjustedDate = new Date(localDate.getTime() - (5 * 60 * 60 * 1000)); // -5 horas
+
+              console.log('📅 [AddTransaction] Fecha ajustada para Perú:', {
+                input: dateString,
+                horaSeleccionada: localDate.toLocaleString('es-PE'),
+                horaAjustada: adjustedDate.toLocaleString('es-PE'),
+                paraBackend: adjustedDate.toISOString(),
+                explicacion: 'Se restaron 5 horas para compensar UTC-5'
+              });
+
+              return adjustedDate;
+            }
+          }
+
+          // Fallback para otros formatos
           const date = new Date(dateString);
-          
+
           // Verificar que la fecha sea válida
           if (isNaN(date.getTime())) {
             console.warn('❌ Fecha inválida detectada, usando fecha actual:', dateString);
             return new Date();
           }
-          
-          return date;
+
+          // También aplicar ajuste a fechas en otros formatos
+          const adjustedDate = new Date(date.getTime() - (5 * 60 * 60 * 1000));
+          console.log('📅 [AddTransaction] Fecha fallback ajustada:', {
+            original: date.toISOString(),
+            ajustada: adjustedDate.toISOString()
+          });
+
+          return adjustedDate;
         } catch (error) {
           console.error('❌ Error parseando fecha:', error);
           return new Date();
@@ -378,11 +422,11 @@ export default function AddTransaction() {
         console.log("💳 [AddTransaction] Método de pago aplicado:", data.paymentmethod);
       }
 
-      // 🔥 CORRECCIÓN: Aplicar fecha con hora mejorada (sin duplicación)
+      // 🔥 CORRECCIÓN: Aplicar fecha con ajuste de zona horaria para Perú
       if (data.date) {
         try {
           const extractedDate = new Date(data.date);
-          
+
           // Verificar que la fecha sea válida
           if (!isNaN(extractedDate.getTime())) {
             // Si la fecha extraída no tiene hora específica, usar hora actual
@@ -392,13 +436,42 @@ export default function AddTransaction() {
               extractedDate.setMinutes(now.getMinutes());
               console.log("🕐 [AddTransaction] Hora actual aplicada a fecha OCR");
             }
-            
+
+            // 🔥 CLAVE: Crear string local con compensación para zona horaria de Perú
+            const year = extractedDate.getFullYear();
+            const month = String(extractedDate.getMonth() + 1).padStart(2, '0');
+            const day = String(extractedDate.getDate()).padStart(2, '0');
+            const hours = String(extractedDate.getHours()).padStart(2, '0');
+            const minutes = String(extractedDate.getMinutes()).padStart(2, '0');
+
+            // Crear fecha local y luego ajustar para compensar UTC-5
+            const localDate = new Date(
+              extractedDate.getFullYear(),
+              extractedDate.getMonth(),
+              extractedDate.getDate(),
+              extractedDate.getHours(),
+              extractedDate.getMinutes(),
+              0
+            );
+
+            // 🔥 SOLUCIÓN: Restar 5 horas para compensar zona horaria de Perú
+            const adjustedDate = new Date(localDate.getTime() - (5 * 60 * 60 * 1000));
+            const localDateTime = adjustedDate.toISOString();
+
             if (formState.isPaid) {
-              updates.date = extractedDate.toISOString();
-              console.log("📅 [AddTransaction] Fecha de pago aplicada:", extractedDate.toISOString());
+              updates.date = localDateTime;
+              console.log("📅 [AddTransaction] Fecha de pago aplicada (ajustada):", {
+                original: `${hours}:${minutes}`,
+                ajustada: adjustedDate.toLocaleString('es-PE'),
+                paraBackend: localDateTime
+              });
             } else {
-              updates.dueDate = extractedDate.toISOString();
-              console.log("📅 [AddTransaction] Fecha de vencimiento aplicada:", extractedDate.toISOString());
+              updates.dueDate = localDateTime;
+              console.log("📅 [AddTransaction] Fecha de vencimiento aplicada (ajustada):", {
+                original: `${hours}:${minutes}`,
+                ajustada: adjustedDate.toLocaleString('es-PE'),
+                paraBackend: localDateTime
+              });
             }
             fieldsUpdated++;
           } else {
