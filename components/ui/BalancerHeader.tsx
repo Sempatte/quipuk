@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 20,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5',
   },
   balanceContainer: {
     flex: 1.2, // Ajusta el tamaño de la sección de balance

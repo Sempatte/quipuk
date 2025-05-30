@@ -450,68 +450,63 @@ export default function AddTransaction() {
     setShowScanner(true);
   }, []);
 
+  const headerColor = TRANSACTION_COLORS[formState.selectedOption];
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }} edges={["top"]}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <ScrollView
+          style={{ flex: 1, backgroundColor: "#FFF" }}
+          contentContainerStyle={{ backgroundColor: "#FFF" }}
           nestedScrollEnabled={true}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View style={[styles.animatedContainer, animatedStyle]}>
+          <Animated.View style={[styles.animatedContainer, animatedStyle, { backgroundColor: headerColor }]}> 
             <Text style={styles.title}>Agregar</Text>
-
             <View style={styles.sliderContainer}>
               <AgregarSlides
                 colors={TRANSACTION_COLORS}
                 onChange={handleSliderChange}
               />
             </View>
-
             {/* Botón de escaneo de comprobantes */}
             <View style={styles.scanButtonContainer}>
               <TouchableOpacity
                 style={styles.scanButton}
-                onPress={handleOpenScanner} // Usar la función específica
+                onPress={handleOpenScanner}
                 activeOpacity={0.8}
               >
                 <Ionicons name="scan" size={24} color="#FFF" />
                 <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
               </TouchableOpacity>
-
-              {/* Indicador de estado OCR (solo en desarrollo) */}
               {__DEV__ && (
                 <View style={styles.ocrStatusContainer}>
                   <OCRStatusIndicator showDetails={false} />
                 </View>
               )}
             </View>
-
-            {/* Carrusel que ahora se oculta cuando está vacío */}
             <View style={styles.containerCarousel}>
               <Carousel
                 title={`${formState.selectedOption} Frecuentes`}
                 items={frequentTransactions}
                 onAddPress={handleCreateTransaction}
                 emptyMessage={`No hay ${formState.selectedOption.toLowerCase()} frecuentes`}
-                hideIfEmpty={true} // Clave para ocultar completamente si no hay elementos
+                hideIfEmpty={true}
               />
             </View>
           </Animated.View>
-
-          <View style={styles.amountContainer}>
+          <View style={[styles.amountContainer, { backgroundColor: "#FFF" }]}>
             <AmountInput
               value={formState.amount}
               onChangeText={(value) => updateFormState({ amount: value })}
             />
           </View>
-
-          <View style={styles.descriptionContainer}>
+          <View style={[styles.descriptionContainer, { backgroundColor: "#FFF" }]}>
             <DescriptionInput
               value={formState.description}
               onChangeText={(value) => updateFormState({ description: value })}
             />
           </View>
-
           <TransactionOptions
             type={TRANSACTION_MAPPING[formState.selectedOption]}
             onSelectFrequent={(frequent) => updateFormState({ frequent })}
@@ -520,17 +515,15 @@ export default function AddTransaction() {
             initialStatus={formState.isPaid}
             statusReadOnly={statusReadOnly}
           />
-
-          <View style={styles.categoryContainer}>
+          <View style={[styles.categoryContainer, { backgroundColor: "#FFF" }]}>
             <CategorySelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
               onSelect={(category) => updateFormState({ category })}
-              selectedCategory={formState.category} // 🆕 Prop para controlar selección
-              initialCategory={undefined} // Se maneja via selectedCategory
+              selectedCategory={formState.category}
+              initialCategory={undefined}
             />
           </View>
-
-          <View style={styles.paymentContainer}>
+          <View style={[styles.paymentContainer, { backgroundColor: "#FFF" }]}>
             <PaymentMethodSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
               onSelect={(paymentmethod) => updateFormState({ paymentmethod })}
@@ -538,14 +531,10 @@ export default function AddTransaction() {
               selectedPaymentMethod={formState.paymentmethod}
             />
           </View>
-
-          {/* Selector de fecha - ahora con título condicional según estado y limitación de fechas */}
-          <View style={styles.dateSelectorContainer}>
+          <View style={[styles.dateSelectorContainer, { backgroundColor: "#FFF" }]}>
             <DateSelector
               type={TRANSACTION_MAPPING[formState.selectedOption]}
-              selectedDate={
-                formState.isPaid ? formState.date : formState.dueDate
-              }
+              selectedDate={formState.isPaid ? formState.date : formState.dueDate}
               onSelectDate={(date) => {
                 if (formState.isPaid) {
                   updateFormState({ date });
@@ -555,10 +544,10 @@ export default function AddTransaction() {
               }}
               title={formState.isPaid ? "Fecha" : "Fecha de vencimiento"}
               isPaid={formState.isPaid}
-              initialDate={undefined} // Se maneja via selectedDate
+              initialDate={undefined}
             />
           </View>
-          <View style={styles.addButtonContainer}>
+          <View style={[styles.addButtonContainer, { backgroundColor: "#FFF" }]}>
             <TouchableOpacity
               style={[
                 styles.addButton,
@@ -581,8 +570,6 @@ export default function AddTransaction() {
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
-
-      {/* Modal del scanner de comprobantes - CALLBACKS CORREGIDOS */}
       <ReceiptScanner
         visible={showScanner}
         onClose={handleScannerClose}
@@ -595,12 +582,13 @@ export default function AddTransaction() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "#FFFFFF",
   },
   centeredContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#FFF",
   },
   scrollContainer: {
     paddingBottom: 50,

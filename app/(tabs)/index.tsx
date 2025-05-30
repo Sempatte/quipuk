@@ -19,6 +19,8 @@ import Loader from "@/components/ui/Loader";
 import RecentTransactions from "@/components/ui/RecentTransactions"; // Importamos el nuevo componente
 import UpcomingPayments from "@/components/ui/UpcomingPayments";
 import QuipuTip from "@/components/ui/QuipuTip";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "react-native";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -44,44 +46,44 @@ export default function Index() {
   }
 
   return (
-    <ScrollView style={styles.scrollView}>
-      <KeyboardAvoidingView style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <QuipukLogo width={70} height={70} />
-          </View>
-
-          <View style={styles.iconContainer}>
-            <View style={styles.iconButton}>
-              <BellIcon width={24} height={24} fill="#00c450" />
+    <>
+      <SafeAreaView style={{ backgroundColor: "#000" }} edges={["top"]}>
+        <KeyboardAvoidingView style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <View style={styles.logoContainer}>
+              <QuipukLogo width={70} height={70} />
             </View>
-            <View style={styles.iconButton}>
-              <SettingsIcon width={24} height={24} fill="#00c450" />
+            <View style={styles.iconContainer}>
+              <View style={styles.iconButton}>
+                <BellIcon width={24} height={24} fill="#00c450" />
+              </View>
+              <View style={styles.iconButton}>
+                <SettingsIcon width={24} height={24} fill="#00c450" />
+              </View>
             </View>
           </View>
-        </View>
-
-        {/* Welcome Message */}
-        <View style={styles.welcomeContainer}>
-          <Text style={styles.welcome}>
-            Hola,{" "}
-            <Text style={styles.username}>
-              {loading ? "..." : data?.getUserProfile.fullName || "Usuario"}
+          {/* Welcome Message */}
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcome}>
+              Hola,{" "}
+              <Text style={styles.username}>
+                {loading ? "..." : data?.getUserProfile.fullName || "Usuario"}
+              </Text>
             </Text>
-          </Text>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.contentContainer}>
+          {/* Componente de Últimos Movimientos */}
+          <RecentTransactions />
+          <UpcomingPayments />
+          <QuipuTip/>
+          {/* Aquí puedes añadir más componentes */}
         </View>
-      </KeyboardAvoidingView>
-
-      {/* Contenido fuera del KeyboardAvoidingView negro */}
-      <View style={styles.contentContainer}>
-        {/* Componente de Últimos Movimientos */}
-        <RecentTransactions />
-        <UpcomingPayments />
-        <QuipuTip/>
-        {/* Aquí puedes añadir más componentes */}
-      </View>
-    </ScrollView>
+      </ScrollView>
+    </>
   );
 }
 
@@ -105,8 +107,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 50,
+    paddingHorizontal: 20
   },
   logoContainer: {
     flex: 1,

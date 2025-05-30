@@ -1,5 +1,6 @@
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { TouchableOpacity, View, StyleSheet } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useEffect } from "react";
 import Icon from "react-native-vector-icons/MaterialIcons";
 import Animated, {
@@ -25,75 +26,77 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   });
 
   return (
-    <View style={styles.tabBar}>
-      {state.routes.map((route, index) => {
-        const { options } = descriptors[route.key];
-        const isFocused = state.index === index;
+    <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#000" }}>
+      <View style={styles.tabBar}>
+        {state.routes.map((route, index) => {
+          const { options } = descriptors[route.key];
+          const isFocused = state.index === index;
 
-        const onPress = () => {
-          const event = navigation.emit({
-            type: "tabPress",
-            target: route.key,
-            canPreventDefault: true,
-          });
+          const onPress = () => {
+            const event = navigation.emit({
+              type: "tabPress",
+              target: route.key,
+              canPreventDefault: true,
+            });
 
-          if (!isFocused && !event.defaultPrevented) {
-            navigation.navigate(route.name);
+            if (!isFocused && !event.defaultPrevented) {
+              navigation.navigate(route.name);
+            }
+          };
+
+          if (route.name === "add") {
+            return (
+              <TouchableOpacity
+                key={route.name}
+                accessibilityRole="button"
+                accessibilityState={isFocused ? { selected: true } : {}}
+                accessibilityLabel={options.tabBarAccessibilityLabel}
+                onPress={onPress}
+                activeOpacity={1} // ✅ Evita la opacidad en iOS
+                style={styles.centralButtonContainer}
+              >
+                <Animated.View
+                  style={[
+                    styles.centralButton,
+                    isAddScreenActive ? styles.centralButtonActive : null,
+                  ]}
+                >
+                  <Animated.View style={animatedIconStyle}>
+                    <Icon name="add" size={30} color="#FFF" />
+                  </Animated.View>
+                </Animated.View>
+              </TouchableOpacity>
+            );
           }
-        };
 
-        if (route.name === "add") {
           return (
             <TouchableOpacity
               key={route.name}
               accessibilityRole="button"
+              onPress={onPress}
               accessibilityState={isFocused ? { selected: true } : {}}
               accessibilityLabel={options.tabBarAccessibilityLabel}
-              onPress={onPress}
               activeOpacity={1} // ✅ Evita la opacidad en iOS
-              style={styles.centralButtonContainer}
+              style={styles.tabButton}
             >
-              <Animated.View
-                style={[
-                  styles.centralButton,
-                  isAddScreenActive ? styles.centralButtonActive : null,
-                ]}
-              >
-                <Animated.View style={animatedIconStyle}>
-                  <Icon name="add" size={30} color="#FFF" />
-                </Animated.View>
-              </Animated.View>
+              <Icon
+                name={
+                  route.name === "movements"
+                    ? "swap-horiz"
+                    : route.name === "board"
+                    ? "bar-chart"
+                    : route.name === "profile"
+                    ? "person"
+                    : "home"
+                }
+                size={30}
+                color={isFocused ? "#00DC5A" : "#FFF"}
+              />
             </TouchableOpacity>
           );
-        }
-
-        return (
-          <TouchableOpacity
-            key={route.name}
-            accessibilityRole="button"
-            onPress={onPress}
-            accessibilityState={isFocused ? { selected: true } : {}}
-            accessibilityLabel={options.tabBarAccessibilityLabel}
-            activeOpacity={1} // ✅ Evita la opacidad en iOS
-            style={styles.tabButton}
-          >
-            <Icon
-              name={
-                route.name === "movements"
-                  ? "swap-horiz"
-                  : route.name === "board"
-                  ? "bar-chart"
-                  : route.name === "profile"
-                  ? "person"
-                  : "home"
-              }
-              size={30}
-              color={isFocused ? "#00DC5A" : "#FFF"}
-            />
-          </TouchableOpacity>
-        );
-      })}
-    </View>
+        })}
+      </View>
+    </SafeAreaView>
   );
 }
 
@@ -103,7 +106,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-around",
     backgroundColor: "#000",
     height: 60,
-    paddingBottom: 10,
   },
   tabButton: {
     flex: 1,

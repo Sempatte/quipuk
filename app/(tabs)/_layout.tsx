@@ -21,6 +21,11 @@ export default function TabLayout() {
 
   return (
     <>
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor="#000000"
+        translucent={false}
+      />
       <Tabs tabBar={(props) => <TabBar {...props} />}>
         <Tabs.Screen
           name="index"

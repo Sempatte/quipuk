@@ -7,6 +7,7 @@ import { ThemedView } from "@/components/ThemedView";
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
 import { globalStyles } from '../styles/globalStyles';
 import { GET_TRANSACTIONS } from '../graphql/transaction.graphql';
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Import all chart components
 import FinancialSituation from '@/components/ui/FinancialSituation';
@@ -67,10 +68,11 @@ export default function Board() {
 
   return (
     <ThemedView style={styles.mainContainer}>
-      <View style={globalStyles.header}>
-        <QuipuBoardLogo width={400} height={60} />
-      </View>
-      
+      <SafeAreaView style={{ backgroundColor: "#FFF" }} edges={["top"]}>
+        <View style={globalStyles.header}>
+          <QuipuBoardLogo width={400} height={60} />
+        </View>
+      </SafeAreaView>
       <ScrollView 
         showsVerticalScrollIndicator={false}
         refreshControl={

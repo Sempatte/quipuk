@@ -6,10 +6,10 @@ import {
   FlatList,
   TouchableOpacity,
   Modal,
-  ScrollView,
   Dimensions,
-  Platform,
+  Platform
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@apollo/client";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -26,6 +26,7 @@ import {
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Animated from 'react-native-reanimated';
 
 import { ThemedView } from "@/components/ThemedView";
 import TransactionItem from "@/components/ui/TransactionItem";
@@ -41,6 +42,7 @@ const DAY_BUTTON_WIDTH = width * 0.15;
 // Espacio entre botones
 const DAY_BUTTON_MARGIN = 8;
 
+
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "LoginScreen"
@@ -55,7 +57,7 @@ const Movements = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [days, setDays] = useState<Date[]>([]);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null); // Animated.ScrollView
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const [didInitialScroll, setDidInitialScroll] = useState(false);
 
@@ -145,21 +147,15 @@ const Movements = () => {
     (index: number) => {
       if (scrollViewRef.current && index >= 0 && index < days.length) {
         const position = index * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
+        const screenWidth = Dimensions.get('window').width;
+        const centerOffset = (screenWidth - DAY_BUTTON_WIDTH) / 2;
+        const adjustedPosition = Math.max(0, position - centerOffset);
 
-        // En Android usamos un pequeño delay para asegurar que el scroll funcione
-        if (Platform.OS === "android") {
-          setTimeout(() => {
-            scrollViewRef.current?.scrollTo({
-              x: position,
-              animated: true,
-            });
-          }, 100);
-        } else {
-          scrollViewRef.current.scrollTo({
-            x: position,
-            animated: true,
-          });
-        }
+        scrollViewRef.current.scrollTo({
+          x: adjustedPosition,
+          y: 0,
+          animated: true,
+        });
       }
     },
     [days]
@@ -190,29 +186,41 @@ const Movements = () => {
   // Efecto para desplazar al final (días más recientes) al iniciar
   useEffect(() => {
     if (days.length > 0 && !didInitialScroll) {
-      // Esperar un poco para asegurar que el ScrollView esté renderizado
-      setTimeout(() => {
-        if (selectedDate) {
-          // Buscar el índice del día seleccionado
-          const selectedIndex = days.findIndex(
-            (day) => day.toDateString() === selectedDate.toDateString()
+      const timeoutId = setTimeout(() => {
+        if (scrollViewRef.current) {
+          const today = new Date();
+          const todayIndex = days.findIndex(
+            (day) => day.toDateString() === today.toDateString()
           );
 
-          if (selectedIndex >= 0) {
-            scrollToDay(selectedIndex);
+          if (selectedDate) {
+            const selectedIndex = days.findIndex(
+              (day) => day.toDateString() === selectedDate.toDateString()
+            );
+            if (selectedIndex >= 0) {
+              scrollToDay(selectedIndex);
+            } else {
+              scrollToEnd();
+            }
+          } else if (todayIndex >= 0) {
+            scrollToDay(todayIndex);
           } else {
-            // Si no encontramos el día seleccionado, ir al final (días más recientes)
             scrollToEnd();
           }
-        } else {
-          // Si no hay día seleccionado, ir al final (días más recientes)
-          scrollToEnd();
+          setDidInitialScroll(true);
         }
+      }, Platform.OS === 'android' ? 500 : 100); // Ajuste de tiempo según plataforma
 
-        setDidInitialScroll(true);
-      }, 300);
+      return () => clearTimeout(timeoutId);
     }
   }, [days, selectedDate, scrollToDay, scrollToEnd, didInitialScroll]);
+
+  // Efecto adicional para resetear el scroll cuando cambia la pestaña
+  useFocusEffect(
+    useCallback(() => {
+      setDidInitialScroll(false);
+    }, [])
+  );
 
   // Verifica si hay transacciones en un día específico, sin filtrar por status
   const hasTransactionsOnDay = useCallback(
@@ -395,9 +403,11 @@ const Movements = () => {
 
   if (error) {
     return (
-      <ThemedView style={styles.centeredContainer}>
-        <Text>Error: {error.message}</Text>
-      </ThemedView>
+      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
+        <View style={styles.centeredContainer}>
+          <Text>Error: {error.message}</Text>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -408,123 +418,117 @@ const Movements = () => {
     referenceDay.getFullYear() < today.getFullYear();
 
   return (
-    <ThemedView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Transacciones</Text>
+    <>
+      <SafeAreaView style={{ backgroundColor: "#000" }} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Transacciones</Text>
 
-        <View style={styles.monthYearContainer}>
-          <TouchableOpacity
-            onPress={goToPreviousMonth}
-            style={styles.monthArrowButton}
-          >
-            <Text style={styles.arrowText}>{"<"}</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => setIsCalendarVisible(true)}
-            style={styles.monthTextButton}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.monthYearText}>
-              <Text style={styles.monthText}>{monthYear}</Text>
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={goToNextMonth}
-            disabled={!canGoNext}
-            style={styles.monthArrowButton}
-          >
-            <Text
-              style={[styles.arrowText, !canGoNext && styles.disabledArrow]}
+          <View style={styles.monthYearContainer}>
+            <TouchableOpacity
+              onPress={goToPreviousMonth}
+              style={styles.monthArrowButton}
             >
-              {">"}
-            </Text>
-          </TouchableOpacity>
-        </View>
+              <Text style={styles.arrowText}>{"<"}</Text>
+            </TouchableOpacity>
 
-        <View style={styles.daysScrollWrapper}>
-          <ScrollView
-            ref={scrollViewRef}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.daysScrollContainer}
-            decelerationRate="normal"
-            snapToInterval={DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2}
-            snapToAlignment="start"
-          >
-            {days.map((day, index) => {
-              const isActive =
-                selectedDate &&
-                day.toDateString() === selectedDate.toDateString();
-              const hasTransactions = hasTransactionsOnDay(day);
-              const isCurrentDay =
-                day.toDateString() === new Date().toDateString();
-              const isFuture = isFutureDay(day);
+            <TouchableOpacity
+              onPress={() => setIsCalendarVisible(true)}
+              style={styles.monthTextButton}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.monthYearText}>
+                <Text style={styles.monthText}>{monthYear}</Text>
+              </Text>
+            </TouchableOpacity>
 
-              return (
-                <View
-                  key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
-                  style={styles.dayButtonContainer}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.dayButton,
-                      isActive && styles.activeDaySelected,
-                      !isActive &&
-                        hasTransactions &&
-                        !isFuture &&
-                        styles.hasTransactionsDay,
-                      !isActive &&
-                        !hasTransactions &&
-                        !isFuture &&
-                        styles.noTransactionsDay,
-                      isFuture && styles.futureDayButton, // Estilo para días futuros
-                    ]}
-                    onPress={() => toggleDateSelection(day)}
-                    activeOpacity={isFuture ? 1 : 0.8} // No mostrar feedback en días futuros
-                    disabled={isFuture} // Deshabilitamos días futuros
+            <TouchableOpacity
+              onPress={goToNextMonth}
+              disabled={!canGoNext}
+              style={styles.monthArrowButton}
+            >
+              <Text
+                style={[styles.arrowText, !canGoNext && styles.disabledArrow]}
+              >
+                {">"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.daysScrollWrapper}>
+            <Animated.ScrollView
+              ref={scrollViewRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.daysScrollContainer}
+              decelerationRate="normal"
+              snapToInterval={DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2}
+              snapToAlignment="start"
+            >
+              {days.map((day, index) => {
+                const isActive =
+                  selectedDate &&
+                  day.toDateString() === selectedDate.toDateString();
+                const hasTransactions = hasTransactionsOnDay(day);
+                const isCurrentDay =
+                  day.toDateString() === new Date().toDateString();
+                const isFuture = isFutureDay(day);
+
+                return (
+                  <View
+                    key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
+                    style={styles.dayButtonContainer}
                   >
-                    <Text
+                    <TouchableOpacity
                       style={[
-                        styles.dayNumber,
-                        isFuture && styles.futureDayText, // Texto gris para días futuros
+                        styles.dayButton,
+                        isActive && styles.activeDaySelected,
+                        !isActive &&
+                          hasTransactions &&
+                          !isFuture &&
+                          styles.hasTransactionsDay,
+                        !isActive &&
+                          !hasTransactions &&
+                          !isFuture &&
+                          styles.noTransactionsDay,
+                        isFuture && styles.futureDayButton, // Estilo para días futuros
                       ]}
+                      onPress={() => toggleDateSelection(day)}
+                      activeOpacity={isFuture ? 1 : 0.8} // No mostrar feedback en días futuros
+                      disabled={isFuture} // Deshabilitamos días futuros
                     >
-                      {format(day, "dd", { locale: es })}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.dayLabel,
-                        isFuture && styles.futureDayText, // Texto gris para días futuros
-                      ]}
-                    >
-                      {format(day, "EEE", { locale: es })}
-                    </Text>
+                      <Text
+                        style={[
+                          styles.dayNumber,
+                          isFuture && styles.futureDayText, // Texto gris para días futuros
+                        ]}
+                      >
+                        {format(day, "dd", { locale: es })}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.dayLabel,
+                          isFuture && styles.futureDayText, // Texto gris para días futuros
+                        ]}
+                      >
+                        {format(day, "EEE", { locale: es })}
+                      </Text>
 
-                    {hasTransactions && !isFuture && (
-                      <View
-                        style={[styles.greenDot, isActive && styles.whiteDot]}
-                      />
+                      {hasTransactions && !isFuture && (
+                        <View
+                          style={[styles.greenDot, isActive && styles.whiteDot]}
+                        />
+                      )}
+                    </TouchableOpacity>
+                    {isCurrentDay && (
+                      <Text style={styles.todayIndicator}>Hoy</Text>
                     )}
-                  </TouchableOpacity>
-                  {isCurrentDay && (
-                    <Text style={styles.todayIndicator}>Hoy</Text>
-                  )}
-                </View>
-              );
-            })}
-          </ScrollView>
+                  </View>
+                );
+              })}
+            </Animated.ScrollView>
+          </View>
         </View>
-      </View>
-
-      <BalanceHeader
-        balance={balance}
-        income={income}
-        expenses={expenses}
-        monthYear={monthYear}
-      />
-
+      </SafeAreaView>
       <FlatList
         data={filteredTransactionsForRender}
         keyExtractor={(item: GroupedTransactionItem) => item[0]}
@@ -558,8 +562,15 @@ const Movements = () => {
           );
         }}
         contentContainerStyle={styles.listContent}
+        ListHeaderComponent={
+          <BalanceHeader
+            balance={balance}
+            income={income}
+            expenses={expenses}
+            monthYear={monthYear}
+          />
+        }
       />
-
       <Modal
         transparent={true}
         visible={isCalendarVisible}
@@ -593,14 +604,18 @@ const Movements = () => {
           </View>
         </View>
       </Modal>
-    </ThemedView>
+    </>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFF",
+    backgroundColor: "#F5F5F5",
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
   },
   centeredContainer: {
     flex: 1,
@@ -608,17 +623,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   header: {
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingTop: Platform.OS === 'ios' ? 10 : 16, // Menos padding superior en iOS
+    paddingBottom: 16,
     backgroundColor: "#000",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    // Asegurar que el header tenga suficiente altura mínima
+    minHeight: Platform.OS === 'ios' ? 180 : 200,
   },
   headerTitle: {
     fontSize: 26,
-    color: "#FFF",
+    color: "#F5F5F5",
     fontWeight: "bold",
     textAlign: "center",
     fontFamily: "Outfit_500Medium",
+    marginBottom: 10,
   },
   monthYearContainer: {
     flexDirection: "row",
