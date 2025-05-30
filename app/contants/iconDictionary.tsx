@@ -1,4 +1,4 @@
-// app/contants/iconDictionary.tsx - CON SOPORTE PARA COLORES DINÁMICOS
+// app/constants/iconDictionary.tsx - CORREGIDO para mostrar bordes
 import React from 'react';
 import { Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -30,125 +30,237 @@ interface IconProps {
   width?: number;
   height?: number;
   color?: string;
+  stroke?: string;
+  fill?: string;
 }
 
 interface CategoryIconMapping {
   [key: string]: (props: IconProps) => JSX.Element;
 }
 
-// 🎯 TAMAÑO POR DEFECTO
-const DEFAULT_SIZE = 30;
+// 🎯 TAMAÑO Y COLORES POR DEFECTO
+const DEFAULT_SIZE = 24;
+const DEFAULT_STROKE_COLOR = '#666';
+const DEFAULT_FILL = 'none'; // 🔥 CLAVE: Sin relleno por defecto
 
-// 🎯 ICONOS DE GASTOS CON SOPORTE PARA COLOR DINÁMICO
-const gastosIconsWithColor: CategoryIconMapping = {
-  Alquiler: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <AlquilerIcon width={width} height={height} fill={color} />,
+// 🎯 ICONOS DE GASTOS CON STROKE (SOLO BORDES)
+const gastosIconsWithStroke: CategoryIconMapping = {
+  Alquiler: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <AlquilerIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Transporte: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <BusIcon width={width} height={height} fill={color} />,
+  Transporte: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <BusIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Deducibles: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <TijeraIcon width={width} height={height} fill={color} />,
+  Deducibles: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <TijeraIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Otros: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <GraficaAbajoIcon width={width} height={height} fill={color} />,
+  Otros: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <GraficaAbajoIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Hogar: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <HogarIcon width={width} height={height} fill={color} />,
+  Hogar: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <HogarIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Comida: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <EnsaladaIcon width={width} height={height} fill={color} />,
+  Comida: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <EnsaladaIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Salud: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <SaludIcon width={width} height={height} fill={color} />,
+  Salud: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <SaludIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Super: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <SuperIcon width={width} height={height} fill={color} />,
+  Super: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <SuperIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Teléfono: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <TelefonoIcon width={width} height={height} fill={color} />,
+  Teléfono: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <TelefonoIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  // 🎯 CATEGORÍAS ADICIONALES CON ICONOS GENÉRICOS
-  Suscripciones: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="card-outline" size={width} color={color || '#666'} />,
+  // 🎯 CATEGORÍAS CON IONICONS (YA TIENEN STROKE POR DEFECTO)
+  Suscripciones: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="card-outline" size={width} color={color} />,
   
-  Ropa: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="shirt-outline" size={width} color={color || '#666'} />,
+  Ropa: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="shirt-outline" size={width} color={color} />,
   
-  "Cuidado personal": ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="cut-outline" size={width} color={color || '#666'} />,
+  "Cuidado personal": ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="cut-outline" size={width} color={color} />,
   
-  Bienestar: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="heart-outline" size={width} color={color || '#666'} />,
+  Bienestar: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="heart-outline" size={width} color={color} />,
   
-  Fiestas: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="gift-outline" size={width} color={color || '#666'} />,
+  Fiestas: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="gift-outline" size={width} color={color} />,
   
-  Gasolina: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="car-outline" size={width} color={color || '#666'} />,
+  Gasolina: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="car-outline" size={width} color={color} />,
   
-  Tarjeta: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <CardIcon width={width} height={height} fill={color} />,
+  Tarjeta: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <CardIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Deudas: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="warning-outline" size={width} color={color || '#666'} />,
+  Deudas: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="warning-outline" size={width} color={color} />,
   
-  Educación: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="school-outline" size={width} color={color || '#666'} />,
+  Educación: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="school-outline" size={width} color={color} />,
   
-  Mascotas: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="paw-outline" size={width} color={color || '#666'} />,
+  Mascotas: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="paw-outline" size={width} color={color} />,
 };
 
-// 🎯 ICONOS DE INGRESOS CON SOPORTE PARA COLOR DINÁMICO
-const ingresosIconsWithColor: CategoryIconMapping = {
-  Empleo: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <EmpleoIcon width={width} height={height} fill={color} />,
+// 🎯 ICONOS DE INGRESOS CON STROKE
+const ingresosIconsWithStroke: CategoryIconMapping = {
+  Empleo: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <EmpleoIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  "Trabajo Independiente": ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <TrabajoIndepIcon width={width} height={height} fill={color} />,
+  "Trabajo Independiente": ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <TrabajoIndepIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Alquiler: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <AlquilerIcon width={width} height={height} fill={color} />,
+  Alquiler: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <AlquilerIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Intereses: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <SavingMoneyIcon width={width} height={height} fill={color} />,
+  Intereses: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <SavingMoneyIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Director: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <DirectorIcon width={width} height={height} fill={color} />,
+  Director: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <DirectorIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Airbnb: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <AirbnbIcon width={width} height={height} fill={color} />,
+  Airbnb: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <AirbnbIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  Bolsa: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <BolsaIcon width={width} height={height} fill={color} />,
+  Bolsa: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <BolsaIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
   
-  "Otros Ingresos": ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <OtrosIngresosIcon width={width} height={height} fill={color} />,
+  "Otros Ingresos": ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <OtrosIngresosIcon 
+      width={width} 
+      height={height} 
+      stroke={color} 
+      fill="none"
+      strokeWidth="1.5"
+    />,
 };
 
-// 🎯 ICONOS DE AHORRO CON SOPORTE PARA COLOR DINÁMICO
-const ahorrosIconsWithColor: CategoryIconMapping = {
-  Emergencia: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="shield-outline" size={width} color={color || '#666'} />,
+// 🎯 ICONOS DE AHORRO CON STROKE
+const ahorrosIconsWithStroke: CategoryIconMapping = {
+  Emergencia: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="shield-outline" size={width} color={color} />,
   
-  Meta: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="flag-outline" size={width} color={color || '#666'} />,
+  Meta: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="flag-outline" size={width} color={color} />,
   
-  Inversión: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="trending-up-outline" size={width} color={color || '#666'} />,
+  Inversión: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="trending-up-outline" size={width} color={color} />,
   
-  Viaje: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="airplane-outline" size={width} color={color || '#666'} />,
+  Viaje: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="airplane-outline" size={width} color={color} />,
   
-  Educación: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="school-outline" size={width} color={color || '#666'} />,
+  Educación: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="school-outline" size={width} color={color} />,
   
-  Otros: ({ width = DEFAULT_SIZE, height = DEFAULT_SIZE, color }) => 
-    <Ionicons name="wallet-outline" size={width} color={color || '#666'} />,
+  Otros: ({ width = DEFAULT_SIZE, color = DEFAULT_STROKE_COLOR }) => 
+    <Ionicons name="wallet-outline" size={width} color={color} />,
 };
 
-// 🎯 MÉTODOS DE PAGO (estos mantienen su color original)
+// 🎯 MÉTODOS DE PAGO (mantienen colores originales)
 export const constPaymentMethodsIcons: Record<string, JSX.Element> = {
   Efectivo: <FluentMoneyIcon width={30} height={30} />,
   Yape: <Image source={YapeIcon} style={{ width: 30, height: 30 }} />,
@@ -157,11 +269,11 @@ export const constPaymentMethodsIcons: Record<string, JSX.Element> = {
   "Tarjeta de Débito": <Ionicons name="card-outline" size={30} color="#4A90E2" />,
 };
 
-// 🎯 FUNCIÓN PRINCIPAL PARA OBTENER ICONO CON COLOR DINÁMICO
+// 🎯 FUNCIÓN PRINCIPAL MEJORADA - SOLO BORDES
 export const getTransactionIconWithColor = (
   category: string, 
   type: string, 
-  color?: string,
+  color: string = DEFAULT_STROKE_COLOR,
   size: number = DEFAULT_SIZE
 ): JSX.Element => {
   const iconProps: IconProps = {
@@ -174,50 +286,56 @@ export const getTransactionIconWithColor = (
 
   switch (type) {
     case "gasto":
-      const gastoIconFunction = gastosIconsWithColor[category];
+      const gastoIconFunction = gastosIconsWithStroke[category];
       iconComponent = gastoIconFunction 
         ? gastoIconFunction(iconProps)
-        : gastosIconsWithColor.Otros(iconProps);
+        : gastosIconsWithStroke.Otros(iconProps);
       break;
       
     case "ingreso":
-      const ingresoIconFunction = ingresosIconsWithColor[category];
+      const ingresoIconFunction = ingresosIconsWithStroke[category];
       iconComponent = ingresoIconFunction 
         ? ingresoIconFunction(iconProps)
-        : ingresosIconsWithColor["Otros Ingresos"](iconProps);
+        : ingresosIconsWithStroke["Otros Ingresos"](iconProps);
       break;
       
     case "ahorro":
-      const ahorroIconFunction = ahorrosIconsWithColor[category];
+      const ahorroIconFunction = ahorrosIconsWithStroke[category];
       iconComponent = ahorroIconFunction 
         ? ahorroIconFunction(iconProps)
-        : ahorrosIconsWithColor.Otros(iconProps);
+        : ahorrosIconsWithStroke.Otros(iconProps);
       break;
       
     default:
-      iconComponent = <Ionicons name="help-circle-outline" size={size} color={color || '#666'} />;
+      iconComponent = <Ionicons name="help-circle-outline" size={size} color={color} />;
   }
 
   return iconComponent;
 };
 
-// 🎯 FUNCIÓN LEGACY PARA COMPATIBILIDAD (sin color)
+// 🎯 FUNCIÓN LEGACY CORREGIDA
 export const getTransactionIcon = (category: string, type: string): JSX.Element => {
-  return getTransactionIconWithColor(category, type, undefined, DEFAULT_SIZE);
+  return getTransactionIconWithColor(category, type, DEFAULT_STROKE_COLOR, DEFAULT_SIZE);
 };
 
-// 🎯 ICONOS ESTÁTICOS LEGACY (mantenidos para compatibilidad)
+// 🎯 FUNCIÓN ESPECÍFICA PARA CATEGORÍAS (con color de categoría)
+export const getCategoryIcon = (category: string, type: string, categoryColor?: string): JSX.Element => {
+  const iconColor = categoryColor || DEFAULT_STROKE_COLOR;
+  return getTransactionIconWithColor(category, type, iconColor, DEFAULT_SIZE);
+};
+
+// 🎯 ICONOS ESTÁTICOS LEGACY (actualizados con stroke)
 export const gastosIcons: Record<string, JSX.Element> = Object.fromEntries(
-  Object.entries(gastosIconsWithColor).map(([key, iconFunc]) => [
+  Object.entries(gastosIconsWithStroke).map(([key, iconFunc]) => [
     key, 
-    iconFunc({ width: DEFAULT_SIZE, height: DEFAULT_SIZE })
+    iconFunc({ width: DEFAULT_SIZE, height: DEFAULT_SIZE, color: DEFAULT_STROKE_COLOR })
   ])
 );
 
 export const ingresosIcons: Record<string, JSX.Element> = Object.fromEntries(
-  Object.entries(ingresosIconsWithColor).map(([key, iconFunc]) => [
+  Object.entries(ingresosIconsWithStroke).map(([key, iconFunc]) => [
     key, 
-    iconFunc({ width: DEFAULT_SIZE, height: DEFAULT_SIZE })
+    iconFunc({ width: DEFAULT_SIZE, height: DEFAULT_SIZE, color: DEFAULT_STROKE_COLOR })
   ])
 );
 

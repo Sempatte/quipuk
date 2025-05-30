@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from "react";
+import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -7,19 +7,24 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  Alert,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   interpolateColor,
-  runOnJS
+  runOnJS,
+  withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from 'expo-haptics';
 
 // Importaciones de componentes
 import AgregarSlides from "@/components/ui/AddSlider";
@@ -50,79 +55,100 @@ import {
 } from "../interfaces/transaction.interface";
 
 // Utilidades
-import { getTransactionIcon } from "../contants/iconDictionary";
+import { getCategoryIcon } from "../contants/iconDictionary"; // 🔥 Usar nueva función
 import { useToast } from "@/app/providers/ToastProvider";
 import { RootStackParamList } from "../interfaces/navigation";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
 
-// Definir la interfaz para los parámetros de la ruta
+// 🎯 INTERFACES MEJORADAS
 interface AddTransactionRouteParams {
   forcePaymentStatus?: "pending" | "completed";
   statusReadOnly?: boolean;
   preselectedTab?: TransactionOption;
 }
 
-type LoginScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "movements"
->;
+interface FormState {
+  selectedOption: TransactionOption;
+  amount: string;
+  description: string;
+  category: string;
+  paymentmethod: string;
+  date: string;
+  dueDate: string;
+  frequent: boolean;
+  isPaid: boolean;
+}
 
-// Definir un tipo para los indexadores del colorIndex
-type ColorIndexMap = {
-  [key in TransactionOption]: number;
+// 🎯 TIPOS MEJORADOS
+type AddTransactionNavigationProp = NativeStackNavigationProp<RootStackParamList, "movements">;
+type ColorIndexMap = Record<TransactionOption, number>;
+
+// 🎯 CONSTANTES
+const COLOR_INDEX_MAP: ColorIndexMap = {
+  Gastos: 0,
+  Ingresos: 1,
+  Ahorros: 2,
 };
 
+const INITIAL_FORM_STATE: FormState = {
+  selectedOption: "Gastos",
+  amount: "",
+  description: "",
+  category: "",
+  paymentmethod: "Efectivo",
+  date: new Date().toISOString(),
+  dueDate: new Date().toISOString(),
+  frequent: false,
+  isPaid: true,
+};
+
+const VALIDATION_RULES = {
+  amount: (value: string) => value && parseFloat(value) > 0,
+  category: (value: string) => value.length > 0,
+  paymentmethod: (value: string) => value.length > 0,
+} as const;
+
 export default function AddTransaction() {
+  // 🎯 HOOKS BÁSICOS
   const { showToast } = useToast();
-  const colorValue = useSharedValue(0);
-  const navigation = useNavigation<LoginScreenNavigationProp>();
-
-  // Utilizar RouteProp tipado correctamente
-  const route =
-    useRoute<RouteProp<Record<string, AddTransactionRouteParams>, string>>();
-
-  // Obtener parámetros de la ruta de navegación con tipos seguros
-  const params = route.params || {};
-  const { forcePaymentStatus, statusReadOnly, preselectedTab } = params;
-
-  // Estado para controlar el scanner de comprobantes
+  const navigation = useNavigation<AddTransactionNavigationProp>();
+  const route = useRoute<RouteProp<Record<string, AddTransactionRouteParams>, string>>();
+  
+  // 🎯 PARÁMETROS DE RUTA
+  const { forcePaymentStatus, statusReadOnly, preselectedTab } = route.params || {};
+  
+  // 🎯 REFS PARA OPTIMIZACIONES
+  const scrollRef = useRef<ScrollView>(null);
+  const amountInputRef = useRef<any>(null);
+  
+  // 🎯 VALORES ANIMADOS
+  const colorValue = useSharedValue(COLOR_INDEX_MAP[preselectedTab || "Gastos"]);
+  const buttonScale = useSharedValue(1);
+  
+  // 🎯 ESTADO LOCAL
+  const [formState, setFormState] = useState<FormState>(() => ({
+    ...INITIAL_FORM_STATE,
+    selectedOption: preselectedTab || "Gastos",
+    isPaid: forcePaymentStatus !== "pending",
+  }));
+  
   const [showScanner, setShowScanner] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Estado del formulario
-  const [formState, setFormState] = useState({
-    selectedOption: (preselectedTab || "Gastos") as TransactionOption,
-    amount: "",
-    description: "",
-    category: "",
-    paymentmethod: "Efectivo", // Valor por defecto
-    date: new Date().toISOString(),
-    dueDate: new Date().toISOString(),
-    frequent: false,
-    isPaid: forcePaymentStatus === "pending" ? false : true,
-  });
-
-  // Configurar el slider si viene preseleccionado
+  // 🎯 INICIALIZACIÓN DE ESTADO CON PARÁMETROS
   useEffect(() => {
     if (preselectedTab) {
-      const colorIndex: ColorIndexMap = {
-        Gastos: 0,
-        Ingresos: 1,
-        Ahorros: 2,
-      };
-      colorValue.value = withTiming(colorIndex[preselectedTab], {
-        duration: 300,
-      });
+      colorValue.value = withTiming(COLOR_INDEX_MAP[preselectedTab], { duration: 300 });
     }
-  }, [preselectedTab, colorValue]);
+  }, [preselectedTab]);
 
   useEffect(() => {
     if (forcePaymentStatus === "pending") {
-      // Establecer fecha de vencimiento predeterminada (7 días después)
       const defaultDueDate = new Date();
       defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-
-      setFormState((prev) => ({
+      
+      setFormState(prev => ({
         ...prev,
         isPaid: false,
         dueDate: defaultDueDate.toISOString(),
@@ -130,35 +156,58 @@ export default function AddTransaction() {
     }
   }, [forcePaymentStatus]);
 
-  // Actualización del estado - MEJORADA para manejar múltiples updates
-  const updateFormState = useCallback((updates: Partial<typeof formState>) => {
-    console.log(
-      "🔄 [AddTransaction] Actualizando estado del formulario:",
-      updates
-    );
-    setFormState((prev) => {
+  // 🎯 ACTUALIZACIÓN OPTIMIZADA DEL ESTADO
+  const updateFormState = useCallback((updates: Partial<FormState>) => {
+    setFormState(prev => {
       const newState = { ...prev, ...updates };
-      console.log("✅ [AddTransaction] Nuevo estado:", newState);
+      
+      // 🎯 LOGGING CONDICIONAL (solo en desarrollo)
+      if (__DEV__) {
+        console.log("🔄 [AddTransaction] Estado actualizado:", updates);
+      }
+      
       return newState;
     });
   }, []);
 
-  // Cambio de slider
-  const handleSliderChange = useCallback(
-    (value: TransactionOption) => {
-      updateFormState({ selectedOption: value });
-      const colorIndex: ColorIndexMap = {
-        Gastos: 0,
-        Ingresos: 1,
-        Ahorros: 2,
-      };
-      colorValue.value = withTiming(colorIndex[value], { duration: 300 });
-    },
-    [updateFormState, colorValue]
-  );
+  // 🎯 VALIDACIÓN MEJORADA DEL FORMULARIO
+  const formValidation = useMemo(() => {
+    const errors: string[] = [];
+    const isAmountValid = VALIDATION_RULES.amount(formState.amount);
+    const isCategoryValid = VALIDATION_RULES.category(formState.category);
+    const isPaymentMethodValid = VALIDATION_RULES.paymentmethod(formState.paymentmethod);
+    
+    if (!isAmountValid) errors.push("Monto requerido");
+    if (!isCategoryValid) errors.push("Categoría requerida");
+    if (!isPaymentMethodValid) errors.push("Método de pago requerido");
+    
+    return {
+      isValid: errors.length === 0,
+      errors,
+      fieldValidation: {
+        amount: isAmountValid,
+        category: isCategoryValid,
+        paymentmethod: isPaymentMethodValid,
+      }
+    };
+  }, [formState.amount, formState.category, formState.paymentmethod]);
 
-  // Estilo animado de color
-  const animatedStyle = useAnimatedStyle(() => {
+  // 🎯 CAMBIO DE SLIDER CON ANIMACIÓN MEJORADA
+  const handleSliderChange = useCallback((value: TransactionOption) => {
+    // Haptic feedback
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+    
+    updateFormState({ selectedOption: value });
+    colorValue.value = withSpring(COLOR_INDEX_MAP[value], {
+      damping: 15,
+      stiffness: 150,
+    });
+  }, [updateFormState, colorValue]);
+
+  // 🎯 ESTILOS ANIMADOS MEJORADOS
+  const animatedHeaderStyle = useAnimatedStyle(() => {
     const backgroundColor = interpolateColor(
       colorValue.value,
       [0, 1, 2],
@@ -167,423 +216,404 @@ export default function AddTransaction() {
     return { backgroundColor };
   });
 
-  // Consulta para transacciones frecuentes
-  const { data: frequentData, loading: loadingFrequent } =
-    useQuery<FrequentTransactionsData>(GET_FREQUENT_TRANSACTIONS, {
+  const animatedButtonStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: buttonScale.value }],
+  }));
+
+  // 🎯 CONSULTA OPTIMIZADA DE TRANSACCIONES FRECUENTES
+  const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
+    GET_FREQUENT_TRANSACTIONS,
+    {
       variables: {
         type: TRANSACTION_MAPPING[formState.selectedOption],
         frequent: true,
       },
-      fetchPolicy: "network-only", // Forzar que siempre busque del servidor
-    });
-
-  // Mutación de creación de transacción
-  const [createTransaction, { loading: creating }] = useMutation(
-    CREATE_TRANSACTION,
-    {
-      refetchQueries: [
-        {
-          query: GET_TRANSACTIONS,
-        },
-        {
-          query: GET_FREQUENT_TRANSACTIONS,
-          variables: {
-            type: TRANSACTION_MAPPING[formState.selectedOption],
-            frequent: true,
-          },
-        },
-      ],
-      onCompleted: () => {
-        // Resetear formulario
-        setFormState({
-          selectedOption: "Gastos",
-          amount: "",
-          description: "",
-          category: "",
-          paymentmethod: "Efectivo",
-          date: new Date().toISOString(),
-          dueDate: new Date().toISOString(),
-          frequent: false,
-          isPaid: true,
-        });
-        navigation.navigate("movements");
-        showToast("success", "Éxito", "Transacción agregada correctamente");
-      },
-      onError: (error) => {
-        showToast("error", "Error", error.message);
-      },
+      fetchPolicy: "cache-first", // 🔥 Mejor rendimiento
+      skip: !formState.selectedOption, // 🔥 Skip si no hay selección
     }
   );
 
-  // Validación de formulario
-  const isFormValid = useMemo(
-    () => formState.amount && formState.category && formState.paymentmethod,
-    [formState]
-  );
+  // 🎯 MUTACIÓN OPTIMIZADA
+  const [createTransaction, { loading: creating }] = useMutation(CREATE_TRANSACTION, {
+    refetchQueries: [
+      { query: GET_TRANSACTIONS },
+      {
+        query: GET_FREQUENT_TRANSACTIONS,
+        variables: {
+          type: TRANSACTION_MAPPING[formState.selectedOption],
+          frequent: true,
+        },
+      },
+    ],
+    onCompleted: () => {
+      // 🎯 RESET OPTIMIZADO DEL FORMULARIO
+      setFormState({
+        ...INITIAL_FORM_STATE,
+        selectedOption: formState.selectedOption, // Mantener la pestaña actual
+      });
+      
+      // 🎯 HAPTIC FEEDBACK DE ÉXITO
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      
+      navigation.navigate("movements");
+      showToast("success", "¡Éxito!", "Transacción agregada correctamente");
+    },
+    onError: (error) => {
+      // 🎯 HAPTIC FEEDBACK DE ERROR
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      }
+      
+      showToast("error", "Error", error.message);
+    },
+  });
 
-  // Transformación de transacciones frecuentes
+  // 🎯 TRANSFORMACIÓN OPTIMIZADA DE TRANSACCIONES FRECUENTES
   const frequentTransactions = useMemo(() => {
     if (!frequentData?.frequentTransactions) return [];
 
-    return frequentData.frequentTransactions.map((transaction) => ({
+    return frequentData.frequentTransactions.map(transaction => ({
       id: transaction.id.toString(),
       title: transaction.title,
       description: transaction.description || "",
       type: transaction.type,
       amount: `S/ ${transaction.amount.toFixed(2)}`,
-      icon: getTransactionIcon(transaction.category, transaction.type),
+      icon: getCategoryIcon(transaction.category, transaction.type), // 🔥 Usar nueva función
       backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
     }));
   }, [frequentData]);
 
-  // 🔥 FUNCIÓN ULTRA SIMPLIFICADA
+  // 🎯 CREACIÓN DE TRANSACCIÓN MEJORADA
   const handleCreateTransaction = useCallback(async () => {
-    if (!isFormValid) {
-      showToast("error", "Error", "Por favor completa todos los campos requeridos.");
+    if (!formValidation.isValid) {
+      const errorMessage = formValidation.errors.join(", ");
+      showToast("error", "Formulario incompleto", errorMessage);
+      
+      // 🎯 SCROLL TO ERROR Y FOCUS
+      scrollRef.current?.scrollTo({ y: 0, animated: true });
+      if (!formValidation.fieldValidation.amount) {
+        setTimeout(() => amountInputRef.current?.focus(), 300);
+      }
       return;
     }
+
+    setIsSubmitting(true);
+    buttonScale.value = withSpring(0.95);
 
     try {
       const storedUserId = await AsyncStorage.getItem("userId");
       if (!storedUserId) {
-        showToast("error", "Error", "No se pudo obtener el ID del usuario.");
-        return;
+        throw new Error("No se pudo obtener el ID del usuario");
       }
 
       const userId = parseInt(storedUserId, 10);
+      
+      // 🎯 VALIDACIÓN ADICIONAL DE MONTO
+      const amount = parseFloat(formState.amount);
+      if (isNaN(amount) || amount <= 0) {
+        throw new Error("El monto debe ser un número válido mayor a 0");
+      }
 
-      // 🔥 SIMPLIFICADO AL MÁXIMO - Sin ajustes de zona horaria
       const transactionInput: CreateTransactionInput = {
         userId,
         title: formState.category,
-        description: formState.description,
-        amount: parseFloat(formState.amount),
+        description: formState.description || `${formState.selectedOption} en ${formState.category}`,
+        amount,
         type: TRANSACTION_MAPPING[formState.selectedOption],
         frequent: formState.frequent,
         paymentmethod: formState.paymentmethod,
         category: formState.category,
         status: formState.isPaid ? "completed" : "pending",
-        // 🔥 MEGA SIMPLE: Solo crear la fecha directamente
         dueDate: new Date(formState.isPaid ? formState.date : formState.dueDate),
       };
 
-      console.log('📅 [AddTransaction] Enviando fecha sin modificaciones:', {
-        fechaOriginal: formState.isPaid ? formState.date : formState.dueDate,
-        fechaFinal: transactionInput.dueDate.toISOString(),
-        fechaLocal: transactionInput.dueDate.toLocaleString('es-PE')
-      });
-
-      await createTransaction({
-        variables: { input: transactionInput },
-      });
+      await createTransaction({ variables: { input: transactionInput } });
+      
     } catch (error: any) {
       console.error("❌ Error al crear transacción:", error);
-      showToast("error", "Error", "Hubo un problema al agregar la transacción.");
+      showToast("error", "Error", error.message || "Hubo un problema al agregar la transacción");
+    } finally {
+      setIsSubmitting(false);
+      buttonScale.value = withSpring(1);
     }
-  }, [formState, isFormValid, createTransaction, showToast]);
+  }, [formState, formValidation, createTransaction, showToast]);
 
-  // Manejo de cambio de estado de pago
-  const handleStatusChange = useCallback(
-    (isPaid: boolean) => {
-      // Si el estado de pago es de solo lectura, no permitir cambios
-      if (statusReadOnly) {
-        return;
-      }
-      updateFormState({ isPaid });
+  // 🎯 MANEJO OPTIMIZADO DE CAMBIO DE ESTADO
+  const handleStatusChange = useCallback((isPaid: boolean) => {
+    if (statusReadOnly) return;
+    
+    updateFormState({ isPaid });
+    
+    if (!isPaid && formState.date === new Date().toISOString()) {
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+      updateFormState({ dueDate: defaultDueDate.toISOString() });
+    }
+  }, [formState.date, updateFormState, statusReadOnly]);
 
-      // Si cambia a pendiente, asegurarse de que haya una fecha de vencimiento seleccionada
-      if (!isPaid && formState.date === new Date().toISOString()) {
-        // Establecer fecha de vencimiento predeterminada (por ejemplo, 7 días después)
-        const defaultDueDate = new Date();
-        defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-        updateFormState({ dueDate: defaultDueDate.toISOString() });
-      }
-    },
-    [formState.date, updateFormState, statusReadOnly]
-  );
+  // 🎯 SELECCIÓN OPTIMIZADA DE TRANSACCIÓN FRECUENTE
+  const handleSelectFrequent = useCallback((item: any) => {
+    const updates: Partial<FormState> = {
+      amount: item.amount.replace("S/ ", ""),
+      description: item.description || "",
+      category: item.title,
+      frequent: true,
+    };
+    
+    updateFormState(updates);
+    
+    // 🎯 HAPTIC FEEDBACK
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [updateFormState]);
 
-  // Manejar selección de transacción frecuente
-  const handleSelectFrequent = useCallback(
-    (item: any) => {
-      // Autollenar el formulario con los datos de la transacción seleccionada
-      updateFormState({
-        amount: item.amount.replace("S/ ", ""),
-        description: item.description || "",
-        category: item.title,
-        frequent: true,
-      });
-    },
-    [updateFormState]
-  );
+  // 🎯 MANEJO MEJORADO DE DATOS OCR
+  const handleReceiptDataExtracted = useCallback((data: ExtractedReceiptData) => {
+    if (__DEV__) {
+      console.log("📄 [AddTransaction] Datos OCR recibidos:", data);
+    }
 
-  /**
-   * 🔥 FUNCIÓN CORREGIDA - Maneja los datos extraídos del comprobante escaneado
-   */
-  const handleReceiptDataExtracted = useCallback(
-    (data: ExtractedReceiptData) => {
-      console.log(
-        "📄 [AddTransaction] ============ DATOS RECIBIDOS DEL OCR ============"
-      );
-      console.log("📄 [AddTransaction] Datos extraídos:", data);
-
-      setShowScanner(false);
-
-      const updates: Partial<typeof formState> = {};
-      let fieldsUpdated = 0;
-
-      // Aplicar monto si está disponible
-      if (data.amount && data.amount > 0) {
-        updates.amount = data.amount.toString();
-        fieldsUpdated++;
-        console.log("💰 [AddTransaction] Monto aplicado:", data.amount);
-      }
-
-      // Aplicar descripción si está disponible
-      if (data.description && data.description.trim().length > 0) {
-        updates.description = data.description.trim();
-        fieldsUpdated++;
-        console.log("📝 [AddTransaction] Descripción aplicada:", data.description);
-      }
-
-      // Aplicar categoría si está disponible y es válida
-      if (data.category && data.category.trim().length > 0) {
-        updates.category = data.category.trim();
-        fieldsUpdated++;
-        console.log("🏷️ [AddTransaction] Categoría aplicada:", data.category);
-      }
-
-      // 🆕 APLICAR MÉTODO DE PAGO SI ESTÁ DISPONIBLE
-      if (data.paymentmethod && data.paymentmethod.trim().length > 0) {
-        updates.paymentmethod = data.paymentmethod.trim();
-        fieldsUpdated++;
-        console.log("💳 [AddTransaction] Método de pago aplicado:", data.paymentmethod);
-      }
-
-      // 🔥 CORRECCIÓN: Aplicar fecha con ajuste de zona horaria para Perú
-      if (data.date) {
-        try {
-          const extractedDate = new Date(data.date);
-
-          // Verificar que la fecha sea válida
-          if (!isNaN(extractedDate.getTime())) {
-            // Si la fecha extraída no tiene hora específica, usar hora actual
-            if (extractedDate.getHours() === 0 && extractedDate.getMinutes() === 0) {
-              const now = new Date();
-              extractedDate.setHours(now.getHours());
-              extractedDate.setMinutes(now.getMinutes());
-              console.log("🕐 [AddTransaction] Hora actual aplicada a fecha OCR");
-            }
-
-            // 🔥 CLAVE: Crear string local con compensación para zona horaria de Perú
-            const year = extractedDate.getFullYear();
-            const month = String(extractedDate.getMonth() + 1).padStart(2, '0');
-            const day = String(extractedDate.getDate()).padStart(2, '0');
-            const hours = String(extractedDate.getHours()).padStart(2, '0');
-            const minutes = String(extractedDate.getMinutes()).padStart(2, '0');
-
-            // Crear fecha local y luego ajustar para compensar UTC-5
-            const localDate = new Date(
-              extractedDate.getFullYear(),
-              extractedDate.getMonth(),
-              extractedDate.getDate(),
-              extractedDate.getHours(),
-              extractedDate.getMinutes(),
-              0
-            );
-
-            // 🔥 SOLUCIÓN: Restar 5 horas para compensar zona horaria de Perú
-            const adjustedDate = new Date(localDate.getTime() - (5 * 60 * 60 * 1000));
-            const localDateTime = adjustedDate.toISOString();
-
-            if (formState.isPaid) {
-              updates.date = localDateTime;
-              console.log("📅 [AddTransaction] Fecha de pago aplicada (ajustada):", {
-                original: `${hours}:${minutes}`,
-                ajustada: adjustedDate.toLocaleString('es-PE'),
-                paraBackend: localDateTime
-              });
-            } else {
-              updates.dueDate = localDateTime;
-              console.log("📅 [AddTransaction] Fecha de vencimiento aplicada (ajustada):", {
-                original: `${hours}:${minutes}`,
-                ajustada: adjustedDate.toLocaleString('es-PE'),
-                paraBackend: localDateTime
-              });
-            }
-            fieldsUpdated++;
-          } else {
-            console.warn("⚠️ [AddTransaction] Fecha OCR inválida:", data.date);
-          }
-        } catch (error) {
-          console.error("❌ [AddTransaction] Error procesando fecha OCR:", error);
-        }
-      }
-
-      // Aplicar nombre del comercio a la descripción si no hay descripción específica
-      if (data.merchantName && !updates.description && !formState.description) {
-        updates.description = `Compra en ${data.merchantName}`;
-        fieldsUpdated++;
-        console.log("🏪 [AddTransaction] Descripción desde comercio:", updates.description);
-      }
-
-      console.log("🔄 [AddTransaction] Actualizaciones a aplicar:", updates);
-      console.log("📊 [AddTransaction] Campos a actualizar:", fieldsUpdated);
-
-      // Actualizar el formulario con todos los datos
-      if (fieldsUpdated > 0) {
-        updateFormState(updates);
-
-        showToast(
-          "success",
-          "¡Datos extraídos!",
-          `Se completaron automáticamente ${fieldsUpdated} campos del formulario.`
-        );
-
-        console.log("✅ [AddTransaction] Formulario actualizado exitosamente");
-      } else {
-        console.log("⚠️ [AddTransaction] No se encontraron datos válidos para aplicar");
-        showToast(
-          "info",
-          "Comprobante procesado",
-          "Se procesó el comprobante pero no se encontraron datos válidos para llenar automáticamente."
-        );
-      }
-    },
-    [updateFormState, formState.isPaid, formState.description, showToast]
-  );
-
-  /**
-   * FUNCIÓN CORREGIDA - Cierra el scanner y procesa los datos
-   */
-  const handleScannerClose = useCallback(() => {
-    console.log("📷 [AddTransaction] Cerrando scanner...");
     setShowScanner(false);
-  }, []);
+    
+    const updates: Partial<FormState> = {};
+    let fieldsUpdated = 0;
 
+    // 🎯 VALIDACIÓN Y APLICACIÓN DE DATOS
+    if (data.amount && data.amount > 0) {
+      updates.amount = data.amount.toString();
+      fieldsUpdated++;
+    }
+
+    if (data.description?.trim()) {
+      updates.description = data.description.trim();
+      fieldsUpdated++;
+    }
+
+    if (data.category?.trim()) {
+      updates.category = data.category.trim();
+      fieldsUpdated++;
+    }
+
+    if (data.paymentmethod?.trim()) {
+      updates.paymentmethod = data.paymentmethod.trim();
+      fieldsUpdated++;
+    }
+
+    // 🎯 MANEJO MEJORADO DE FECHAS
+    if (data.date) {
+      try {
+        const extractedDate = new Date(data.date);
+        if (!isNaN(extractedDate.getTime())) {
+          const dateField = formState.isPaid ? 'date' : 'dueDate';
+          updates[dateField] = extractedDate.toISOString();
+          fieldsUpdated++;
+        }
+      } catch (error) {
+        console.warn("Error procesando fecha OCR:", error);
+      }
+    }
+
+    // 🎯 APLICAR MERCHANT NAME SI NO HAY DESCRIPCIÓN
+    if (data.merchantName && !updates.description && !formState.description) {
+      updates.description = `Compra en ${data.merchantName}`;
+      fieldsUpdated++;
+    }
+
+    if (fieldsUpdated > 0) {
+      updateFormState(updates);
+      showToast(
+        "success",
+        "¡Datos extraídos!",
+        `Se completaron ${fieldsUpdated} campos automáticamente`
+      );
+    } else {
+      showToast(
+        "info",
+        "Comprobante procesado",
+        "No se encontraron datos válidos para completar"
+      );
+    }
+  }, [updateFormState, formState.isPaid, formState.description, showToast]);
+
+  // 🎯 MANEJO DE SCANNER
   const handleOpenScanner = useCallback(() => {
-    console.log("📷 [AddTransaction] Abriendo scanner...");
     setShowScanner(true);
   }, []);
 
-  const headerColor = TRANSACTION_COLORS[formState.selectedOption];
+  const handleScannerClose = useCallback(() => {
+    setShowScanner(false);
+  }, []);
 
+  // 🎯 RESET AL VOLVER A LA PANTALLA
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        // Cleanup si es necesario
+      };
+    }, [])
+  );
+
+  // 🎯 RENDER PRINCIPAL
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#000" }} edges={["top"]}>
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <ScrollView
-          style={{ flex: 1, backgroundColor: "#FFF" }}
-          contentContainerStyle={{ backgroundColor: "#FFF" }}
-          nestedScrollEnabled={true}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Animated.View style={[styles.animatedContainer, animatedStyle, { backgroundColor: headerColor }]}>
-            <Text style={styles.title}>Agregar</Text>
-            <View style={styles.sliderContainer}>
-              <AgregarSlides
-                colors={TRANSACTION_COLORS}
-                onChange={handleSliderChange}
-              />
-            </View>
-            {/* Botón de escaneo de comprobantes */}
-            <View style={styles.scanButtonContainer}>
-              <TouchableOpacity
-                style={styles.scanButton}
-                onPress={handleOpenScanner}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="scan" size={24} color="#FFF" />
-                <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
-              </TouchableOpacity>
-              {__DEV__ && (
-                <View style={styles.ocrStatusContainer}>
-                  <OCRStatusIndicator showDetails={false} />
-                </View>
-              )}
-            </View>
-            <View style={styles.containerCarousel}>
-              <Carousel
-                title={`${formState.selectedOption} Frecuentes`}
-                items={frequentTransactions}
-                onAddPress={handleCreateTransaction}
-                emptyMessage={`No hay ${formState.selectedOption.toLowerCase()} frecuentes`}
-                hideIfEmpty={true}
-              />
-            </View>
-          </Animated.View>
-          <View style={[styles.amountContainer, { backgroundColor: "#FFF" }]}>
-            <AmountInput
-              value={formState.amount}
-              onChangeText={(value) => updateFormState({ amount: value })}
-            />
-          </View>
-          <View style={[styles.descriptionContainer, { backgroundColor: "#FFF" }]}>
-            <DescriptionInput
-              value={formState.description}
-              onChangeText={(value) => updateFormState({ description: value })}
-            />
-          </View>
-          <TransactionOptions
-            type={TRANSACTION_MAPPING[formState.selectedOption]}
-            onSelectFrequent={(frequent) => updateFormState({ frequent })}
-            onSelectStatus={handleStatusChange}
-            initialFrequent={formState.frequent}
-            initialStatus={formState.isPaid}
-            statusReadOnly={statusReadOnly}
-          />
-          <View style={[styles.categoryContainer, { backgroundColor: "#FFF" }]}>
-            <CategorySelector
-              type={TRANSACTION_MAPPING[formState.selectedOption]}
-              onSelect={(category) => updateFormState({ category })}
-              selectedCategory={formState.category}
-              initialCategory={undefined}
-            />
-          </View>
-          <View style={[styles.paymentContainer, { backgroundColor: "#FFF" }]}>
-            <PaymentMethodSelector
-              type={TRANSACTION_MAPPING[formState.selectedOption]}
-              onSelect={(paymentmethod) => updateFormState({ paymentmethod })}
-              isPending={!formState.isPaid}
-              selectedPaymentMethod={formState.paymentmethod}
-            />
-          </View>
-          <View style={[styles.dateSelectorContainer, { backgroundColor: "#FFF" }]}>
-            <DateTimeSelector
-              selectedDate={formState.isPaid ? formState.date : formState.dueDate}
-              onSelectDate={(date) => {
-                if (formState.isPaid) {
-                  updateFormState({ date });
-                } else {
-                  updateFormState({ dueDate: date });
-                }
-              }}
-              title={formState.isPaid ? "Fecha y hora" : "Fecha y hora de vencimiento"}
-              isPaid={formState.isPaid}
-              disabled={false}
-            />
-          </View>
-          <View style={[styles.addButtonContainer, { backgroundColor: "#FFF" }]}>
-            <TouchableOpacity
-              style={[
-                styles.addButton,
-                {
-                  backgroundColor: TRANSACTION_COLORS[formState.selectedOption],
-                },
-              ]}
-              onPress={handleCreateTransaction}
-              disabled={creating || !isFormValid}
-            >
-              <View style={styles.addButtonContent}>
-                <View style={styles.addIconContainer}>
-                  <Text style={styles.addIconText}>+</Text>
-                </View>
-                <Text style={styles.addButtonText}>
-                  {creating ? "Agregando..." : "Agregar"}
-                </Text>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardAvoid}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* 🎯 HEADER ANIMADO */}
+            <Animated.View style={[styles.headerContainer, animatedHeaderStyle]}>
+              <Text style={styles.title}>Agregar</Text>
+              
+              {/* 🎯 SLIDER DE TIPOS */}
+              <View style={styles.sliderContainer}>
+                <AgregarSlides
+                  colors={TRANSACTION_COLORS}
+                  onChange={handleSliderChange}
+                />
               </View>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </TouchableWithoutFeedback>
+
+              {/* 🎯 BOTÓN DE SCANNER MEJORADO */}
+              <View style={styles.scanButtonContainer}>
+                <TouchableOpacity
+                  style={styles.scanButton}
+                  onPress={handleOpenScanner}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="scan" size={24} color="#FFF" />
+                  <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
+                </TouchableOpacity>
+                
+                {__DEV__ && (
+                  <View style={styles.ocrStatusContainer}>
+                    <OCRStatusIndicator showDetails={false} />
+                  </View>
+                )}
+              </View>
+
+              {/* 🎯 CAROUSEL MEJORADO */}
+              <View style={styles.carouselContainer}>
+                <Carousel
+                  title={`${formState.selectedOption} Frecuentes`}
+                  items={frequentTransactions}
+                  onSelectItem={handleSelectFrequent} // 🔥 Mejor prop name
+                  emptyMessage={`No hay ${formState.selectedOption.toLowerCase()} frecuentes`}
+                  hideIfEmpty={true}
+                  loading={loadingFrequent}
+                />
+              </View>
+            </Animated.View>
+
+            {/* 🎯 FORMULARIO PRINCIPAL */}
+            <View style={styles.formContainer}>
+              
+              {/* 🎯 INPUT DE MONTO */}
+              <View style={styles.inputSection}>
+                <AmountInput
+                  ref={amountInputRef}
+                  value={formState.amount}
+                  onChangeText={(value) => updateFormState({ amount: value })}
+                  isValid={formValidation.fieldValidation.amount}
+                />
+              </View>
+
+              {/* 🎯 INPUT DE DESCRIPCIÓN */}
+              <View style={styles.inputSection}>
+                <DescriptionInput
+                  value={formState.description}
+                  onChangeText={(value) => updateFormState({ description: value })}
+                  placeholder={`Describe tu ${formState.selectedOption.toLowerCase()}...`}
+                />
+              </View>
+
+              {/* 🎯 OPCIONES DE TRANSACCIÓN */}
+              <TransactionOptions
+                type={TRANSACTION_MAPPING[formState.selectedOption]}
+                onSelectFrequent={(frequent) => updateFormState({ frequent })}
+                onSelectStatus={handleStatusChange}
+                initialFrequent={formState.frequent}
+                initialStatus={formState.isPaid}
+                statusReadOnly={statusReadOnly}
+              />
+
+              {/* 🎯 SELECTOR DE CATEGORÍA */}
+              <View style={styles.inputSection}>
+                <CategorySelector
+                  type={TRANSACTION_MAPPING[formState.selectedOption]}
+                  onSelect={(category) => updateFormState({ category })}
+                  selectedCategory={formState.category}
+                  isValid={formValidation.fieldValidation.category}
+                />
+              </View>
+
+              {/* 🎯 SELECTOR DE MÉTODO DE PAGO */}
+              <View style={styles.inputSection}>
+                <PaymentMethodSelector
+                  type={TRANSACTION_MAPPING[formState.selectedOption]}
+                  onSelect={(paymentmethod) => updateFormState({ paymentmethod })}
+                  isPending={!formState.isPaid}
+                  selectedPaymentMethod={formState.paymentmethod}
+                />
+              </View>
+
+              {/* 🎯 SELECTOR DE FECHA */}
+              <View style={styles.inputSection}>
+                <DateTimeSelector
+                  selectedDate={formState.isPaid ? formState.date : formState.dueDate}
+                  onSelectDate={(date) => {
+                    const field = formState.isPaid ? 'date' : 'dueDate';
+                    updateFormState({ [field]: date });
+                  }}
+                  title={formState.isPaid ? "Fecha y hora" : "Fecha y hora de vencimiento"}
+                  isPaid={formState.isPaid}
+                  disabled={false}
+                />
+              </View>
+
+              {/* 🎯 BOTÓN DE AGREGAR MEJORADO */}
+              <Animated.View style={[styles.addButtonContainer, animatedButtonStyle]}>
+                <TouchableOpacity
+                  style={[
+                    styles.addButton,
+                    {
+                      backgroundColor: TRANSACTION_COLORS[formState.selectedOption],
+                      opacity: (!formValidation.isValid || isSubmitting) ? 0.6 : 1,
+                    },
+                  ]}
+                  onPress={handleCreateTransaction}
+                  disabled={creating || !formValidation.isValid || isSubmitting}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.addButtonContent}>
+                    <View style={styles.addIconContainer}>
+                      <Ionicons 
+                        name={creating ? "hourglass" : "add"} 
+                        size={20} 
+                        color="#FFF" 
+                      />
+                    </View>
+                    <Text style={styles.addButtonText}>
+                      {creating ? "Agregando..." : "Agregar"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Animated.View>
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
+
+      {/* 🎯 SCANNER MODAL */}
       <ReceiptScanner
         visible={showScanner}
         onClose={handleScannerClose}
@@ -593,126 +623,110 @@ export default function AddTransaction() {
   );
 }
 
+// 🎯 ESTILOS OPTIMIZADOS
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "#000",
   },
-  centeredContainer: {
+  keyboardAvoid: {
     flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
+  },
+  scrollView: {
+    flex: 1,
     backgroundColor: "#FFF",
   },
-  scrollContainer: {
-    paddingBottom: 50,
+  scrollContent: {
+    backgroundColor: "#FFF",
   },
-  animatedContainer: {
-    padding: 20,
-    width: "100%",
-    alignSelf: "center",
+  headerContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
   },
   title: {
-    fontSize: 30,
-    fontFamily: "Outfit_600SemiBold",
+    fontSize: 32,
+    fontFamily: "Outfit_700Bold",
     color: "#FFFFFF",
     textAlign: "center",
-    lineHeight: 35,
-    marginBottom: 10,
-    alignSelf: "center",
+    marginBottom: 16,
   },
   sliderContainer: {
-    marginBottom: 10,
+    marginBottom: 16,
   },
   scanButtonContainer: {
-    marginVertical: 15,
+    marginVertical: 16,
     alignItems: "center",
     position: "relative",
   },
   scanButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 25,
+    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderColor: "rgba(255, 255, 255, 0.2)",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   scanButtonText: {
     color: "#FFF",
     fontSize: 16,
-    fontFamily: "Outfit_500Medium",
+    fontFamily: "Outfit_600SemiBold",
     marginLeft: 8,
   },
   ocrStatusContainer: {
     position: "absolute",
-    top: -5,
-    right: -5,
+    top: -8,
+    right: -8,
     zIndex: 10,
   },
-  containerCarousel: {
-    marginVertical: 15,
+  carouselContainer: {
+    marginTop: 8,
     overflow: "visible",
   },
-  amountContainer: {
-    marginTop: 15,
-    marginHorizontal: 20,
-  },
-  descriptionContainer: {
-    width: "100%",
-    marginTop: 15,
+  formContainer: {
     paddingHorizontal: 20,
+    paddingTop: 24,
+    paddingBottom: 40,
   },
-  categoryContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  paymentContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
-  },
-  dateSelectorContainer: {
-    marginTop: 20,
-    paddingHorizontal: 20,
+  inputSection: {
     marginBottom: 20,
   },
   addButtonContainer: {
-    marginTop: 30,
+    marginTop: 32,
     alignItems: "center",
-    marginBottom: 30,
   },
   addButton: {
-    width: "80%",
-    height: 60,
-    borderRadius: 40,
+    width: "100%",
+    height: 56,
+    borderRadius: 28,
     justifyContent: "center",
     alignItems: "center",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
-    elevation: 5, // Para sombra en Android
-    marginBottom: 20,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
   },
   addButtonContent: {
     flexDirection: "row",
     alignItems: "center",
   },
   addIconContainer: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    borderWidth: 2,
-    borderColor: "#FFF",
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255, 255, 255, 0.2)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
-  },
-  addIconText: {
-    color: "#FFF",
-    fontSize: 18,
-    fontWeight: "bold",
+    marginRight: 12,
   },
   addButtonText: {
     fontSize: 18,
