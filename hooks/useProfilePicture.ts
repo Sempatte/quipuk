@@ -1,4 +1,4 @@
-// hooks/useProfilePicture.ts
+// hooks/useProfilePicture.ts - CORREGIDO
 import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { Alert } from 'react-native';
@@ -11,7 +11,8 @@ export interface ProfilePictureState {
   isUploading: boolean;
   isDeleting: boolean;
   uploadProgress: number;
-  hasInitiallyLoaded: boolean; // 🆕 Nuevo estado
+  hasInitiallyLoaded: boolean;
+  isInitialLoading: boolean; // 🆕 Distinguir entre carga inicial y operaciones
 }
 
 export interface UseProfilePictureReturn {
@@ -28,21 +29,22 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false); // 🆕
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false);
 
   // Query para obtener perfil del usuario
   const { data, refetch, loading } = useQuery(GET_USER_PROFILE, {
-    fetchPolicy: 'cache-first', // 🆕 Cambiar a cache-first
+    fetchPolicy: 'cache-first',
     errorPolicy: 'all',
-    notifyOnNetworkStatusChange: false, // 🆕 Desactivar notificaciones
+    notifyOnNetworkStatusChange: false,
   });
 
-  // 🆕 Efecto para marcar como cargado inicialmente
+  // 🔧 SOLUCIÓN: Efecto mejorado para marcar como cargado
   useEffect(() => {
-    if (data?.getUserProfile) {
+    // Marcar como cargado tan pronto como tengamos datos O cuando termine la carga inicial
+    if (data?.getUserProfile !== undefined || !loading) {
       setHasInitiallyLoaded(true);
     }
-  }, [data]);
+  }, [data, loading]);
 
   // Mutation para eliminar foto de perfil
   const [deleteProfilePictureMutation] = useMutation(DELETE_PROFILE_PICTURE, {
@@ -56,13 +58,14 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
     }
   });
 
-  // Estado combinado
+  // 🔧 SOLUCIÓN: Estado combinado mejorado
   const state: ProfilePictureState = {
     profilePictureUrl: data?.getUserProfile?.profilePictureUrl || null,
     isUploading,
     isDeleting,
     uploadProgress,
-    hasInitiallyLoaded, // 🆕
+    hasInitiallyLoaded,
+    isInitialLoading: loading && !hasInitiallyLoaded, // 🆕 Solo true durante carga inicial real
   };
 
   /**

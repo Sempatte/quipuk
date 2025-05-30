@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx
+// app/(tabs)/profile.tsx - CORREGIDO
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
@@ -38,8 +38,7 @@ export default function Profile() {
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
     GET_USER_PROFILE,
     {
-      // 🆕 Configuración mejorada para evitar loading innecesario
-      fetchPolicy: 'cache-first', // Usar caché primero
+      fetchPolicy: 'cache-first',
       errorPolicy: 'all',
       notifyOnNetworkStatusChange: true,
     }
@@ -102,11 +101,18 @@ export default function Profile() {
     }
   }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
 
-  // 🆕 Determinar si mostrar loading en el avatar
-  const shouldShowAvatarLoading = () => {
-    // 🔧 CLAVE: Solo mostrar loading durante operaciones reales, no durante carga de imagen
+  // 🔧 SOLUCIÓN: Lógica mejorada para determinar cuándo mostrar loading en el avatar
+  const shouldShowAvatarLoading = useCallback(() => {
+    // Solo mostrar loading durante operaciones reales (subir/eliminar)
+    // NO durante la carga inicial del perfil
     return profilePictureState.isUploading || profilePictureState.isDeleting;
-  };
+  }, [profilePictureState.isUploading, profilePictureState.isDeleting]);
+
+  // 🔧 SOLUCIÓN: Determinar si mostrar loading general de la pantalla
+  const shouldShowGeneralLoading = useCallback(() => {
+    // Solo mostrar loading general si es la primera carga Y no hay datos
+    return profilePictureState.isInitialLoading && !data?.getUserProfile;
+  }, [profilePictureState.isInitialLoading, data?.getUserProfile]);
 
   if (error) {
     return (
@@ -139,11 +145,11 @@ export default function Profile() {
             editable={true}
             onPress={handleAvatarPress}
             onEdit={selectAndUploadImage}
-            loading={shouldShowAvatarLoading()} // 🆕 Lógica mejorada
+            loading={shouldShowAvatarLoading()} // 🔧 SOLUCIÓN: Lógica mejorada
             progress={profilePictureState.uploadProgress}
           />
           
-          {/* 🆕 Mensajes de estado más específicos */}
+          {/* 🔧 SOLUCIÓN: Mensajes de estado más específicos y condicionales */}
           {profilePictureState.isUploading && (
             <Text style={styles.uploadingText}>
               Subiendo imagen... {Math.round(profilePictureState.uploadProgress)}%
@@ -156,8 +162,8 @@ export default function Profile() {
         </View>
 
         <View style={styles.contentContainer}>
-          {/* 🆕 Mostrar loading solo si no hay datos y está cargando */}
-          {(loading && !data?.getUserProfile) ? (
+          {/* 🔧 SOLUCIÓN: Loading general mejorado */}
+          {shouldShowGeneralLoading() ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#00DC5A" />
               <Text style={styles.loadingText}>Cargando perfil...</Text>
@@ -296,7 +302,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
-    minHeight: 200, // 🆕 Altura mínima para evitar saltos
+    minHeight: 200,
   },
   loadingText: {
     marginTop: 10,

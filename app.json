@@ -19,7 +19,7 @@
     ],
     "ios": {
       "jsEngine": "hermes",
-      "userInterfaceStyle": "light",
+      "userInterfaceStyle": "dark",
       "supportsTablet": true,
       "bundleIdentifier": "com.quipuk.app",
       "buildNumber": "1",
