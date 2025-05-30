@@ -1,268 +1,311 @@
-// components/ui/CategorySelector.tsx - CORREGIDO
-import { gastosIcons, ingresosIcons } from "@/app/contants/iconDictionary";
-import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from "react-native";
+// components/ui/CategorySelector.tsx
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
+import { gastosIcons, ingresosIcons } from '@/app/contants/iconDictionary';
+import { useCategories, Category } from '@/hooks/useCategories';
+import { TransactionType } from '@/app/interfaces/transaction.interface';
 
-// Definir los tipos de propiedades
+const { width: screenWidth } = Dimensions.get('window');
+
+// 🎨 COLORES DINÁMICOS POR TIPO DE TRANSACCIÓN
+const SELECTION_COLORS = {
+  gasto: '#FF5252',    // Rojo para gastos
+  ingreso: '#00DC5A',  // Verde para ingresos  
+  ahorro: '#2196F3',   // Azul para ahorros
+} as const;
+
 interface CategorySelectorProps {
   type: "gasto" | "ingreso" | "ahorro";
   onSelect: (category: string) => void;
-  initialCategory?: string; // 🆕 Nueva prop para categoría inicial
-  selectedCategory?: string; // 🆕 Nueva prop para categoría controlada
+  selectedCategory?: string;
+  initialCategory?: string;
 }
 
-const categoryData = {
-  gasto: {
-    mainCategories: ["Frecuentes", "Deducibles", "Otros"],
-    subCategories: [
-      "Alquiler",
-      "Hogar",
-      "Telefono",
-      "Super",
-      "Comida",
-      "Suscripciones",
-      "Ropa",
-      "Cuidado personal",
-      "Bienestar",
-      "Fiestas",
-      "Transporte",
-      "Gasolina",
-      "Tarjeta",
-      "Deudas",
-      "Educación",
-      "Mascotas"
-    ],
-    selectedColor: "#FF5252",
-  },
-  ingreso: {
-    mainCategories: [],
-    subCategories: [
-      "Empleo",
-      "Trabajo Independiente",
-      "Director",
-      "Alquiler",
-      "Airbnb",
-      "Bolsa",
-      "Intereses",
-      "Otros Ingresos"
-    ],
-    selectedColor: "#65CE13",
-  },
-  ahorro: {
-    mainCategories: [],
-    subCategories: ["Cuenta de Ahorro", "Fondo de Inversión", "Cuenta de Retiro", "Cuenta de Inversión", "Cuenta de Emergencia"],
-    selectedColor: "#2196F3",
-  }
-};
-
-// Función para truncar texto si es demasiado largo
-const truncateText = (text: string, maxLength: number) => {
-  return text.length > maxLength ? text.substring(0, maxLength).trim() + "." : text;
-};
-
-const MAX_LENGTH_FOR_SUBCATEGORY = 16;
-
-const CategorySelector: React.FC<CategorySelectorProps> = ({ 
-  type, 
-  onSelect, 
+export const CategorySelector: React.FC<CategorySelectorProps> = ({
+  type,
+  onSelect,
+  selectedCategory,
   initialCategory,
-  selectedCategory 
 }) => {
-  // Si es tipo ahorro, no mostrar el componente
-  if (type === "ahorro") {
-    return null;
-  }
-
-  // 🔧 CORRECCIÓN: Usar categoría controlada o inicial
-  const [internalSelectedCategory, setInternalSelectedCategory] = useState(
-    selectedCategory || initialCategory || ""
+  const [selected, setSelected] = useState<string>(
+    selectedCategory || initialCategory || ''
   );
 
-  // 🔧 CORRECCIÓN: Sincronizar con prop externa
+  const { getCategoriesByType, getCategoryColor } = useCategories();
+
+  // 🔄 ACTUALIZAR SELECCIÓN CUANDO CAMBIE LA PROP
   useEffect(() => {
-    if (selectedCategory !== undefined && selectedCategory !== internalSelectedCategory) {
-      console.log('🏷️ [CategorySelector] Sincronizando categoría externa:', selectedCategory);
-      setInternalSelectedCategory(selectedCategory);
+    if (selectedCategory !== undefined) {
+      setSelected(selectedCategory);
     }
-  }, [selectedCategory, internalSelectedCategory]);
+  }, [selectedCategory]);
 
-  // 🔧 CORRECCIÓN: Aplicar categoría inicial al montar
-  useEffect(() => {
-    if (initialCategory && !internalSelectedCategory) {
-      console.log('🏷️ [CategorySelector] Aplicando categoría inicial:', initialCategory);
-      setInternalSelectedCategory(initialCategory);
-      onSelect(initialCategory);
-    }
-  }, [initialCategory, internalSelectedCategory, onSelect]);
+  // 🎯 OBTENER COLOR DINÁMICO SEGÚN EL TIPO
+  const selectionColor = SELECTION_COLORS[type];
 
-  const subCategories = categoryData[type].subCategories;
-  const iconSet = type === "gasto" ? gastosIcons : ingresosIcons;
-  const selectedColor = categoryData[type].selectedColor;
+  // 🎯 OBTENER CATEGORÍAS E ICONOS SEGÚN EL TIPO
+  const categories = getCategoriesByType(type);
+  const icons = type === 'gasto' ? gastosIcons : ingresosIcons;
 
-  const handleSelectCategory = (category: string) => {
-    console.log('🏷️ [CategorySelector] Categoría seleccionada:', category);
-    setInternalSelectedCategory(category);
-    onSelect(category);
+  // 🎯 MANEJAR SELECCIÓN
+  const handleSelect = (category: string) => {
+    const newSelection = selected === category ? '' : category;
+    setSelected(newSelection);
+    onSelect(newSelection);
   };
 
-  // 🔧 CORRECCIÓN: Usar estado interno actualizado
-  const currentSelection = selectedCategory || internalSelectedCategory;
-
-  // Agrupar subcategorías en "páginas" de 2 filas (3 columnas por fila)
-  const COLUMNS = 3;
-  const ROWS = 2;
-  const PAGE_SIZE = COLUMNS * ROWS;
-  const { width: windowWidth } = Dimensions.get('window');
-  const PAGE_WIDTH = Math.round(windowWidth * 0.88); // 88% del ancho de pantalla
-  const CATEGORY_SIZE = Math.floor((PAGE_WIDTH - 32) / COLUMNS); // 16px padding lateral
-  const pages: string[][] = [];
-  for (let i = 0; i < subCategories.length; i += PAGE_SIZE) {
-    pages.push(subCategories.slice(i, i + PAGE_SIZE));
+  // 🎯 AGRUPAR CATEGORÍAS EN PÁGINAS DE 3x2 (6 items por página)
+  const itemsPerPage = 6;
+  const pages: Category[][] = [];
+  
+  for (let i = 0; i < categories.length; i += itemsPerPage) {
+    pages.push(categories.slice(i, i + itemsPerPage));
   }
+
+  // 🎯 CALCULAR DIMENSIONES CON SEPARACIÓN
+  const containerPadding = 40; // padding horizontal total del contenedor
+  const itemSpacing = 12; // separación entre items
+  const pageWidth = screenWidth - containerPadding;
+  const totalSpacingPerRow = itemSpacing * 2; // 2 espacios entre 3 items
+  const itemWidth = (pageWidth - totalSpacingPerRow) / 3; // 3 columnas
+  const itemHeight = 100; // altura fija para mantener diseño
+
+  const renderCategoryItem = (category: Category, pageIndex: number, itemIndex: number) => {
+    const icon = icons[category.name] || icons['Otros'] || icons['Otros Ingresos'];
+    const isSelected = selected === category.name;
+    const key = `${pageIndex}-${itemIndex}-${category.name}`;
+
+    return (
+      <TouchableOpacity
+        key={key}
+        style={[
+          styles.categoryItem,
+          {
+            width: itemWidth,
+            height: itemHeight,
+            marginHorizontal: itemSpacing / 2, // separación horizontal
+          },
+          isSelected && [
+            styles.categoryItemSelected,
+            { 
+              backgroundColor: selectionColor,
+              borderColor: selectionColor,
+            }
+          ],
+        ]}
+        onPress={() => handleSelect(category.name)}
+        activeOpacity={0.7}
+      >
+        {/* Ícono */}
+        <View style={styles.iconContainer}>
+          {React.cloneElement(icon, {
+            width: 40,
+            height: 40,
+          })}
+        </View>
+
+        {/* Texto */}
+        <Text 
+          style={[
+            styles.categoryText,
+            isSelected && styles.categoryTextSelected,
+          ]}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {category.name}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderPage = (pageCategories: Category[], pageIndex: number) => {
+    // 🎯 ORGANIZAR EN 2 FILAS DE 3 COLUMNAS
+    const firstRow = pageCategories.slice(0, 3);
+    const secondRow = pageCategories.slice(3, 6);
+
+    return (
+      <View 
+        key={pageIndex}
+        style={[styles.page, { width: pageWidth }]}
+      >
+        {/* Primera fila */}
+        <View style={styles.row}>
+          {firstRow.map((category, index) => 
+            renderCategoryItem(category, pageIndex, index)
+          )}
+          {/* Rellenar espacios vacíos para mantener layout */}
+          {firstRow.length < 3 && 
+            Array.from({ length: 3 - firstRow.length }).map((_, index) => (
+              <View 
+                key={`empty-first-${index}`} 
+                style={{ 
+                  width: itemWidth, 
+                  height: itemHeight,
+                  marginHorizontal: itemSpacing / 2,
+                }} 
+              />
+            ))
+          }
+        </View>
+
+        {/* Separación entre filas */}
+        <View style={{ height: itemSpacing }} />
+
+        {/* Segunda fila */}
+        <View style={styles.row}>
+          {secondRow.map((category, index) => 
+            renderCategoryItem(category, pageIndex, index + 3)
+          )}
+          {/* Rellenar espacios vacíos para mantener layout */}
+          {secondRow.length < 3 && 
+            Array.from({ length: 3 - secondRow.length }).map((_, index) => (
+              <View 
+                key={`empty-second-${index}`} 
+                style={{ 
+                  width: itemWidth, 
+                  height: itemHeight,
+                  marginHorizontal: itemSpacing / 2,
+                }} 
+              />
+            ))
+          }
+        </View>
+      </View>
+    );
+  };
 
   return (
     <View style={styles.container}>
+      {/* Título */}
       <Text style={styles.title}>Categoría</Text>
+
+      {/* ScrollView horizontal con páginas */}
       <ScrollView
         horizontal
+        pagingEnabled
         showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.horizontalScroll}
-        snapToInterval={PAGE_WIDTH + 20}
+        contentContainerStyle={styles.scrollContent}
+        style={styles.scrollView}
         decelerationRate="fast"
-        snapToAlignment="start"
-        overScrollMode="never"
       >
-        {pages.map((page, pageIndex) => (
-          <View
-            key={pageIndex}
-            style={[
-              styles.pageContainer,
-              { width: PAGE_WIDTH, marginHorizontal: 10 },
-              pageIndex === 0 && { marginLeft: 16 }, // margen extra al inicio
-              pageIndex === pages.length - 1 && { marginRight: 16 } // margen extra al final
-            ]}
-          >
-            {/* Renderizar 2 filas */}
-            {[0, 1].map(rowIdx => {
-              const rowCategories = page.slice(rowIdx * COLUMNS, (rowIdx + 1) * COLUMNS);
-              const emptySlots = COLUMNS - rowCategories.length;
-              return (
-                <View key={rowIdx} style={styles.rowContainer}>
-                  {rowCategories.map((category) => {
-                    const isSelected = currentSelection === category;
-                    return (
-                      <View key={category} style={[styles.categoryWrapper, { width: CATEGORY_SIZE, height: CATEGORY_SIZE }]}> 
-                        <TouchableOpacity
-                          style={[
-                            styles.subCategoryButton,
-                            isSelected && { backgroundColor: selectedColor },
-                            { width: CATEGORY_SIZE - 8, height: CATEGORY_SIZE - 8 },
-                          ]}
-                          onPress={() => handleSelectCategory(category)}
-                          activeOpacity={0.85}
-                        >
-                          {iconSet[category] && (
-                            <View style={[
-                              styles.icon,
-                              isSelected && styles.selectedIcon
-                            ]}>
-                              {React.cloneElement(iconSet[category], isSelected ? { color: '#FFF' } : {})}
-                            </View>
-                          )}
-                        </TouchableOpacity>
-                        <Text style={[
-                          styles.subCategoryText,
-                          isSelected && styles.selectedCategoryText,
-                          { width: CATEGORY_SIZE - 8, textAlign: 'center' }
-                        ]} numberOfLines={2}>
-                          {truncateText(category, MAX_LENGTH_FOR_SUBCATEGORY)}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                  {/* Espaciadores invisibles para centrar la fila */}
-                  {Array.from({ length: emptySlots }).map((_, idx) => (
-                    <View key={`spacer-${rowIdx}-${idx}`} style={{ width: CATEGORY_SIZE, height: CATEGORY_SIZE, marginHorizontal: 4, marginVertical: 4 }} />
-                  ))}
-                </View>
-              );
-            })}
-          </View>
-        ))}
+        {pages.map((pageCategories, pageIndex) => 
+          renderPage(pageCategories, pageIndex)
+        )}
       </ScrollView>
+
+      {/* Indicadores de página */}
+      {pages.length > 1 && (
+        <View style={styles.pageIndicators}>
+          {pages.map((_, index) => (
+            <View
+              key={index}
+              style={styles.pageIndicator}
+            />
+          ))}
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    paddingHorizontal: 0,
+    width: '100%',
   },
+  
   title: {
-    fontSize: 22,
-    fontFamily: "Outfit_600SemiBold",
-    marginBottom: 5,
-    lineHeight: 25,
+    fontSize: 18,
+    fontFamily: 'Outfit_600SemiBold',
+    color: '#000',
+    marginBottom: 16,
   },
-  subCategoryContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "flex-start",
-    backgroundColor: "#F8F8F8",
-    borderRadius: 15,
-    padding: 15,
+  
+  scrollView: {
+    flexGrow: 0,
   },
-  categoryWrapper: {
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginHorizontal: 4,
-    marginVertical: 4,
-  },
-  subCategoryButton: {
-    width: 75,
-    height: 75,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-  },
-  subCategoryText: {
-    fontSize: 14,
-    marginTop: 5,
-    color: "#000",
-    fontFamily: "Outfit_400Regular",
-    textAlign: "center",
-  },
-  selectedCategoryText: {
-    color: "#000",
-    fontFamily: "Outfit_500Medium",
-  },
-  icon: {
-    width: "80%",
-    height: "80%",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  selectedIcon: {
-    // Antes: filter: 'brightness(0) invert(1)',
-    // Si el icono es SVG, se debe pasar color blanco desde el render
-  },
-  horizontalScroll: {
-    flexDirection: 'row',
+  
+  scrollContent: {
     alignItems: 'flex-start',
   },
-  pageContainer: {
-    flexDirection: 'column',
+  
+  page: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'transparent',
+    paddingVertical: 10,
   },
-  rowContainer: {
+  
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'center', // 🎯 CENTRADO PERFECTO
+    alignItems: 'center',
+    width: '100%',
+  },
+  
+  categoryItem: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E8EB',
+    padding: 8,
+    // 🎯 SOMBRA SUTIL
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  
+  categoryItemSelected: {
+    // 🎯 ESTILOS BASE PARA SELECCIÓN (el color se aplica dinámicamente)
+    // 🎯 SOMBRA MÁS PRONUNCIADA CUANDO ESTÁ SELECCIONADO
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  
+  iconContainer: {
+    marginBottom: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  
+  categoryText: {
+    fontSize: 12,
+    fontFamily: 'Outfit_500Medium',
+    color: '#2C3E50',
+    textAlign: 'center',
+  },
+  
+  categoryTextSelected: {
+    color: '#FFFFFF',
+  },
+  
+  pageIndicators: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 12,
+    alignItems: 'center',
+    marginTop: 12,
+    gap: 6,
+  },
+  
+  pageIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#E5E8EB',
   },
 });
 
