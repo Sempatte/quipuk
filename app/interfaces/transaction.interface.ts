@@ -27,7 +27,7 @@ export interface Transaction {
   frequent: boolean;
   category: string;
   status?: TransactionStatus;
-  dueDate?: string;
+  dueDate: Date;
   createdAt: string;
   updatedAt: string;
   paymentmethod: string;
@@ -61,7 +61,7 @@ export interface CreateTransactionInput {
   frequent: boolean;
   category: string;
   status?: TransactionStatus;
-  dueDate?: Date;
+  dueDate: Date;
   paymentmethod: string;
 }
 

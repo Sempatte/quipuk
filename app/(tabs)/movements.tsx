@@ -1,6 +1,7 @@
 import React, { useCallback, useState, useRef, useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { useQuery } from "@apollo/client";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
@@ -264,17 +265,23 @@ export default function Movements() {
 
   if (loading) return <Loader visible fullScreen text="Cargando movimientos..." />;
   if (error) return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.center}><Text>Error: {error.message}</Text></View>
-    </SafeAreaView>
+    <View style={styles.errorContainer}>
+      {/* 🔧 StatusBar siempre negro */}
+      <StatusBar style="light" backgroundColor="#000000" />
+      <Text style={styles.errorText}>Error: {error.message}</Text>
+    </View>
   );
 
   const today = new Date();
   const canNext = referenceDay.getMonth() < today.getMonth() || referenceDay.getFullYear() < today.getFullYear();
 
   return (
-    <>
-      <SafeAreaView style={{ backgroundColor: "#000" }} edges={["top"]}>
+    <View style={styles.container}>
+      {/* 🔧 SOLUCIÓN: StatusBar siempre negro */}
+      <StatusBar style="light" backgroundColor="#000000" />
+      
+      {/* 🔧 SOLUCIÓN: Header negro con SafeAreaView */}
+      <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
         <Animated.View style={[styles.header, animatedHeader]}>
           <Text style={styles.title}>Transacciones</Text>
           
@@ -323,16 +330,21 @@ export default function Movements() {
         </Animated.View>
       </SafeAreaView>
       
-      <FlatList
-        data={grouped}
-        keyExtractor={item => item[0]}
-        renderItem={renderItem}
-        ListHeaderComponent={<BalanceHeader {...stats} monthYear={monthYear} />}
-        removeClippedSubviews
-        maxToRenderPerBatch={8}
-        windowSize={8}
-        initialNumToRender={4}
-      />
+      {/* 🔧 SOLUCIÓN: Lista con fondo blanco */}
+      <View style={styles.listContainer}>
+        <FlatList
+          data={grouped}
+          keyExtractor={item => item[0]}
+          renderItem={renderItem}
+          ListHeaderComponent={<BalanceHeader {...stats} monthYear={monthYear} />}
+          removeClippedSubviews
+          maxToRenderPerBatch={8}
+          windowSize={8}
+          initialNumToRender={4}
+          style={styles.flatList}
+          contentContainerStyle={styles.flatListContent}
+        />
+      </View>
       
       <Modal visible={calendarVisible} transparent animationType="fade">
         <View style={styles.modal}>
@@ -363,48 +375,242 @@ export default function Movements() {
           </View>
         </View>
       </Modal>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F5F5F5" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  // 🔧 SOLUCIÓN: Estructura de contenedores corregida
+  container: { 
+    flex: 1, 
+    backgroundColor: "#F5F5F5" 
+  },
+  
+  // 🔧 SOLUCIÓN: SafeArea para el header negro
+  headerSafeArea: {
+    backgroundColor: "#000000"
+  },
+  
   header: {
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 10 : 16,
+    paddingTop: 10,
     paddingBottom: 16,
-    backgroundColor: "#000",
+    backgroundColor: "#000000",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    minHeight: Platform.OS === 'ios' ? 180 : 200,
+    minHeight: Platform.OS === 'ios' ? 160 : 180,
   },
-  title: { fontSize: 26, color: "#F5F5F5", fontWeight: "bold", textAlign: "center", fontFamily: "Outfit_500Medium", marginBottom: 10 },
-  monthContainer: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 10, width: "90%", alignSelf: "center" },
-  monthButton: { flex: 1, paddingVertical: 8, paddingHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: "#FFF", alignItems: "center" },
-  arrow: { padding: 10, width: 44, alignItems: "center", justifyContent: "center" },
-  monthText: { fontSize: 20, fontWeight: "bold", color: "#00DC5A" },
-  arrowText: { color: "#FFF", fontSize: 24 },
-  disabled: { color: "#555" },
-  daysWrapper: { height: 90, marginTop: 8 },
-  daysContainer: { paddingVertical: 8, paddingHorizontal: 10, minWidth: width },
-  dayContainer: { alignItems: "center" },
-  dayButton: { alignItems: "center", padding: 8, borderRadius: 10, width: DAY_WIDTH, height: 70 },
-  dayActive: { backgroundColor: "#00DC5A", borderColor: "#00DC5A", borderWidth: 1 },
-  dayWithTx: { borderColor: "#00DC5A", borderWidth: 1 },
-  dayEmpty: { borderColor: "#FFF", borderWidth: 1 },
-  dayFuture: { borderColor: "#555", borderWidth: 1 },
-  dayNumber: { color: "#FFF", fontSize: 18, fontFamily: "Outfit_500Medium" },
-  dayLabel: { color: "#FFF", fontSize: 14, fontFamily: "Outfit_500Medium" },
-  futureText: { color: "#555" },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#00DC5A", marginTop: 9 },
-  dotActive: { backgroundColor: "#FFF" },
-  todayText: { color: "#FFF", fontSize: 7.5, marginTop: 2, fontWeight: "bold", lineHeight: 10 },
-  group: { marginBottom: 20, paddingHorizontal: 15 },
-  groupDate: { fontSize: 16, fontWeight: "bold", color: "#000", marginBottom: 8 },
-  empty: { fontSize: 14, color: "#666", fontStyle: "italic", textAlign: "center", paddingVertical: 10 },
-  modal: { flex: 1, justifyContent: "center", backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center" },
-  calendarBox: { width: "90%", backgroundColor: "#fff", padding: 16, borderRadius: 16, elevation: 5 },
-  closeBtn: { marginTop: 12, alignSelf: "center", paddingVertical: 8, paddingHorizontal: 20, backgroundColor: "#00DC5A", borderRadius: 8 },
-  closeBtnText: { color: "#fff", fontWeight: "bold" },
+  
+  // 🔧 SOLUCIÓN: Contenedor para la lista con fondo blanco
+  listContainer: {
+    flex: 1,
+    backgroundColor: "#F5F5F5"
+  },
+  
+  flatList: {
+    flex: 1,
+    backgroundColor: "#F5F5F5"
+  },
+  
+  flatListContent: {
+    backgroundColor: "#F5F5F5",
+    paddingBottom: 20
+  },
+  
+  // 🔧 SOLUCIÓN: Container de error con fondo claro
+  errorContainer: { 
+    flex: 1, 
+    justifyContent: "center", 
+    alignItems: "center",
+    backgroundColor: "#F5F5F5",
+    padding: 20
+  },
+  
+  errorText: {
+    fontSize: 16,
+    color: "#E74C3C",
+    textAlign: "center",
+    fontFamily: "Outfit_500Medium"
+  },
+
+  title: { 
+    fontSize: 26, 
+    color: "#F5F5F5", 
+    fontWeight: "bold", 
+    textAlign: "center", 
+    fontFamily: "Outfit_500Medium", 
+    marginBottom: 10 
+  },
+  
+  monthContainer: { 
+    flexDirection: "row", 
+    justifyContent: "space-between", 
+    alignItems: "center", 
+    marginVertical: 10, 
+    width: "90%", 
+    alignSelf: "center" 
+  },
+  
+  monthButton: { 
+    flex: 1, 
+    paddingVertical: 8, 
+    paddingHorizontal: 16, 
+    borderRadius: 10, 
+    borderWidth: 1, 
+    borderColor: "#FFF", 
+    alignItems: "center" 
+  },
+  
+  arrow: { 
+    padding: 10, 
+    width: 44, 
+    alignItems: "center", 
+    justifyContent: "center" 
+  },
+  
+  monthText: { 
+    fontSize: 20, 
+    fontWeight: "bold", 
+    color: "#00DC5A" 
+  },
+  
+  arrowText: { 
+    color: "#FFF", 
+    fontSize: 24 
+  },
+  
+  disabled: { 
+    color: "#555" 
+  },
+  
+  daysWrapper: { 
+    height: 90, 
+    marginTop: 8 
+  },
+  
+  daysContainer: { 
+    paddingVertical: 8, 
+    paddingHorizontal: 10, 
+    minWidth: width 
+  },
+  
+  dayContainer: { 
+    alignItems: "center" 
+  },
+  
+  dayButton: { 
+    alignItems: "center", 
+    padding: 8, 
+    borderRadius: 10, 
+    width: DAY_WIDTH, 
+    height: 70 
+  },
+  
+  dayActive: { 
+    backgroundColor: "#00DC5A", 
+    borderColor: "#00DC5A", 
+    borderWidth: 1 
+  },
+  
+  dayWithTx: { 
+    borderColor: "#00DC5A", 
+    borderWidth: 1 
+  },
+  
+  dayEmpty: { 
+    borderColor: "#FFF", 
+    borderWidth: 1 
+  },
+  
+  dayFuture: { 
+    borderColor: "#555", 
+    borderWidth: 1 
+  },
+  
+  dayNumber: { 
+    color: "#FFF", 
+    fontSize: 18, 
+    fontFamily: "Outfit_500Medium" 
+  },
+  
+  dayLabel: { 
+    color: "#FFF", 
+    fontSize: 14, 
+    fontFamily: "Outfit_500Medium" 
+  },
+  
+  futureText: { 
+    color: "#555" 
+  },
+  
+  dot: { 
+    width: 6, 
+    height: 6, 
+    borderRadius: 3, 
+    backgroundColor: "#00DC5A", 
+    marginTop: 9 
+  },
+  
+  dotActive: { 
+    backgroundColor: "#FFF" 
+  },
+  
+  todayText: { 
+    color: "#FFF", 
+    fontSize: 7.5, 
+    marginTop: 2, 
+    fontWeight: "bold", 
+    lineHeight: 10 
+  },
+  
+  group: { 
+    marginBottom: 20, 
+    paddingHorizontal: 15,
+    backgroundColor: "#F5F5F5" // 🔧 Asegurar fondo claro
+  },
+  
+  groupDate: { 
+    fontSize: 16, 
+    fontWeight: "bold", 
+    color: "#000", 
+    marginBottom: 8,
+    fontFamily: "Outfit_600SemiBold"
+  },
+  
+  empty: { 
+    fontSize: 14, 
+    color: "#666", 
+    fontStyle: "italic", 
+    textAlign: "center", 
+    paddingVertical: 10 
+  },
+  
+  modal: { 
+    flex: 1, 
+    justifyContent: "center", 
+    backgroundColor: "rgba(0,0,0,0.6)", 
+    alignItems: "center" 
+  },
+  
+  calendarBox: { 
+    width: "90%", 
+    backgroundColor: "#fff", 
+    padding: 16, 
+    borderRadius: 16, 
+    elevation: 5 
+  },
+  
+  closeBtn: { 
+    marginTop: 12, 
+    alignSelf: "center", 
+    paddingVertical: 8, 
+    paddingHorizontal: 20, 
+    backgroundColor: "#00DC5A", 
+    borderRadius: 8 
+  },
+  
+  closeBtnText: { 
+    color: "#fff", 
+    fontWeight: "bold" 
+  },
 });

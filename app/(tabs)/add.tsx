@@ -29,7 +29,7 @@ import DescriptionInput from "@/components/ui/DescriptionInput";
 import TransactionOptions from "@/components/ui/TransactionOptions";
 import CategorySelector from "@/components/ui/CategorySelector";
 import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import DateSelector from "@/components/ui/DateSelector";
+import DateTimeSelector from "@/components/ui/DateTimeSelector";
 import ReceiptScanner from "@/components/ui/ReceiptScanner";
 import OCRStatusIndicator from "@/components/ui/OCRStatusIndicator";
 
@@ -55,7 +55,6 @@ import { useToast } from "@/app/providers/ToastProvider";
 import { RootStackParamList } from "../interfaces/navigation";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
-import { set } from "lodash";
 
 // Definir la interfaz para los parámetros de la ruta
 interface AddTransactionRouteParams {
@@ -237,14 +236,10 @@ export default function AddTransaction() {
     }));
   }, [frequentData]);
 
-  // Creación de transacción
+  // 🔥 FUNCIÓN CORREGIDA: Creación de transacción
   const handleCreateTransaction = useCallback(async () => {
     if (!isFormValid) {
-      showToast(
-        "error",
-        "Error",
-        "Por favor completa todos los campos requeridos."
-      );
+      showToast("error", "Error", "Por favor completa todos los campos requeridos.");
       return;
     }
 
@@ -257,7 +252,25 @@ export default function AddTransaction() {
 
       const userId = parseInt(storedUserId, 10);
 
-      // Crear objeto para la transacción
+      // 🔥 MEJORA: Función helper para manejo seguro de fechas
+      const getAdjustedDate = (dateString: string): Date => {
+        try {
+          const date = new Date(dateString);
+          
+          // Verificar que la fecha sea válida
+          if (isNaN(date.getTime())) {
+            console.warn('❌ Fecha inválida detectada, usando fecha actual:', dateString);
+            return new Date();
+          }
+          
+          return date;
+        } catch (error) {
+          console.error('❌ Error parseando fecha:', error);
+          return new Date();
+        }
+      };
+
+      // 🔥 CORRECCIÓN: Crear transactionInput con tipado correcto
       const transactionInput: CreateTransactionInput = {
         userId,
         title: formState.category,
@@ -268,36 +281,23 @@ export default function AddTransaction() {
         paymentmethod: formState.paymentmethod,
         category: formState.category,
         status: formState.isPaid ? "completed" : "pending",
-        // Ajuste para manejar correctamente la zona horaria
-        dueDate: formState.isPaid
-          ? new Date()
-          : adjustDateForTimezone(new Date(formState.dueDate)),
+        // 🔥 FIX: Asegurar que dueDate siempre tenga un valor válido
+        dueDate: getAdjustedDate(formState.isPaid ? formState.date : formState.dueDate),
       };
 
-      // Función para ajustar la fecha según la zona horaria
-      function adjustDateForTimezone(date: Date): Date {
-        // Obtenemos la diferencia de zona horaria en minutos
-        const timezoneOffset = date.getTimezoneOffset();
-
-        // Creamos una nueva fecha con el ajuste para compensar la conversión UTC
-        const adjustedDate = new Date(date.getTime() + timezoneOffset * 60000);
-
-        // Aseguramos que la hora sea mediodía para evitar problemas cerca de medianoche
-        adjustedDate.setHours(12, 0, 0, 0);
-
-        return adjustedDate;
-      }
+      console.log('📅 [AddTransaction] Datos enviados al backend:', {
+        isPaid: formState.isPaid,
+        dateUsed: formState.isPaid ? formState.date : formState.dueDate,
+        finalDate: transactionInput.dueDate.toISOString(),
+        transactionInput
+      });
 
       await createTransaction({
         variables: { input: transactionInput },
       });
     } catch (error: any) {
-      console.error("Error al crear transacción:", error);
-      showToast(
-        "error",
-        "Error",
-        "Hubo un problema al agregar la transacción."
-      );
+      console.error("❌ Error al crear transacción:", error);
+      showToast("error", "Error", "Hubo un problema al agregar la transacción.");
     }
   }, [formState, isFormValid, createTransaction, showToast]);
 
@@ -336,7 +336,7 @@ export default function AddTransaction() {
   );
 
   /**
-   * FUNCIÓN CORREGIDA - Maneja los datos extraídos del comprobante escaneado
+   * 🔥 FUNCIÓN CORREGIDA - Maneja los datos extraídos del comprobante escaneado
    */
   const handleReceiptDataExtracted = useCallback(
     (data: ExtractedReceiptData) => {
@@ -361,10 +361,7 @@ export default function AddTransaction() {
       if (data.description && data.description.trim().length > 0) {
         updates.description = data.description.trim();
         fieldsUpdated++;
-        console.log(
-          "📝 [AddTransaction] Descripción aplicada:",
-          data.description
-        );
+        console.log("📝 [AddTransaction] Descripción aplicada:", data.description);
       }
 
       // Aplicar categoría si está disponible y es válida
@@ -378,35 +375,45 @@ export default function AddTransaction() {
       if (data.paymentmethod && data.paymentmethod.trim().length > 0) {
         updates.paymentmethod = data.paymentmethod.trim();
         fieldsUpdated++;
-        console.log(
-          "💳 [AddTransaction] Método de pago aplicado:",
-          data.paymentmethod
-        );
+        console.log("💳 [AddTransaction] Método de pago aplicado:", data.paymentmethod);
       }
 
-      // Aplicar fecha si está disponible
+      // 🔥 CORRECCIÓN: Aplicar fecha con hora mejorada (sin duplicación)
       if (data.date) {
-        if (formState.isPaid) {
-          updates.date = data.date;
-          console.log("📅 [AddTransaction] Fecha de pago aplicada:", data.date);
-        } else {
-          updates.dueDate = data.date;
-          console.log(
-            "📅 [AddTransaction] Fecha de vencimiento aplicada:",
-            data.date
-          );
+        try {
+          const extractedDate = new Date(data.date);
+          
+          // Verificar que la fecha sea válida
+          if (!isNaN(extractedDate.getTime())) {
+            // Si la fecha extraída no tiene hora específica, usar hora actual
+            if (extractedDate.getHours() === 0 && extractedDate.getMinutes() === 0) {
+              const now = new Date();
+              extractedDate.setHours(now.getHours());
+              extractedDate.setMinutes(now.getMinutes());
+              console.log("🕐 [AddTransaction] Hora actual aplicada a fecha OCR");
+            }
+            
+            if (formState.isPaid) {
+              updates.date = extractedDate.toISOString();
+              console.log("📅 [AddTransaction] Fecha de pago aplicada:", extractedDate.toISOString());
+            } else {
+              updates.dueDate = extractedDate.toISOString();
+              console.log("📅 [AddTransaction] Fecha de vencimiento aplicada:", extractedDate.toISOString());
+            }
+            fieldsUpdated++;
+          } else {
+            console.warn("⚠️ [AddTransaction] Fecha OCR inválida:", data.date);
+          }
+        } catch (error) {
+          console.error("❌ [AddTransaction] Error procesando fecha OCR:", error);
         }
-        fieldsUpdated++;
       }
 
       // Aplicar nombre del comercio a la descripción si no hay descripción específica
       if (data.merchantName && !updates.description && !formState.description) {
         updates.description = `Compra en ${data.merchantName}`;
         fieldsUpdated++;
-        console.log(
-          "🏪 [AddTransaction] Descripción desde comercio:",
-          updates.description
-        );
+        console.log("🏪 [AddTransaction] Descripción desde comercio:", updates.description);
       }
 
       console.log("🔄 [AddTransaction] Actualizaciones a aplicar:", updates);
@@ -424,9 +431,7 @@ export default function AddTransaction() {
 
         console.log("✅ [AddTransaction] Formulario actualizado exitosamente");
       } else {
-        console.log(
-          "⚠️ [AddTransaction] No se encontraron datos válidos para aplicar"
-        );
+        console.log("⚠️ [AddTransaction] No se encontraron datos válidos para aplicar");
         showToast(
           "info",
           "Comprobante procesado",
@@ -461,7 +466,7 @@ export default function AddTransaction() {
           nestedScrollEnabled={true}
           keyboardShouldPersistTaps="handled"
         >
-          <Animated.View style={[styles.animatedContainer, animatedStyle, { backgroundColor: headerColor }]}> 
+          <Animated.View style={[styles.animatedContainer, animatedStyle, { backgroundColor: headerColor }]}>
             <Text style={styles.title}>Agregar</Text>
             <View style={styles.sliderContainer}>
               <AgregarSlides
@@ -532,8 +537,7 @@ export default function AddTransaction() {
             />
           </View>
           <View style={[styles.dateSelectorContainer, { backgroundColor: "#FFF" }]}>
-            <DateSelector
-              type={TRANSACTION_MAPPING[formState.selectedOption]}
+            <DateTimeSelector
               selectedDate={formState.isPaid ? formState.date : formState.dueDate}
               onSelectDate={(date) => {
                 if (formState.isPaid) {
@@ -542,9 +546,9 @@ export default function AddTransaction() {
                   updateFormState({ dueDate: date });
                 }
               }}
-              title={formState.isPaid ? "Fecha" : "Fecha de vencimiento"}
+              title={formState.isPaid ? "Fecha y hora" : "Fecha y hora de vencimiento"}
               isPaid={formState.isPaid}
-              initialDate={undefined}
+              disabled={false}
             />
           </View>
           <View style={[styles.addButtonContainer, { backgroundColor: "#FFF" }]}>
@@ -706,5 +710,3 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
-
-// To Do: Incluir hora en la fecha de pago / fecha de vencimiento
