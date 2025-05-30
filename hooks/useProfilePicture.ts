@@ -1,5 +1,5 @@
 // hooks/useProfilePicture.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useMutation, useQuery } from '@apollo/client';
 import { Alert } from 'react-native';
 import { imageUploadService } from '@/app/services/imageUploadService';
@@ -11,6 +11,7 @@ export interface ProfilePictureState {
   isUploading: boolean;
   isDeleting: boolean;
   uploadProgress: number;
+  hasInitiallyLoaded: boolean; // 🆕 Nuevo estado
 }
 
 export interface UseProfilePictureReturn {
@@ -27,12 +28,21 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
   const [isUploading, setIsUploading] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [hasInitiallyLoaded, setHasInitiallyLoaded] = useState(false); // 🆕
 
   // Query para obtener perfil del usuario
-  const { data, refetch } = useQuery(GET_USER_PROFILE, {
-    fetchPolicy: 'cache-and-network',
-    errorPolicy: 'all'
+  const { data, refetch, loading } = useQuery(GET_USER_PROFILE, {
+    fetchPolicy: 'cache-first', // 🆕 Cambiar a cache-first
+    errorPolicy: 'all',
+    notifyOnNetworkStatusChange: false, // 🆕 Desactivar notificaciones
   });
+
+  // 🆕 Efecto para marcar como cargado inicialmente
+  useEffect(() => {
+    if (data?.getUserProfile) {
+      setHasInitiallyLoaded(true);
+    }
+  }, [data]);
 
   // Mutation para eliminar foto de perfil
   const [deleteProfilePictureMutation] = useMutation(DELETE_PROFILE_PICTURE, {
@@ -52,6 +62,7 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
     isUploading,
     isDeleting,
     uploadProgress,
+    hasInitiallyLoaded, // 🆕
   };
 
   /**

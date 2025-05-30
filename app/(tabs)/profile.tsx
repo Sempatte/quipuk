@@ -36,7 +36,13 @@ export default function Profile() {
 
   // 📌 Consulta GraphQL del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
-    GET_USER_PROFILE
+    GET_USER_PROFILE,
+    {
+      // 🆕 Configuración mejorada para evitar loading innecesario
+      fetchPolicy: 'cache-first', // Usar caché primero
+      errorPolicy: 'all',
+      notifyOnNetworkStatusChange: true,
+    }
   );
 
   // 📌 Hook personalizado para manejar foto de perfil
@@ -96,6 +102,12 @@ export default function Profile() {
     }
   }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
 
+  // 🆕 Determinar si mostrar loading en el avatar
+  const shouldShowAvatarLoading = () => {
+    // 🔧 CLAVE: Solo mostrar loading durante operaciones reales, no durante carga de imagen
+    return profilePictureState.isUploading || profilePictureState.isDeleting;
+  };
+
   if (error) {
     return (
       <View style={styles.container}>
@@ -127,12 +139,15 @@ export default function Profile() {
             editable={true}
             onPress={handleAvatarPress}
             onEdit={selectAndUploadImage}
-            loading={profilePictureState.isUploading || profilePictureState.isDeleting}
+            loading={shouldShowAvatarLoading()} // 🆕 Lógica mejorada
             progress={profilePictureState.uploadProgress}
           />
           
+          {/* 🆕 Mensajes de estado más específicos */}
           {profilePictureState.isUploading && (
-            <Text style={styles.uploadingText}>Subiendo imagen...</Text>
+            <Text style={styles.uploadingText}>
+              Subiendo imagen... {Math.round(profilePictureState.uploadProgress)}%
+            </Text>
           )}
           
           {profilePictureState.isDeleting && (
@@ -141,7 +156,8 @@ export default function Profile() {
         </View>
 
         <View style={styles.contentContainer}>
-          {loading ? (
+          {/* 🆕 Mostrar loading solo si no hay datos y está cargando */}
+          {(loading && !data?.getUserProfile) ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#00DC5A" />
               <Text style={styles.loadingText}>Cargando perfil...</Text>
@@ -252,38 +268,22 @@ const styles = StyleSheet.create({
   },
   avatarContainer: {
     alignItems: "center",
-    marginTop: 30, // Mayor solapamiento con el header
+    marginTop: 30,
     zIndex: 1,
-  },
-  avatar: {
-    // Estilos específicos para el Avatar
-    borderWidth: 4,
-    borderColor: '#ffffff',
-  },
-  editIconContainer: {
-    backgroundColor: '#00DC5A',
-    borderRadius: 20,
-    padding: 8,
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    bottom: 0,
-    right: 0,
-  },
-  editIcon: {
-    color: '#FFFFFF',
-    fontSize: 18,
   },
   uploadingText: {
     marginTop: 12,
     fontSize: 14,
     color: "#00DC5A",
     fontFamily: "Outfit_500Medium",
+    textAlign: "center",
   },
   deletingText: {
     marginTop: 12,
     fontSize: 14,
     color: "#E86F51",
     fontFamily: "Outfit_500Medium",
+    textAlign: "center",
   },
   contentContainer: {
     flex: 1,
@@ -296,6 +296,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
+    minHeight: 200, // 🆕 Altura mínima para evitar saltos
   },
   loadingText: {
     marginTop: 10,

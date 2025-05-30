@@ -26,7 +26,18 @@ import {
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import Animated from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  withSpring,
+  withSequence,
+  runOnJS,
+  interpolate,
+  Extrapolate,
+  FadeIn,
+  SlideInRight,
+} from 'react-native-reanimated';
 
 import { ThemedView } from "@/components/ThemedView";
 import TransactionItem from "@/components/ui/TransactionItem";
@@ -42,7 +53,6 @@ const DAY_BUTTON_WIDTH = width * 0.15;
 // Espacio entre botones
 const DAY_BUTTON_MARGIN = 8;
 
-
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
   "LoginScreen"
@@ -57,9 +67,21 @@ const Movements = () => {
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [days, setDays] = useState<Date[]>([]);
-  const scrollViewRef = useRef<any>(null); // Animated.ScrollView
+  const scrollViewRef = useRef<Animated.ScrollView>(null);
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const [didInitialScroll, setDidInitialScroll] = useState(false);
+  
+  // 🚀 NUEVO: Estado para guardar la posición del scroll
+  const [savedScrollPosition, setSavedScrollPosition] = useState<number | null>(null);
+  // 🚀 NUEVO: Ref para evitar bucles infinitos
+  const isInitialMount = useRef(true);
+  const isRestoringPosition = useRef(false);
+
+  // 🚀 NUEVOS VALORES ANIMADOS
+  const scrollProgress = useSharedValue(0);
+  const headerOpacity = useSharedValue(0);
+  const dayButtonsScale = useSharedValue(0);
+  const todayIndicatorPulse = useSharedValue(1);
 
   // Array de transacciones
   const transactions: Transaction[] = data?.getTransactions || [];
@@ -115,14 +137,219 @@ const Movements = () => {
     return day > today;
   }, []);
 
+  // 🚀 ANIMACIÓN DE ENTRADA DEL HEADER
+  const animatedHeaderStyle = useAnimatedStyle(() => {
+    return {
+      opacity: headerOpacity.value,
+      transform: [
+        {
+          translateY: interpolate(
+            headerOpacity.value,
+            [0, 1],
+            [-20, 0],
+            Extrapolate.CLAMP
+          ),
+        },
+      ],
+    };
+  });
+
+  // 🚀 ANIMACIÓN DE LOS BOTONES DE DÍAS
+  const animatedDayButtonsStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        {
+          scale: dayButtonsScale.value,
+        },
+      ],
+    };
+  });
+
+  // 🚀 FUNCIÓN MEJORADA PARA SCROLL AUTOMÁTICO AL DÍA ACTUAL
+  const scrollToTodayAnimated = useCallback(() => {
+    if (!scrollViewRef.current || days.length === 0) return;
+
+    const today = new Date();
+    const todayIndex = days.findIndex(
+      (day) => day.toDateString() === today.toDateString()
+    );
+
+    if (todayIndex === -1) {
+      // Si no se encuentra hoy, scroll al final
+      const maxPosition = Math.max(
+        0,
+        days.length * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2) - width
+      );
+      
+      scrollViewRef.current.scrollTo({
+        x: maxPosition,
+        animated: true,
+      });
+      return;
+    }
+
+    // Calcular posición centrada para el día actual
+    const position = todayIndex * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
+    const screenWidth = Dimensions.get('window').width;
+    const centerOffset = (screenWidth - DAY_BUTTON_WIDTH) / 2;
+    const adjustedPosition = Math.max(0, position - centerOffset);
+
+    // Animar el progreso del scroll
+    scrollProgress.value = withSequence(
+      withTiming(0.3, { duration: 200 }),
+      withTiming(0.7, { duration: 400 }),
+      withTiming(1, { duration: 300 })
+    );
+
+    // Ejecutar el scroll con una animación suave
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        x: adjustedPosition,
+        animated: true,
+      });
+
+      // Activar la animación de pulso en el indicador "Hoy"
+      todayIndicatorPulse.value = withSequence(
+        withSpring(1.3, { damping: 8, stiffness: 200 }),
+        withSpring(1, { damping: 8, stiffness: 200 })
+      );
+    }, 100);
+
+  }, [days, scrollProgress, todayIndicatorPulse]);
+
+  // 🚀 FUNCIÓN PARA GUARDAR LA POSICIÓN ACTUAL DEL SCROLL
+  const saveScrollPosition = useCallback((x: number) => {
+    setSavedScrollPosition(x);
+    console.log('💾 Posición de scroll guardada:', x);
+  }, []);
+
+  // 🚀 FUNCIÓN PARA SCROLL AUTOMÁTICO AL DÍA ACTUAL (solo primera vez)
+  const performInitialScroll = useCallback(() => {
+    if (!scrollViewRef.current || days.length === 0 || isRestoringPosition.current) return;
+
+    console.log('🔄 Ejecutando scroll inicial al día actual...');
+
+    const today = new Date();
+    const todayIndex = days.findIndex(
+      (day) => day.toDateString() === today.toDateString()
+    );
+
+    let targetPosition: number;
+
+    if (todayIndex === -1) {
+      // Si no se encuentra hoy, scroll al final (días más recientes)
+      targetPosition = Math.max(
+        0,
+        days.length * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2) - width
+      );
+      console.log('📍 Scrolleando al final, posición:', targetPosition);
+    } else {
+      // Calcular posición centrada para el día actual
+      const position = todayIndex * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
+      const screenWidth = Dimensions.get('window').width;
+      const centerOffset = (screenWidth - DAY_BUTTON_WIDTH) / 2;
+      targetPosition = Math.max(0, position - centerOffset);
+      console.log('📍 Scrolleando al día actual, posición:', targetPosition);
+    }
+
+    // Ejecutar el scroll
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        x: targetPosition,
+        animated: true,
+      });
+      
+      // Guardar la posición
+      saveScrollPosition(targetPosition);
+
+      // Activar animación de pulso solo si es el día actual
+      if (todayIndex !== -1) {
+        todayIndicatorPulse.value = withSequence(
+          withSpring(1.3, { damping: 8, stiffness: 200 }),
+          withSpring(1, { damping: 8, stiffness: 200 })
+        );
+      }
+    }, 300);
+
+  }, [days, todayIndicatorPulse, saveScrollPosition]);
+
+  // 🚀 FUNCIÓN PARA RESTAURAR LA POSICIÓN DEL SCROLL
+  const restoreScrollPosition = useCallback(() => {
+    if (!scrollViewRef.current || savedScrollPosition === null || isRestoringPosition.current) return;
+
+    console.log('🔄 Restaurando posición de scroll:', savedScrollPosition);
+    isRestoringPosition.current = true;
+    
+    setTimeout(() => {
+      scrollViewRef.current?.scrollTo({
+        x: savedScrollPosition,
+        animated: true,
+      });
+      
+      // Resetear flag después del scroll
+      setTimeout(() => {
+        isRestoringPosition.current = false;
+      }, 1000);
+    }, 300);
+  }, [savedScrollPosition]);
+
   // Actualizar los días cuando cambie la fecha de referencia
   useEffect(() => {
     const allDaysOfMonth = getDaysOfMonth(referenceDay);
     setDays(allDaysOfMonth);
     setDidInitialScroll(false);
+    // 🚀 NUEVO: Resetear refs cuando cambia el mes
+    isInitialMount.current = false;
+    isRestoringPosition.current = false;
   }, [referenceDay, getDaysOfMonth]);
 
-  // Inicializar y verificar errores
+  // 🚀 EFECTO SIMPLIFICADO PARA SCROLL INICIAL
+  useEffect(() => {
+    if (days.length === 0 || didInitialScroll) return;
+
+    console.log('🚀 Days disponibles, ejecutando scroll inicial...');
+
+    const timeoutId = setTimeout(() => {
+      if (savedScrollPosition === null) {
+        // Primera vez - scroll al día actual
+        performInitialScroll();
+      } else {
+        // Hay posición guardada - restaurar
+        restoreScrollPosition();
+      }
+      setDidInitialScroll(true);
+    }, 600);
+
+    return () => clearTimeout(timeoutId);
+  }, [days, didInitialScroll, savedScrollPosition, performInitialScroll, restoreScrollPosition]);
+
+  // 🚀 INICIALIZAR ANIMACIONES UNA SOLA VEZ AL MONTAR
+  useEffect(() => {
+    headerOpacity.value = withTiming(1, { duration: 600 });
+    dayButtonsScale.value = withTiming(1, { duration: 800 });
+  }, []);
+
+  // 🚀 MANEJO SIMPLIFICADO DE FOCUS - SOLO PARA RESTAURAR CUANDO VIENE DE OTRA TAB
+  useFocusEffect(
+    useCallback(() => {
+      // Solo actuar si no es el montaje inicial y hay una posición guardada
+      if (isInitialMount.current || savedScrollPosition === null || isRestoringPosition.current) {
+        isInitialMount.current = false;
+        return;
+      }
+
+      console.log('👁️ Regresando de otra tab - restaurando posición');
+      
+      // Pequeño delay para asegurar que la pantalla esté lista
+      const timeoutId = setTimeout(() => {
+        restoreScrollPosition();
+      }, 200);
+
+      return () => clearTimeout(timeoutId);
+    }, [savedScrollPosition, restoreScrollPosition])
+  );
+
+  // Verificar errores de autenticación
   useFocusEffect(
     useCallback(() => {
       if (error?.message === "Token expired or invalid") {
@@ -133,94 +360,69 @@ const Movements = () => {
     }, [refetch, error, navigation])
   );
 
-  // Calcular la posición máxima de scroll
-  const calculateMaxScrollPosition = useCallback(() => {
-    if (days.length === 0) return 0;
-    return Math.max(
-      0,
-      days.length * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2) - width
+  // 🚀 COMPONENTE ANIMADO PARA EL BOTÓN DE DÍA
+  const AnimatedDayButton = ({ day, index }: { day: Date; index: number }) => {
+    const isActive = selectedDate && day.toDateString() === selectedDate.toDateString();
+    const hasTransactions = hasTransactionsOnDay(day);
+    const isCurrentDay = day.toDateString() === new Date().toDateString();
+    const isFuture = isFutureDay(day);
+
+    // Animación especial para el indicador "Hoy"
+    const todayIndicatorStyle = useAnimatedStyle(() => {
+      if (!isCurrentDay) return {};
+      
+      return {
+        transform: [{ scale: todayIndicatorPulse.value }],
+      };
+    });
+
+    return (
+      <View style={styles.dayButtonContainer}>
+        <TouchableOpacity
+          style={[
+            styles.dayButton,
+            isActive && styles.activeDaySelected,
+            !isActive && hasTransactions && !isFuture && styles.hasTransactionsDay,
+            !isActive && !hasTransactions && !isFuture && styles.noTransactionsDay,
+            isFuture && styles.futureDayButton,
+          ]}
+          onPress={() => toggleDateSelection(day)}
+          activeOpacity={isFuture ? 1 : 0.8}
+          disabled={isFuture}
+        >
+          <Text
+            style={[
+              styles.dayNumber,
+              isFuture && styles.futureDayText,
+            ]}
+          >
+            {format(day, "dd", { locale: es })}
+          </Text>
+          <Text
+            style={[
+              styles.dayLabel,
+              isFuture && styles.futureDayText,
+            ]}
+          >
+            {format(day, "EEE", { locale: es })}
+          </Text>
+
+          {hasTransactions && !isFuture && (
+            <View
+              style={[styles.greenDot, isActive && styles.whiteDot]}
+            />
+          )}
+        </TouchableOpacity>
+        {isCurrentDay && (
+          <Animated.Text 
+            style={[styles.todayIndicator, todayIndicatorStyle]}
+          >
+            Hoy
+          </Animated.Text>
+        )}
+      </View>
     );
-  }, [days]);
-
-  // Desplazar a un día específico, con más opciones para Android
-  const scrollToDay = useCallback(
-    (index: number) => {
-      if (scrollViewRef.current && index >= 0 && index < days.length) {
-        const position = index * (DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2);
-        const screenWidth = Dimensions.get('window').width;
-        const centerOffset = (screenWidth - DAY_BUTTON_WIDTH) / 2;
-        const adjustedPosition = Math.max(0, position - centerOffset);
-
-        scrollViewRef.current.scrollTo({
-          x: adjustedPosition,
-          y: 0,
-          animated: true,
-        });
-      }
-    },
-    [days]
-  );
-
-  // Desplazar al final para mostrar los días más recientes primero
-  const scrollToEnd = useCallback(() => {
-    if (scrollViewRef.current && days.length > 0) {
-      const maxPosition = calculateMaxScrollPosition();
-
-      // En Android usamos un pequeño delay para asegurar que el scroll funcione
-      if (Platform.OS === "android") {
-        setTimeout(() => {
-          scrollViewRef.current?.scrollTo({
-            x: maxPosition,
-            animated: false, // Sin animación para el scroll inicial
-          });
-        }, 100);
-      } else {
-        scrollViewRef.current.scrollTo({
-          x: maxPosition,
-          animated: false, // Sin animación para el scroll inicial
-        });
-      }
-    }
-  }, [days, calculateMaxScrollPosition]);
-
-  // Efecto para desplazar al final (días más recientes) al iniciar
-  useEffect(() => {
-    if (days.length > 0 && !didInitialScroll) {
-      const timeoutId = setTimeout(() => {
-        if (scrollViewRef.current) {
-          const today = new Date();
-          const todayIndex = days.findIndex(
-            (day) => day.toDateString() === today.toDateString()
-          );
-
-          if (selectedDate) {
-            const selectedIndex = days.findIndex(
-              (day) => day.toDateString() === selectedDate.toDateString()
-            );
-            if (selectedIndex >= 0) {
-              scrollToDay(selectedIndex);
-            } else {
-              scrollToEnd();
-            }
-          } else if (todayIndex >= 0) {
-            scrollToDay(todayIndex);
-          } else {
-            scrollToEnd();
-          }
-          setDidInitialScroll(true);
-        }
-      }, Platform.OS === 'android' ? 500 : 100); // Ajuste de tiempo según plataforma
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [days, selectedDate, scrollToDay, scrollToEnd, didInitialScroll]);
-
-  // Efecto adicional para resetear el scroll cuando cambia la pestaña
-  useFocusEffect(
-    useCallback(() => {
-      setDidInitialScroll(false);
-    }, [])
-  );
+  };
 
   // Verifica si hay transacciones en un día específico, sin filtrar por status
   const hasTransactionsOnDay = useCallback(
@@ -289,58 +491,57 @@ const Movements = () => {
   );
 
   // Prepara los datos para el FlatList con el tipo correcto y filtrando por status completed
-  const getFilteredTransactionsForRender =
-    useCallback((): GroupedTransactionItem[] => {
-      // Filtramos solo las transacciones completadas, con algunas verificaciones adicionales
-      const completedTransactions = transactions.filter((transaction) => {
-        // Verificar que la transacción existe y tiene un campo status
-        if (!transaction || typeof transaction.status === "undefined") {
-          return false;
-        }
-        // Comprobar si el status es completed (o cualquier otro valor que indique "completado")
-        return transaction.status === "completed";
+  const getFilteredTransactionsForRender = useCallback((): GroupedTransactionItem[] => {
+    // Filtramos solo las transacciones completadas, con algunas verificaciones adicionales
+    const completedTransactions = transactions.filter((transaction) => {
+      // Verificar que la transacción existe y tiene un campo status
+      if (!transaction || typeof transaction.status === "undefined") {
+        return false;
+      }
+      // Comprobar si el status es completed (o cualquier otro valor que indique "completado")
+      return transaction.status === "completed";
+    });
+
+    if (selectedDate) {
+      // Filtramos transacciones por día seleccionado
+      const filteredItems = completedTransactions.filter(
+        (transaction) =>
+          new Date(transaction.createdAt).toDateString() ===
+          selectedDate.toDateString()
+      );
+
+      const dateKey = format(selectedDate, "dd-MM-yyyy");
+
+      // Siempre devolvemos un formato compatible con renderItem
+      return [[dateKey, filteredItems.length > 0 ? filteredItems : []]];
+    } else {
+      // Agrupar las transacciones completadas por día
+      const completedGroupedTransactions = groupTransactionsByDay(
+        completedTransactions
+      );
+
+      // Convertimos el objeto de transacciones agrupadas a un array
+      const entries = Object.entries(
+        completedGroupedTransactions
+      ) as GroupedTransactionItem[];
+
+      // Log para debug
+      console.log("Grouped transactions entries:", entries.length);
+
+      // Ordenamos por fecha (más reciente primero)
+      entries.sort(([dateA], [dateB]) => {
+        const [dayA, monthA, yearA] = dateA.split("-").map(Number);
+        const [dayB, monthB, yearB] = dateB.split("-").map(Number);
+
+        // Comparamos por año, mes y día
+        if (yearA !== yearB) return yearB - yearA;
+        if (monthA !== monthB) return monthB - monthA;
+        return dayB - dayA;
       });
 
-      if (selectedDate) {
-        // Filtramos transacciones por día seleccionado
-        const filteredItems = completedTransactions.filter(
-          (transaction) =>
-            new Date(transaction.createdAt).toDateString() ===
-            selectedDate.toDateString()
-        );
-
-        const dateKey = format(selectedDate, "dd-MM-yyyy");
-
-        // Siempre devolvemos un formato compatible con renderItem
-        return [[dateKey, filteredItems.length > 0 ? filteredItems : []]];
-      } else {
-        // Agrupar las transacciones completadas por día
-        const completedGroupedTransactions = groupTransactionsByDay(
-          completedTransactions
-        );
-
-        // Convertimos el objeto de transacciones agrupadas a un array
-        const entries = Object.entries(
-          completedGroupedTransactions
-        ) as GroupedTransactionItem[];
-
-        // Log para debug
-        console.log("Grouped transactions entries:", entries.length);
-
-        // Ordenamos por fecha (más reciente primero)
-        entries.sort(([dateA], [dateB]) => {
-          const [dayA, monthA, yearA] = dateA.split("-").map(Number);
-          const [dayB, monthB, yearB] = dateB.split("-").map(Number);
-
-          // Comparamos por año, mes y día
-          if (yearA !== yearB) return yearB - yearA;
-          if (monthA !== monthB) return monthB - monthA;
-          return dayB - dayA;
-        });
-
-        return entries;
-      }
-    }, [selectedDate, transactions, groupTransactionsByDay]);
+      return entries;
+    }
+  }, [selectedDate, transactions, groupTransactionsByDay]);
 
   const filteredTransactionsForRender = getFilteredTransactionsForRender();
 
@@ -367,7 +568,7 @@ const Movements = () => {
     setReferenceDay(newDate);
     setSelectedDate(newDate);
     setIsCalendarVisible(false);
-    setDidInitialScroll(false); // Resetear el scroll inicial
+    setDidInitialScroll(false);
   };
 
   // Navegación al mes anterior
@@ -376,7 +577,10 @@ const Movements = () => {
     newReference.setMonth(newReference.getMonth() - 1);
     setReferenceDay(newReference);
     setSelectedDate(null);
-    setDidInitialScroll(false); // Resetear el scroll inicial
+    setDidInitialScroll(false);
+    // 🚀 NUEVO: Limpiar posición guardada al cambiar de mes
+    setSavedScrollPosition(null);
+    isRestoringPosition.current = false;
   };
 
   // Navegación al mes siguiente (hasta el mes actual)
@@ -393,7 +597,10 @@ const Movements = () => {
     ) {
       setReferenceDay(newReference);
       setSelectedDate(null);
-      setDidInitialScroll(false); // Resetear el scroll inicial
+      setDidInitialScroll(false);
+      // 🚀 NUEVO: Limpiar posición guardada al cambiar de mes
+      setSavedScrollPosition(null);
+      isRestoringPosition.current = false;
     }
   };
 
@@ -420,8 +627,10 @@ const Movements = () => {
   return (
     <>
       <SafeAreaView style={{ backgroundColor: "#000" }} edges={["top"]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Transacciones</Text>
+        <Animated.View style={[styles.header, animatedHeaderStyle]}>
+          <Text style={styles.headerTitle}>
+            Transacciones
+          </Text>
 
           <View style={styles.monthYearContainer}>
             <TouchableOpacity
@@ -454,7 +663,7 @@ const Movements = () => {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.daysScrollWrapper}>
+          <Animated.View style={[styles.daysScrollWrapper, animatedDayButtonsStyle]}>
             <Animated.ScrollView
               ref={scrollViewRef}
               horizontal
@@ -463,72 +672,27 @@ const Movements = () => {
               decelerationRate="normal"
               snapToInterval={DAY_BUTTON_WIDTH + DAY_BUTTON_MARGIN * 2}
               snapToAlignment="start"
+              onScroll={(event) => {
+                // 🚀 NUEVO: Guardar posición del scroll en tiempo real (solo si no estamos restaurando)
+                if (!isRestoringPosition.current) {
+                  const currentX = event.nativeEvent.contentOffset.x;
+                  saveScrollPosition(currentX);
+                }
+              }}
+              scrollEventThrottle={200} // Aumentado para mejor performance
             >
-              {days.map((day, index) => {
-                const isActive =
-                  selectedDate &&
-                  day.toDateString() === selectedDate.toDateString();
-                const hasTransactions = hasTransactionsOnDay(day);
-                const isCurrentDay =
-                  day.toDateString() === new Date().toDateString();
-                const isFuture = isFutureDay(day);
-
-                return (
-                  <View
-                    key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
-                    style={styles.dayButtonContainer}
-                  >
-                    <TouchableOpacity
-                      style={[
-                        styles.dayButton,
-                        isActive && styles.activeDaySelected,
-                        !isActive &&
-                          hasTransactions &&
-                          !isFuture &&
-                          styles.hasTransactionsDay,
-                        !isActive &&
-                          !hasTransactions &&
-                          !isFuture &&
-                          styles.noTransactionsDay,
-                        isFuture && styles.futureDayButton, // Estilo para días futuros
-                      ]}
-                      onPress={() => toggleDateSelection(day)}
-                      activeOpacity={isFuture ? 1 : 0.8} // No mostrar feedback en días futuros
-                      disabled={isFuture} // Deshabilitamos días futuros
-                    >
-                      <Text
-                        style={[
-                          styles.dayNumber,
-                          isFuture && styles.futureDayText, // Texto gris para días futuros
-                        ]}
-                      >
-                        {format(day, "dd", { locale: es })}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.dayLabel,
-                          isFuture && styles.futureDayText, // Texto gris para días futuros
-                        ]}
-                      >
-                        {format(day, "EEE", { locale: es })}
-                      </Text>
-
-                      {hasTransactions && !isFuture && (
-                        <View
-                          style={[styles.greenDot, isActive && styles.whiteDot]}
-                        />
-                      )}
-                    </TouchableOpacity>
-                    {isCurrentDay && (
-                      <Text style={styles.todayIndicator}>Hoy</Text>
-                    )}
-                  </View>
-                );
-              })}
+              {days.map((day, index) => (
+                <AnimatedDayButton 
+                  key={`${day.getFullYear()}-${day.getMonth()}-${day.getDate()}`}
+                  day={day} 
+                  index={index} 
+                />
+              ))}
             </Animated.ScrollView>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </SafeAreaView>
+      
       <FlatList
         data={filteredTransactionsForRender}
         keyExtractor={(item: GroupedTransactionItem) => item[0]}
@@ -571,6 +735,7 @@ const Movements = () => {
           />
         }
       />
+      
       <Modal
         transparent={true}
         visible={isCalendarVisible}
@@ -624,12 +789,11 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 16,
-    paddingTop: Platform.OS === 'ios' ? 10 : 16, // Menos padding superior en iOS
+    paddingTop: Platform.OS === 'ios' ? 10 : 16,
     paddingBottom: 16,
     backgroundColor: "#000",
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    // Asegurar que el header tenga suficiente altura mínima
     minHeight: Platform.OS === 'ios' ? 180 : 200,
   },
   headerTitle: {
@@ -676,17 +840,15 @@ const styles = StyleSheet.create({
     fontSize: 24,
   },
   disabledArrow: {
-    color: "#555", // Color más oscuro para indicar deshabilitado
+    color: "#555",
   },
   daysScrollWrapper: {
-    // Esto asegura que el ScrollView tenga un tamaño definido
     height: 90,
     marginTop: 8,
   },
   daysScrollContainer: {
     paddingVertical: 8,
     paddingHorizontal: 10,
-    // Fijar un ancho mínimo para evitar problemas de scroll
     minWidth: width,
   },
   dayButtonContainer: {
@@ -716,7 +878,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   futureDayButton: {
-    borderColor: "#555", // Borde gris para días futuros
+    borderColor: "#555",
     borderWidth: 1,
   },
   dayNumber: {
@@ -730,7 +892,7 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_500Medium",
   },
   futureDayText: {
-    color: "#555", // Texto gris para días futuros
+    color: "#555",
   },
   greenDot: {
     width: 6,
