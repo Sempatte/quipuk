@@ -49,6 +49,7 @@
     "expo-system-ui": "~5.0.7",
     "expo-web-browser": "~14.1.6",
     "graphql": "^16.10.0",
+    "haptics": "^1.0.0",
     "jest-expo": "~52.0.5",
     "lodash": "^4.17.21",
     "moti": "^0.30.0",

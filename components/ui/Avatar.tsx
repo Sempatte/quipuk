@@ -1,5 +1,5 @@
 // components/ui/Avatar.tsx
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Image,
@@ -29,14 +29,22 @@ const SIZES = {
   medium: 60,
   large: 80,
   xlarge: 120,
-};
+} as const;
 
 const EDIT_ICON_SIZES = {
   small: 16,
   medium: 20,
   large: 24,
   xlarge: 28,
-};
+} as const;
+
+// 🔧 OPTIMIZACIÓN: Enum para estados de imagen más claro
+enum ImageState {
+  IDLE = 'idle',
+  LOADING = 'loading', 
+  LOADED = 'loaded',
+  ERROR = 'error'
+}
 
 export default function Avatar({
   imageUrl,
@@ -45,68 +53,141 @@ export default function Avatar({
   editable = false,
   onPress,
   onEdit,
-  loading = false, // Loading externo
+  loading = false,
   progress = 0,
   showEditIcon = true,
 }: AvatarProps) {
-  // Estados internos para el manejo de la imagen
-  const [imageLoading, setImageLoading] = useState(false);
-  const [imageError, setImageError] = useState(false);
+  // 🔧 SOLUCIÓN: Un solo estado para manejar todas las fases de la imagen
+  const [imageState, setImageState] = useState<ImageState>(ImageState.IDLE);
+  const [lastSuccessfulUrl, setLastSuccessfulUrl] = useState<string | null>(null);
+  
+  // 🔧 OPTIMIZACIÓN: Referencias más específicas
+  const currentImageUrlRef = useRef<string | null>(null);
+  const isMountedRef = useRef(true);
+  const imageStateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const avatarSize = SIZES[size];
   const editIconSize = EDIT_ICON_SIZES[size];
 
-  // 🔧 CLAVE: Resetear estados cuando cambia la URL
+  // 🔧 OPTIMIZACIÓN: Cleanup mejorado
   useEffect(() => {
-    if (imageUrl) {
-      setImageError(false);
-      setImageLoading(false); // 🆕 Comenzar en false, no en true
-    } else {
-      setImageError(false);
-      setImageLoading(false);
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      if (imageStateTimeoutRef.current) {
+        clearTimeout(imageStateTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // 🔧 SOLUCIÓN CLAVE: Resetear estado solo cuando realmente cambia la URL
+  useEffect(() => {
+    const trimmedUrl = imageUrl?.trim() || null;
+    
+    // Solo resetear si la URL realmente cambió
+    if (currentImageUrlRef.current !== trimmedUrl) {
+      console.log(`🔄 [Avatar] URL changed: ${currentImageUrlRef.current} → ${trimmedUrl}`);
+      
+      currentImageUrlRef.current = trimmedUrl;
+      
+      // Limpiar timeout anterior
+      if (imageStateTimeoutRef.current) {
+        clearTimeout(imageStateTimeoutRef.current);
+        imageStateTimeoutRef.current = null;
+      }
+
+      if (trimmedUrl) {
+        // 🔧 CLAVE: Si es la misma URL que ya se cargó exitosamente, marcar como loaded inmediatamente
+        if (trimmedUrl === lastSuccessfulUrl) {
+          console.log('✅ [Avatar] Usando imagen ya cargada desde caché');
+          setImageState(ImageState.LOADED);
+        } else {
+          // Nueva URL - empezar en IDLE (no loading)
+          setImageState(ImageState.IDLE);
+        }
+      } else {
+        // Sin URL - estado idle
+        setImageState(ImageState.IDLE);
+      }
     }
+  }, [imageUrl, lastSuccessfulUrl]);
+
+  // 🔧 SOLUCIÓN: Handlers ultra-optimizados con validación estricta
+  const handleLoadStart = useCallback(() => {
+    const currentUrl = currentImageUrlRef.current;
+    if (!isMountedRef.current || !currentUrl || currentUrl !== imageUrl?.trim()) {
+      return;
+    }
+
+    console.log('🖼️ [Avatar] Load start:', currentUrl);
+    setImageState(ImageState.LOADING);
+    
+    // 🔧 SEGURIDAD: Timeout para evitar loading infinito
+    imageStateTimeoutRef.current = setTimeout(() => {
+      if (isMountedRef.current && currentImageUrlRef.current === currentUrl) {
+        console.log('⏰ [Avatar] Load timeout, assumiendo error');
+        setImageState(ImageState.ERROR);
+      }
+    }, 10000); // 10 segundos máximo
   }, [imageUrl]);
 
-  // Manejar inicio de carga de imagen
-  const handleLoadStart = useCallback(() => {
-    console.log('🖼️ [Avatar] Iniciando carga de imagen');
-    setImageLoading(true);
-    setImageError(false);
-  }, []);
-
-  // Manejar carga exitosa de imagen
   const handleLoadEnd = useCallback(() => {
-    console.log('🖼️ [Avatar] Imagen cargada exitosamente');
-    setImageLoading(false);
-  }, []);
+    const currentUrl = currentImageUrlRef.current;
+    if (!isMountedRef.current || !currentUrl || currentUrl !== imageUrl?.trim()) {
+      return;
+    }
 
-  // Manejar error de carga de imagen
-  const handleError = useCallback((error: NativeSyntheticEvent<ImageErrorEventData>) => {
-    console.log('❌ [Avatar] Error cargando imagen:', error.nativeEvent.error);
-    setImageLoading(false);
-    setImageError(true);
-  }, []);
-
-  // Obtener iniciales del nombre
-  const getInitials = useCallback((fullName?: string): string => {
-    if (!fullName) return '?';
+    console.log('✅ [Avatar] Load success:', currentUrl);
     
-    const words = fullName.trim().split(' ');
+    // Limpiar timeout
+    if (imageStateTimeoutRef.current) {
+      clearTimeout(imageStateTimeoutRef.current);
+      imageStateTimeoutRef.current = null;
+    }
+    
+    setImageState(ImageState.LOADED);
+    setLastSuccessfulUrl(currentUrl);
+  }, [imageUrl]);
+
+  const handleLoadError = useCallback((error: NativeSyntheticEvent<ImageErrorEventData>) => {
+    const currentUrl = currentImageUrlRef.current;
+    if (!isMountedRef.current || !currentUrl || currentUrl !== imageUrl?.trim()) {
+      return;
+    }
+
+    console.log('❌ [Avatar] Load error:', currentUrl, error.nativeEvent.error);
+    
+    // Limpiar timeout
+    if (imageStateTimeoutRef.current) {
+      clearTimeout(imageStateTimeoutRef.current);
+      imageStateTimeoutRef.current = null;
+    }
+    
+    setImageState(ImageState.ERROR);
+    
+    // Si era la misma URL que estaba cacheada, limpiar caché
+    if (currentUrl === lastSuccessfulUrl) {
+      setLastSuccessfulUrl(null);
+    }
+  }, [imageUrl, lastSuccessfulUrl]);
+
+  // 🔧 OPTIMIZACIÓN: Memoizar getInitials
+  const initials = React.useMemo(() => {
+    if (!name) return '?';
+    
+    const words = name.trim().split(' ').filter(Boolean);
     if (words.length >= 2) {
       return `${words[0][0]}${words[1][0]}`.toUpperCase();
     }
-    return fullName.substring(0, 2).toUpperCase();
-  }, []);
+    return name.substring(0, 2).toUpperCase();
+  }, [name]);
 
-  // 🔧 CLAVE: Solo mostrar loading externo, no el interno de la imagen
-  const shouldShowLoading = loading; // Solo loading externo
-
-  // Determinar qué contenido mostrar
-  const renderAvatarContent = () => {
-    // Si hay loading externo (subida/eliminación), mostrar loading
-    if (shouldShowLoading) {
+  // 🔧 SOLUCIÓN PRINCIPAL: Lógica de renderizado completamente reescrita
+  const renderContent = () => {
+    // 1. PRIORIDAD MÁXIMA: Loading externo (subida/eliminación)
+    if (loading) {
       return (
-        <View style={[styles.loadingContainer, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}>
+        <View style={[styles.container, { width: avatarSize, height: avatarSize }]}>
           <ActivityIndicator size="large" color="#00DC5A" />
           {progress > 0 && progress < 100 && (
             <Text style={styles.progressText}>{Math.round(progress)}%</Text>
@@ -115,77 +196,53 @@ export default function Avatar({
       );
     }
 
-    // Si hay URL de imagen y no hay error
-    if (imageUrl && !imageError) {
+    const hasValidUrl = Boolean(imageUrl?.trim());
+
+    // 2. Sin URL válida o error: mostrar iniciales
+    if (!hasValidUrl || imageState === ImageState.ERROR) {
       return (
-        <View style={{ position: 'relative' }}>
-          <Image
-            source={{ uri: imageUrl }}
-            style={[
-              styles.avatar,
-              { 
-                width: avatarSize, 
-                height: avatarSize, 
-                borderRadius: avatarSize / 2,
-                // 🔧 CLAVE: No cambiar opacidad, dejar que la imagen se muestre normalmente
-                opacity: 1,
-              }
-            ]}
-            onLoadStart={handleLoadStart}
-            onLoadEnd={handleLoadEnd}
-            onError={handleError}
-            // Configuraciones para mejorar la carga
-            resizeMode="cover"
-          />
-          
-          {/* 🔧 CLAVE: Solo mostrar loading overlay si realmente está cargando Y es la primera vez */}
-          {imageLoading && (
-            <View style={[
-              styles.imageLoadingOverlay,
-              { 
-                width: avatarSize, 
-                height: avatarSize, 
-                borderRadius: avatarSize / 2 
-              }
-            ]}>
-              <ActivityIndicator size="small" color="#00DC5A" />
-            </View>
-          )}
+        <View style={[styles.initialsContainer, { width: avatarSize, height: avatarSize }]}>
+          <Text style={[styles.initialsText, { fontSize: avatarSize * 0.4 }]}>
+            {initials}
+          </Text>
         </View>
       );
     }
 
-    // Mostrar iniciales si no hay imagen o hay error
+    // 3. Con URL válida: mostrar imagen
     return (
-      <View style={[
-        styles.initialsContainer,
-        { 
-          width: avatarSize, 
-          height: avatarSize, 
-          borderRadius: avatarSize / 2 
-        }
-      ]}>
-        <Text style={[
-          styles.initialsText,
-          { fontSize: avatarSize * 0.4 }
-        ]}>
-          {getInitials(name)}
-        </Text>
+      <View style={styles.imageWrapper}>
+        <Image
+          source={{ uri: imageUrl!.trim() }}
+          style={[styles.avatar, { width: avatarSize, height: avatarSize }]}
+          onLoadStart={handleLoadStart}
+          onLoadEnd={handleLoadEnd}
+          onError={handleLoadError}
+          resizeMode="cover"
+          fadeDuration={100} // Fade rápido pero suave
+        />
+        
+        {/* 🔧 CLAVE: Solo mostrar overlay si está cargando explícitamente */}
+        {imageState === ImageState.LOADING && (
+          <View style={[styles.loadingOverlay, { width: avatarSize, height: avatarSize }]}>
+            <ActivityIndicator size="small" color="#00DC5A" />
+          </View>
+        )}
       </View>
     );
   };
 
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={styles.touchable}
       onPress={onPress}
       disabled={!onPress || loading}
       activeOpacity={onPress ? 0.8 : 1}
     >
-      <View style={styles.avatarWrapper}>
-        {renderAvatarContent()}
+      <View style={styles.wrapper}>
+        {renderContent()}
         
-        {/* Ícono de edición */}
+        {/* Botón de edición */}
         {editable && showEditIcon && !loading && (
           <TouchableOpacity
             style={[
@@ -199,11 +256,7 @@ export default function Avatar({
             onPress={onEdit}
             activeOpacity={0.8}
           >
-            <Ionicons 
-              name="camera" 
-              size={editIconSize} 
-              color="#FFF" 
-            />
+            <Ionicons name="camera" size={editIconSize} color="#FFF" />
           </TouchableOpacity>
         )}
       </View>
@@ -212,27 +265,32 @@ export default function Avatar({
 }
 
 const styles = StyleSheet.create({
-  container: {
+  touchable: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarWrapper: {
+  wrapper: {
+    position: 'relative',
+  },
+  // 🔧 OPTIMIZACIÓN: Estilos base compartidos
+  container: {
+    backgroundColor: '#F0F0F0',
+    borderRadius: 60, // Se sobrescribe dinámicamente
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  imageWrapper: {
     position: 'relative',
   },
   avatar: {
-    borderWidth: 3,
-    borderColor: '#FFF',
-    // Sombra para darle profundidad
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  loadingContainer: {
-    backgroundColor: '#F0F0F0',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 60, // Se sobrescribe dinámicamente
     borderWidth: 3,
     borderColor: '#FFF',
     shadowColor: '#000',
@@ -241,11 +299,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  imageLoadingOverlay: {
+  loadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    borderRadius: 60, // Se sobrescribe dinámicamente
+    backgroundColor: 'rgba(240, 240, 240, 0.9)',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -254,9 +313,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#00DC5A',
     fontFamily: 'Outfit_500Medium',
+    fontWeight: '500',
   },
   initialsContainer: {
     backgroundColor: '#E0E0E0',
+    borderRadius: 60, // Se sobrescribe dinámicamente
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -270,6 +331,7 @@ const styles = StyleSheet.create({
   initialsText: {
     color: '#666',
     fontFamily: 'Outfit_600SemiBold',
+    fontWeight: '600',
     textAlign: 'center',
   },
   editButton: {

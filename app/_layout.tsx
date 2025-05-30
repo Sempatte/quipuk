@@ -1,4 +1,4 @@
-// _layout.tsx (o RootLayout.tsx)
+// app/_layout.tsx - VERSION DEBUG
 import React, { useEffect } from "react";
 import {
   DarkTheme,
@@ -9,6 +9,7 @@ import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar, Platform, View } from "react-native";
 import { ApolloProvider } from "@apollo/client";
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import client from "./apolloClient";
 import { FontProvider } from "./providers/FontProvider";
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -29,10 +30,12 @@ import { OfflineMessage } from "@/components/OfflineMessage";
 SplashScreen.preventAutoHideAsync();
 
 function MainLayout() {
+  console.log('🐛 [DEBUG] MainLayout renderizando...');
+  
   const colorScheme = useColorScheme();
   const { isBackendActive, isLoading } = useBackendHealth({
     showErrorToast: false,
-    retryInterval: 60000, // Reintentar cada 60 segundos si falla
+    retryInterval: 60000,
   });
 
   const [fontsLoaded] = useFonts({
@@ -46,35 +49,40 @@ function MainLayout() {
   });
 
   useEffect(() => {
-    // Configuración del StatusBar
+    console.log('🐛 [DEBUG] Configurando StatusBar...');
     StatusBar.setBarStyle("light-content", true);
     if (Platform.OS === "android") {
       StatusBar.setBackgroundColor("#000000");
-      StatusBar.setTranslucent(true);
+      StatusBar.setTranslucent(false);
     }
   }, []);
 
   useEffect(() => {
-    // Ocultar la pantalla de splash cuando las fuentes están cargadas
-    // y tenemos información sobre el estado del backend
     if (fontsLoaded && !isLoading) {
+      console.log('🐛 [DEBUG] Ocultando SplashScreen...');
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, isLoading]);
 
   if (!fontsLoaded || isLoading) {
-    return null; // No renderizar nada hasta que las fuentes estén cargadas y el backend verificado
+    console.log('🐛 [DEBUG] Mostrando loading...');
+    return null;
   }
 
-  // Si el backend no está activo, mostrar la pantalla completa de error
   if (!isBackendActive) {
+    console.log('🐛 [DEBUG] Backend inactivo, mostrando OfflineMessage...');
     return <OfflineMessage />;
   }
 
-  // Si el backend está activo, mostrar la aplicación normal
+  console.log('🐛 [DEBUG] Renderizando app principal...');
+  
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      <StatusBar barStyle="light-content" backgroundColor="#000000" />
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="#000000" 
+        translucent={Platform.OS === 'ios'}
+      />
       <Stack initialRouteName="LoginScreen">
         <Stack.Screen name="LoginScreen" options={{ headerShown: false }} />
         <Stack.Screen name="RegisterScreen" options={{ headerShown: false }} />
@@ -87,13 +95,17 @@ function MainLayout() {
 }
 
 export default function RootLayout() {
+  console.log('🐛 [DEBUG] RootLayout renderizando...');
+  
   return (
-    <ApolloProvider client={client}>
-      <FontProvider>
-        <ToastProvider>
-          <MainLayout />
-        </ToastProvider>
-      </FontProvider>
-    </ApolloProvider>
+    <SafeAreaProvider>
+      <ApolloProvider client={client}>
+        <FontProvider>
+          <ToastProvider>
+            <MainLayout />
+          </ToastProvider>
+        </FontProvider>
+      </ApolloProvider>
+    </SafeAreaProvider>
   );
 }

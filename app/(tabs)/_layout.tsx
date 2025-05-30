@@ -10,6 +10,7 @@ export default function TabLayout() {
   const router = useRouter();
 
   useEffect(() => {
+
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
@@ -18,6 +19,8 @@ export default function TabLayout() {
     };
     checkAuth();
   }, []);
+
+  
 
   return (
     <>
