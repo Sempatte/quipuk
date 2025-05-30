@@ -106,7 +106,7 @@ export default function LoginScreen() {
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <View style={styles.inner}>
           <View style={styles.logoContainer}>
-            <QuipukLogo width={170} height={90} style={styles.logo} />
+            <QuipukLogo width={90} style={styles.logo} />
           </View>
 
           <View style={styles.formContainer}>
@@ -221,8 +221,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   logo: {
-    width: 270,
-    height: 120,
+    marginTop: 30,
     resizeMode: "contain",
   },
   formContainer: {

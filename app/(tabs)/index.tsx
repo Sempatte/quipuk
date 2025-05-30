@@ -10,7 +10,7 @@ import { useQuery } from "@apollo/client";
 import BellIcon from "@/assets/images/icons/mdi_bell.svg";
 import SettingsIcon from "@/assets/images/icons/settings.svg";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import QuipukLogo from "@/assets/images/Logo.svg";
+import QuipukLogo from "@/assets/images/LogoV2.svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -49,7 +49,7 @@ export default function Index() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <QuipukLogo width={140} height={60} />
+            <QuipukLogo width={70} height={70} />
           </View>
 
           <View style={styles.iconContainer}>

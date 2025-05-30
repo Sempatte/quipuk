@@ -1,56 +1,110 @@
 {
   "expo": {
-    "name": "quipuk-app",
+    "name": "Quipuk",
     "slug": "quipuk-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/Logo.png",
-    "scheme": "myapp",
+    "icon": "./assets/images/Logo1024x1024.png",
+    "scheme": "quipuk",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "jsEngine": "hermes",
+    "primaryColor": "#00D865",
+    "description": "Gestiona tus gastos empresariales de forma inteligente",
+    "keywords": ["gastos", "finanzas", "empresa", "comprobantes"],
+    "privacy": "public",
+    "platforms": ["ios", "android", "web"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "jsEngine": "hermes",
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.quipuk-app",
+      "bundleIdentifier": "com.quipuk.app",
+      "buildNumber": "1",
+      "icon": "./assets/images/Logo1024x1024.png",
+      "splash": {
+        "image": "./assets/images/Logo2048x2048.png",
+        "backgroundColor": "#000000",
+        "resizeMode": "contain"
+      },
       "infoPlist": {
-        "NSCameraUsageDescription": "Esta aplicación necesita acceso a la cámara para escanear comprobantes de gastos.",
-        "NSPhotoLibraryUsageDescription": "Esta aplicación necesita acceso a la galería para seleccionar comprobantes de gastos."
-      }
+        "NSCameraUsageDescription": "Quipuk necesita acceso a la cámara para escanear comprobantes de gastos y facturas.",
+        "NSPhotoLibraryUsageDescription": "Quipuk necesita acceso a la galería para seleccionar comprobantes de gastos desde tus fotos.",
+        "NSMicrophoneUsageDescription": "Quipuk puede necesitar acceso al micrófono para funciones de grabación de notas.",
+        "UIBackgroundModes": ["background-fetch"]
+      },
+      "associatedDomains": ["applinks:quipuk.app"]
+    },
+    "android": {
+      "jsEngine": "hermes",
+      "versionCode": 1,
+      "package": "com.quipuk.app",
+      "icon": "./assets/images/Logo1024x1024.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/Logo1024x1024.png",
+        "backgroundImage": "./assets/images/Logo1024x1024.png"
+      },
+      "splash": {
+        "image": "./assets/images/Logo2048x2048.png",
+        "backgroundColor": "#000000",
+        "resizeMode": "contain"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES",
+        "INTERNET",
+        "ACCESS_NETWORK_STATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "https",
+              "host": "quipuk.app"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "androidStatusBar": {
       "backgroundColor": "#000000",
       "barStyle": "light-content",
       "translucent": false
     },
-    "android": {
-      "jsEngine": "hermes",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/Logo.png",
-        "backgroundColor": "#ffffff"
-      },
-      "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
-      ]
+    "androidNavigationBar": {
+      "backgroundColor": "#000000",
+      "barStyle": "light-content"
     },
     "splash": {
-      "image": "./assets/images/Logo.png",
+      "image": "./assets/images/Logo2048x2048.png",
       "backgroundColor": "#000000",
       "resizeMode": "contain"
     },
     "web": {
       "bundler": "metro",
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "name": "Quipuk - Gestión de Gastos",
+      "shortName": "Quipuk",
+      "lang": "es",
+      "scope": "/",
+      "themeColor": "#00D865",
+      "backgroundColor": "#000000",
+      "display": "standalone",
+      "orientation": "portrait",
+      "startUrl": "."
     },
     "plugins": [
       "expo-router",
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/Logo.png",
+          "image": "./assets/images/Logo2048x2048.png",
           "backgroundColor": "#000000",
           "resizeMode": "contain"
         }
@@ -59,20 +113,40 @@
         "expo-font",
         {
           "fonts": [
-            "./node_modules/@expo-google-fonts/outfit/Outfit_400Regular.ttf",
-            "./node_modules/@expo-google-fonts/outfit/Outfit_700Bold.ttf"
+            "./assets/fonts/Outfit-Regular.ttf",
+            "./assets/fonts/Outfit-Bold.ttf",
+            "./assets/fonts/Outfit-Medium.ttf",
+            "./assets/fonts/Outfit-SemiBold.ttf"
           ]
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "Esta aplicación necesita acceso a la cámara para escanear comprobantes de gastos."
+          "cameraPermission": "Quipuk necesita acceso a la cámara para escanear comprobantes de gastos y facturas.",
+          "microphonePermission": "Quipuk puede necesitar acceso al micrófono para funciones de grabación de notas."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Quipuk necesita acceso a tus fotos para seleccionar comprobantes de gastos."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "updates": {
+      "url": "https://u.expo.dev/[your-project-id]"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "[your-project-id]"
+      }
     }
   }
 }
