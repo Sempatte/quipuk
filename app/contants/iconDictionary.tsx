@@ -33,6 +33,16 @@ export const gastosIcons: Record<string, JSX.Element> = {
   Salud: <SaludIcon width={30} height={30} />,
   Super: <SuperIcon width={30} height={30} />,
   Teléfono: <TelefonoIcon width={30} height={30} />,
+  Suscripciones: <GraficaAbajoIcon width={30} height={30} />,
+  Ropa: <GraficaAbajoIcon width={30} height={30} />,
+  "Cuidado personal": <GraficaAbajoIcon width={30} height={30} />,
+  Bienestar: <GraficaAbajoIcon width={30} height={30} />,
+  Fiestas: <GraficaAbajoIcon width={30} height={30} />,
+  Gasolina: <GraficaAbajoIcon width={30} height={30} />,
+  Tarjeta: <CardIcon width={30} height={30} />,
+  Deudas: <GraficaAbajoIcon width={30} height={30} />,
+  Educación: <GraficaAbajoIcon width={30} height={30} />,
+  Mascotas: <GraficaAbajoIcon width={30} height={30} />,
 };
 
 export const addIcon = <AddIcon width={30} height={30} />;

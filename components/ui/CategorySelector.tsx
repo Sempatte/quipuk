@@ -1,7 +1,7 @@
 // components/ui/CategorySelector.tsx - CORREGIDO
 import { gastosIcons, ingresosIcons } from "@/app/contants/iconDictionary";
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Dimensions } from "react-native";
 
 // Definir los tipos de propiedades
 interface CategorySelectorProps {
@@ -14,12 +14,38 @@ interface CategorySelectorProps {
 const categoryData = {
   gasto: {
     mainCategories: ["Frecuentes", "Deducibles", "Otros"],
-    subCategories: ["Comida", "Transporte", "Hogar", "Alquiler", "Salud", "Teléfono", "Super"],
+    subCategories: [
+      "Alquiler",
+      "Hogar",
+      "Telefono",
+      "Super",
+      "Comida",
+      "Suscripciones",
+      "Ropa",
+      "Cuidado personal",
+      "Bienestar",
+      "Fiestas",
+      "Transporte",
+      "Gasolina",
+      "Tarjeta",
+      "Deudas",
+      "Educación",
+      "Mascotas"
+    ],
     selectedColor: "#FF5252",
   },
   ingreso: {
     mainCategories: [],
-    subCategories: ["Empleo", "Trabajo Independiente", "Director", "Alquiler", "Airbnb", "Bolsa", "Intereses", "Otros Ingresos"],
+    subCategories: [
+      "Empleo",
+      "Trabajo Independiente",
+      "Director",
+      "Alquiler",
+      "Airbnb",
+      "Bolsa",
+      "Intereses",
+      "Otros Ingresos"
+    ],
     selectedColor: "#65CE13",
   },
   ahorro: {
@@ -82,42 +108,88 @@ const CategorySelector: React.FC<CategorySelectorProps> = ({
   // 🔧 CORRECCIÓN: Usar estado interno actualizado
   const currentSelection = selectedCategory || internalSelectedCategory;
 
+  // Agrupar subcategorías en "páginas" de 2 filas (3 columnas por fila)
+  const COLUMNS = 3;
+  const ROWS = 2;
+  const PAGE_SIZE = COLUMNS * ROWS;
+  const { width: windowWidth } = Dimensions.get('window');
+  const PAGE_WIDTH = Math.round(windowWidth * 0.88); // 88% del ancho de pantalla
+  const CATEGORY_SIZE = Math.floor((PAGE_WIDTH - 32) / COLUMNS); // 16px padding lateral
+  const pages: string[][] = [];
+  for (let i = 0; i < subCategories.length; i += PAGE_SIZE) {
+    pages.push(subCategories.slice(i, i + PAGE_SIZE));
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Categoría</Text>
-
-      <View style={styles.subCategoryContainer}>
-        {subCategories.map((category) => {
-          const isSelected = currentSelection === category;
-          
-          return (
-            <View key={category} style={styles.categoryWrapper}>
-              <TouchableOpacity
-                style={[
-                  styles.subCategoryButton,
-                  isSelected && { backgroundColor: selectedColor }
-                ]}
-                onPress={() => handleSelectCategory(category)}
-              >
-                {iconSet[category] && (
-                  <View style={[
-                    styles.icon,
-                    isSelected && styles.selectedIcon
-                  ]}>
-                    {iconSet[category]}
-                  </View>
-                )}
-              </TouchableOpacity>
-              <Text style={[
-                styles.subCategoryText,
-                isSelected && styles.selectedCategoryText
-              ]}>
-                {truncateText(category, MAX_LENGTH_FOR_SUBCATEGORY)}
-              </Text>
-            </View>
-          );
-        })}
-      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.horizontalScroll}
+        snapToInterval={PAGE_WIDTH + 20}
+        decelerationRate="fast"
+        snapToAlignment="start"
+        overScrollMode="never"
+      >
+        {pages.map((page, pageIndex) => (
+          <View
+            key={pageIndex}
+            style={[
+              styles.pageContainer,
+              { width: PAGE_WIDTH, marginHorizontal: 10 },
+              pageIndex === 0 && { marginLeft: 16 }, // margen extra al inicio
+              pageIndex === pages.length - 1 && { marginRight: 16 } // margen extra al final
+            ]}
+          >
+            {/* Renderizar 2 filas */}
+            {[0, 1].map(rowIdx => {
+              const rowCategories = page.slice(rowIdx * COLUMNS, (rowIdx + 1) * COLUMNS);
+              const emptySlots = COLUMNS - rowCategories.length;
+              return (
+                <View key={rowIdx} style={styles.rowContainer}>
+                  {rowCategories.map((category) => {
+                    const isSelected = currentSelection === category;
+                    return (
+                      <View key={category} style={[styles.categoryWrapper, { width: CATEGORY_SIZE, height: CATEGORY_SIZE }]}> 
+                        <TouchableOpacity
+                          style={[
+                            styles.subCategoryButton,
+                            isSelected && { backgroundColor: selectedColor },
+                            { width: CATEGORY_SIZE - 8, height: CATEGORY_SIZE - 8 },
+                          ]}
+                          onPress={() => handleSelectCategory(category)}
+                          activeOpacity={0.85}
+                        >
+                          {iconSet[category] && (
+                            <View style={[
+                              styles.icon,
+                              isSelected && styles.selectedIcon
+                            ]}>
+                              {React.cloneElement(iconSet[category], isSelected ? { color: '#FFF' } : {})}
+                            </View>
+                          )}
+                        </TouchableOpacity>
+                        <Text style={[
+                          styles.subCategoryText,
+                          isSelected && styles.selectedCategoryText,
+                          { width: CATEGORY_SIZE - 8, textAlign: 'center' }
+                        ]} numberOfLines={2}>
+                          {truncateText(category, MAX_LENGTH_FOR_SUBCATEGORY)}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                  {/* Espaciadores invisibles para centrar la fila */}
+                  {Array.from({ length: emptySlots }).map((_, idx) => (
+                    <View key={`spacer-${rowIdx}-${idx}`} style={{ width: CATEGORY_SIZE, height: CATEGORY_SIZE, marginHorizontal: 4, marginVertical: 4 }} />
+                  ))}
+                </View>
+              );
+            })}
+          </View>
+        ))}
+      </ScrollView>
     </View>
   );
 };
@@ -141,9 +213,10 @@ const styles = StyleSheet.create({
     padding: 15,
   },
   categoryWrapper: {
-    width: "25%",
-    alignItems: "center",
-    marginVertical: 5,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    marginHorizontal: 4,
+    marginVertical: 4,
   },
   subCategoryButton: {
     width: 75,
@@ -173,8 +246,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   selectedIcon: {
-    // Aplicamos un filtro CSS que convierte todo a blanco, respetando transparencia
-    filter: 'brightness(0) invert(1)',
+    // Antes: filter: 'brightness(0) invert(1)',
+    // Si el icono es SVG, se debe pasar color blanco desde el render
+  },
+  horizontalScroll: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  pageContainer: {
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  rowContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
 });
 

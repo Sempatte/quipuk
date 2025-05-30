@@ -25,15 +25,52 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction }) => {
     amount = 0, 
     type = "gasto", 
     category = "", 
-    createdAt = new Date().toISOString(),
+    dueDate,
     title = "",
-    paymentMethod = "Efectivo"
+    paymentmethod = "Efectivo"
   } = transaction;
   
-  // Formato de hora y fecha
-  const transactionDate = new Date(createdAt);
-  const timeString = format(transactionDate, 'hh:mm a', { locale: es }).toLowerCase();
-  const dateString = format(transactionDate, 'dd MMM yyyy', { locale: es });
+  // Función robusta para parsear strings de fecha (YYYY-MM-DD HH:MM:SS o ISO) a objetos Date
+  // Esta función es una copia o referencia a la definida en movements.tsx para consistencia.
+  // Si se modifica allá, idealmente se debería modificar aquí también o importarla.
+  function robustParseDateStringForItem(dueDateValue: any): Date | null {
+    if (!dueDateValue) return null;
+    if (dueDateValue instanceof Date && !isNaN(dueDateValue.getTime())) return dueDateValue;
+    if (typeof dueDateValue === 'string') {
+      const specificFormatParts = dueDateValue.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+      if (specificFormatParts) {
+        const year = parseInt(specificFormatParts[1], 10);
+        const month = parseInt(specificFormatParts[2], 10) - 1;
+        const day = parseInt(specificFormatParts[3], 10);
+        const hours = parseInt(specificFormatParts[4], 10);
+        const minutes = parseInt(specificFormatParts[5], 10);
+        const seconds = parseInt(specificFormatParts[6], 10);
+        const d = new Date(year, month, day, hours, minutes, seconds);
+        return isNaN(d.getTime()) ? null : d;
+      }
+      const isoDateString = dueDateValue.includes(' ') ? dueDateValue.replace(' ', 'T') : dueDateValue;
+      const dSafe = new Date(isoDateString);
+      return isNaN(dSafe.getTime()) ? null : dSafe;
+    }
+    return null;
+  }
+
+  const transactionDate = robustParseDateStringForItem(dueDate);
+
+  let timeString = '';
+  let dateString = '';
+  if (transactionDate) {
+    let hours = transactionDate.getHours();
+    let minutes = transactionDate.getMinutes();
+    let isAM = hours < 12;
+    let displayHour = hours % 12 === 0 ? 12 : hours % 12;
+    let displayMinutes = minutes.toString().padStart(2, '0');
+    timeString = `${displayHour}:${displayMinutes} ${isAM ? 'a. m.' : 'p. m.'}`;
+    dateString = format(transactionDate, 'dd MMM yyyy', { locale: es });
+  } else {
+    timeString = 'Fecha no válida';
+    dateString = '';
+  }
   
   // Obtener el ícono correcto según la categoría y tipo
   const categoryIcon = getTransactionIcon(category, type);
@@ -57,7 +94,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({ transaction }) => {
             <Text style={styles.dotSeparator}>·</Text>
             <Text style={styles.dateText}>{dateString}</Text>
           </View>
-          <Text style={styles.paymentMethod}>{paymentMethod}</Text>
+          <Text style={styles.paymentMethod}>{paymentmethod}</Text>
         </View>
       </View>
       

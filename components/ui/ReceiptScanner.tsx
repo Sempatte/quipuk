@@ -9,12 +9,14 @@ import {
   Dimensions,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Camera, CameraView } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { useCameraPermissions } from '@/hooks/useCamaraPermissions';
 import { ExtractedReceiptData, integratedOCRService } from '@/app/services/integratedOCRService';
+import { LoadingDots } from './LoadingDots';
 
 const { width, height } = Dimensions.get('window');
 
@@ -36,6 +38,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   const [flashMode, setFlashMode] = useState<'off' | 'on'>('off');
   const [debugMode, setDebugMode] = useState(__DEV__);
   const cameraRef = useRef<CameraView>(null);
+  const [selectedLens, setSelectedLens] = useState<string | undefined>("builtInWideAngleCamera");
+  const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
   
   const {
     permissions,
@@ -51,6 +55,13 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       requestPermissions();
     }
   }, [visible, permissions.camera, requestPermissions]);
+
+  // Limpiar imagen capturada al cerrar el modal
+  useEffect(() => {
+    if (!visible) {
+      setCapturedImageUri(null);
+    }
+  }, [visible]);
 
   /**
    * FUNCIÓN CORREGIDA - Procesa los datos y cierra el modal
@@ -85,7 +96,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   const processImage = async (imageUri: string): Promise<void> => {
     console.log('🔍 [Scanner] ============ INICIANDO PROCESAMIENTO OCR ============');
     console.log('🔍 [Scanner] URI:', imageUri.substring(0, 80) + '...');
-    
+    setCapturedImageUri(imageUri); // Mostrar imagen en vez de cámara
     try {
       setIsProcessing(true);
       
@@ -175,6 +186,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         throw new Error('No se pudo tomar la foto');
       }
 
+      setCapturedImageUri(photo.uri); // Mostrar imagen en vez de cámara
       // Procesar la imagen
       await processImage(photo.uri);
       
@@ -197,13 +209,12 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [4, 3],
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets[0]) {
         console.log('🔍 [Scanner] Procesando imagen de galería...');
+        setCapturedImageUri(result.assets[0].uri); // Mostrar imagen en vez de cámara
         await processImage(result.assets[0].uri);
       }
     } catch (error) {
@@ -255,6 +266,17 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   const toggleFlash = (): void => {
     const newMode = flashMode === 'off' ? 'on' : 'off';
     setFlashMode(newMode);
+  };
+
+  const handleAvailableLenses = (event: { lenses: string[] }) => {
+    // Buscar la lente principal (1x) evitando la ultra gran angular (0.5x)
+    if (event.lenses.includes("builtInWideAngleCamera")) {
+      setSelectedLens("builtInWideAngleCamera");
+    } else {
+      // Fallback: usar la primera que no sea ultra gran angular
+      const normalLens = event.lenses.find(lens => lens !== "builtInUltraWideCamera");
+      setSelectedLens(normalLens || event.lenses[0]);
+    }
   };
 
   // Renderizar estados de carga y permisos
@@ -311,27 +333,35 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             />
           </TouchableOpacity>
         </View>
-
-        {/* Cámara */}
+        {/* Cámara o Imagen capturada */}
         <View style={styles.cameraContainer}>
-          <CameraView
-            ref={cameraRef}
-            style={styles.camera}
-            facing="back"
-            flash={flashMode}
-          >
-            {/* Overlay con guías */}
-            <View style={styles.overlay}>
-              <View style={styles.scanArea}>
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
+          {capturedImageUri ? (
+            <Image
+              source={{ uri: capturedImageUri }}
+              style={styles.capturedImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <CameraView
+              ref={cameraRef}
+              style={styles.camera}
+              facing="back"
+              flash={flashMode}
+              selectedLens={selectedLens}
+              onAvailableLensesChanged={handleAvailableLenses}
+            >
+              {/* Overlay con guías */}
+              <View style={styles.overlay}>
+                <View style={styles.scanArea}>
+                  <View style={[styles.corner, styles.topLeft]} />
+                  <View style={[styles.corner, styles.topRight]} />
+                  <View style={[styles.corner, styles.bottomLeft]} />
+                  <View style={[styles.corner, styles.bottomRight]} />
+                </View>
               </View>
-            </View>
-          </CameraView>
+            </CameraView>
+          )}
         </View>
-
         {/* Instrucciones */}
         <View style={styles.instructionsContainer}>
           <Text style={styles.instructionsText}>
@@ -341,7 +371,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             Asegúrate de que haya buena iluminación y el texto sea legible
           </Text>
         </View>
-
         {/* Controles */}
         <View style={styles.controls}>
           <TouchableOpacity 
@@ -359,7 +388,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             disabled={isProcessing}
           >
             {isProcessing ? (
-              <ActivityIndicator size="large" color="#FFF" />
+              <View style={styles.captureButtonInner} />
             ) : (
               <View style={styles.captureButtonInner} />
             )}
@@ -389,6 +418,15 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
             <View style={styles.galleryButton} />
           )}
         </View>
+        {/* Overlay de procesamiento: SIEMPRE AL FINAL para estar por encima de todo */}
+        {isProcessing && (
+          <View style={styles.processingOverlay}>
+            <View style={styles.processingContent}>
+              <LoadingDots />
+              <Text style={styles.processingText}>Procesando comprobante...</Text>
+            </View>
+          </View>
+        )}
       </View>
     </Modal>
   );
@@ -597,6 +635,36 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Outfit_500Medium',
     color: '#FFF',
+  },
+  processingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingContent: {
+    backgroundColor: '#000',
+    padding: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingText: {
+    fontSize: 16,
+    fontFamily: 'Outfit_400Regular',
+    color: '#FFF',
+    marginTop: 10,
+  },
+  capturedImage: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+    borderRadius: 20,
+    backgroundColor: '#000',
   },
 });
 

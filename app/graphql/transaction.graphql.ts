@@ -48,6 +48,8 @@ export const GET_TRANSACTIONS_BY_USER = gql`
       updatedAt
       userId
       status
+      dueDate
+      paymentmethod
     }
   }
 `;
