@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import {
   StyleSheet,
   View,
@@ -9,20 +9,18 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from "react-native";
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
   interpolateColor,
-  runOnJS,
   withSpring,
 } from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRoute, RouteProp, useNavigation, useFocusEffect } from "@react-navigation/native";
+import { useRoute, RouteProp, useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 
@@ -45,71 +43,54 @@ import {
   GET_FREQUENT_TRANSACTIONS,
 } from "../graphql/transaction.graphql";
 
-// Importaciones de Interfaces
+// Importaciones de Interfaces y Hooks
 import {
   TransactionOption,
-  CreateTransactionInput,
-  TRANSACTION_MAPPING,
   TRANSACTION_COLORS,
   FrequentTransactionsData,
 } from "../interfaces/transaction.interface";
-
-// Utilidades
-import { getCategoryIcon } from "../contants/iconDictionary"; // 🔥 Usar nueva función
+import { useTransactionForm } from "@/hooks/useTransactionForm";
+import { getCategoryIcon } from "../contants/iconDictionary";
 import { useToast } from "@/app/providers/ToastProvider";
 import { RootStackParamList } from "../interfaces/navigation";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
 
-// 🎯 INTERFACES MEJORADAS
+// 🎯 INTERFACES
 interface AddTransactionRouteParams {
   forcePaymentStatus?: "pending" | "completed";
   statusReadOnly?: boolean;
   preselectedTab?: TransactionOption;
 }
 
-interface FormState {
-  selectedOption: TransactionOption;
+// ✅ Interfaz para los datos que usamos internamente
+interface FrequentTransactionItem {
   amount: string;
-  description: string;
-  category: string;
-  paymentmethod: string;
-  date: string;
-  dueDate: string;
-  frequent: boolean;
-  isPaid: boolean;
+  description?: string;
+  title: string;
 }
 
-// 🎯 TIPOS MEJORADOS
+// ✅ Interfaz que coincide exactamente con lo que espera el Carousel
+interface CarouselItemData {
+  id: string;
+  title: string;
+  description: string;
+  type: string;
+  amount: string;
+  icon: JSX.Element;
+  backgroundColor: string;
+}
+
 type AddTransactionNavigationProp = NativeStackNavigationProp<RootStackParamList, "movements">;
-type ColorIndexMap = Record<TransactionOption, number>;
 
 // 🎯 CONSTANTES
-const COLOR_INDEX_MAP: ColorIndexMap = {
+const COLOR_INDEX_MAP: Record<TransactionOption, number> = {
   Gastos: 0,
   Ingresos: 1,
   Ahorros: 2,
 };
 
-const INITIAL_FORM_STATE: FormState = {
-  selectedOption: "Gastos",
-  amount: "",
-  description: "",
-  category: "",
-  paymentmethod: "Efectivo",
-  date: new Date().toISOString(),
-  dueDate: new Date().toISOString(),
-  frequent: false,
-  isPaid: true,
-};
-
-const VALIDATION_RULES = {
-  amount: (value: string) => value && parseFloat(value) > 0,
-  category: (value: string) => value.length > 0,
-  paymentmethod: (value: string) => value.length > 0,
-} as const;
-
-export default function AddTransaction() {
+export default function AddTransactionWithHook() {
   // 🎯 HOOKS BÁSICOS
   const { showToast } = useToast();
   const navigation = useNavigation<AddTransactionNavigationProp>();
@@ -118,95 +99,101 @@ export default function AddTransaction() {
   // 🎯 PARÁMETROS DE RUTA
   const { forcePaymentStatus, statusReadOnly, preselectedTab } = route.params || {};
   
-  // 🎯 REFS PARA OPTIMIZACIONES
+  // 🎯 HOOK PERSONALIZADO PARA EL FORMULARIO
+  const {
+    formState,
+    validation,
+    updateFormState,
+    resetForm,
+    applyOCRData,
+    prepareTransactionData,
+    handleSliderChange,
+    handleStatusChange,
+    handleFrequentSelection,
+    transactionType,
+  } = useTransactionForm({
+    preselectedTab,
+    forcePaymentStatus,
+  });
+  
+  // 🎯 REFS Y ESTADO LOCAL
   const scrollRef = useRef<ScrollView>(null);
   const amountInputRef = useRef<any>(null);
+  const [showScanner, setShowScanner] = useState(false);
   
   // 🎯 VALORES ANIMADOS
-  const colorValue = useSharedValue(COLOR_INDEX_MAP[preselectedTab || "Gastos"]);
+  const colorValue = useSharedValue(COLOR_INDEX_MAP[formState.selectedOption]);
   const buttonScale = useSharedValue(1);
   
-  // 🎯 ESTADO LOCAL
-  const [formState, setFormState] = useState<FormState>(() => ({
-    ...INITIAL_FORM_STATE,
-    selectedOption: preselectedTab || "Gastos",
-    isPaid: forcePaymentStatus !== "pending",
-  }));
-  
-  const [showScanner, setShowScanner] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // 🎯 INICIALIZACIÓN DE ESTADO CON PARÁMETROS
-  useEffect(() => {
-    if (preselectedTab) {
-      colorValue.value = withTiming(COLOR_INDEX_MAP[preselectedTab], { duration: 300 });
+  // 🎯 CONSULTA DE TRANSACCIONES FRECUENTES
+  const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
+    GET_FREQUENT_TRANSACTIONS,
+    {
+      variables: {
+        type: transactionType,
+        frequent: true,
+      },
+      fetchPolicy: "cache-first",
+      skip: !formState.selectedOption,
     }
-  }, [preselectedTab]);
+  );
 
-  useEffect(() => {
-    if (forcePaymentStatus === "pending") {
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 7);
+  // 🎯 MUTACIÓN DE CREACIÓN
+  const [createTransaction, { loading: creating }] = useMutation(CREATE_TRANSACTION, {
+    refetchQueries: [
+      { query: GET_TRANSACTIONS },
+      {
+        query: GET_FREQUENT_TRANSACTIONS,
+        variables: { type: transactionType, frequent: true },
+      },
+    ],
+    onCompleted: () => {
+      resetForm(true);
       
-      setFormState(prev => ({
-        ...prev,
-        isPaid: false,
-        dueDate: defaultDueDate.toISOString(),
-      }));
-    }
-  }, [forcePaymentStatus]);
-
-  // 🎯 ACTUALIZACIÓN OPTIMIZADA DEL ESTADO
-  const updateFormState = useCallback((updates: Partial<FormState>) => {
-    setFormState(prev => {
-      const newState = { ...prev, ...updates };
-      
-      // 🎯 LOGGING CONDICIONAL (solo en desarrollo)
-      if (__DEV__) {
-        console.log("🔄 [AddTransaction] Estado actualizado:", updates);
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       
-      return newState;
-    });
-  }, []);
-
-  // 🎯 VALIDACIÓN MEJORADA DEL FORMULARIO
-  const formValidation = useMemo(() => {
-    const errors: string[] = [];
-    const isAmountValid = VALIDATION_RULES.amount(formState.amount);
-    const isCategoryValid = VALIDATION_RULES.category(formState.category);
-    const isPaymentMethodValid = VALIDATION_RULES.paymentmethod(formState.paymentmethod);
-    
-    if (!isAmountValid) errors.push("Monto requerido");
-    if (!isCategoryValid) errors.push("Categoría requerida");
-    if (!isPaymentMethodValid) errors.push("Método de pago requerido");
-    
-    return {
-      isValid: errors.length === 0,
-      errors,
-      fieldValidation: {
-        amount: isAmountValid,
-        category: isCategoryValid,
-        paymentmethod: isPaymentMethodValid,
+      navigation.navigate("movements");
+      showToast("success", "¡Éxito!", "Transacción agregada correctamente");
+    },
+    onError: (error) => {
+      if (Platform.OS === 'ios') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       }
-    };
-  }, [formState.amount, formState.category, formState.paymentmethod]);
+      showToast("error", "Error", error.message);
+    },
+  });
 
-  // 🎯 CAMBIO DE SLIDER CON ANIMACIÓN MEJORADA
-  const handleSliderChange = useCallback((value: TransactionOption) => {
-    // Haptic feedback
+  // 🎯 TRANSFORMACIÓN DE TRANSACCIONES FRECUENTES
+  const frequentTransactions = useMemo((): CarouselItemData[] => {
+    if (!frequentData?.frequentTransactions) return [];
+
+    return frequentData.frequentTransactions.map(transaction => ({
+      id: transaction.id.toString(),
+      title: transaction.title,
+      description: transaction.description || "", // ✅ Siempre string
+      type: transaction.type,
+      amount: `S/ ${transaction.amount.toFixed(2)}`,
+      icon: getCategoryIcon(transaction.category, transaction.type),
+      backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
+    }));
+  }, [frequentData]);
+
+  // 🎯 MANEJO MEJORADO DEL SLIDER
+  const handleSliderChangeWithAnimation = useCallback((value: TransactionOption) => {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
     
-    updateFormState({ selectedOption: value });
+    handleSliderChange(value);
     colorValue.value = withSpring(COLOR_INDEX_MAP[value], {
       damping: 15,
       stiffness: 150,
     });
-  }, [updateFormState, colorValue]);
+  }, [handleSliderChange, colorValue]);
 
-  // 🎯 ESTILOS ANIMADOS MEJORADOS
+  // 🎯 ESTILOS ANIMADOS
   const animatedHeaderStyle = useAnimatedStyle(() => {
     const backgroundColor = interpolateColor(
       colorValue.value,
@@ -220,86 +207,19 @@ export default function AddTransaction() {
     transform: [{ scale: buttonScale.value }],
   }));
 
-  // 🎯 CONSULTA OPTIMIZADA DE TRANSACCIONES FRECUENTES
-  const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
-    GET_FREQUENT_TRANSACTIONS,
-    {
-      variables: {
-        type: TRANSACTION_MAPPING[formState.selectedOption],
-        frequent: true,
-      },
-      fetchPolicy: "cache-first", // 🔥 Mejor rendimiento
-      skip: !formState.selectedOption, // 🔥 Skip si no hay selección
-    }
-  );
-
-  // 🎯 MUTACIÓN OPTIMIZADA
-  const [createTransaction, { loading: creating }] = useMutation(CREATE_TRANSACTION, {
-    refetchQueries: [
-      { query: GET_TRANSACTIONS },
-      {
-        query: GET_FREQUENT_TRANSACTIONS,
-        variables: {
-          type: TRANSACTION_MAPPING[formState.selectedOption],
-          frequent: true,
-        },
-      },
-    ],
-    onCompleted: () => {
-      // 🎯 RESET OPTIMIZADO DEL FORMULARIO
-      setFormState({
-        ...INITIAL_FORM_STATE,
-        selectedOption: formState.selectedOption, // Mantener la pestaña actual
-      });
-      
-      // 🎯 HAPTIC FEEDBACK DE ÉXITO
-      if (Platform.OS === 'ios') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      }
-      
-      navigation.navigate("movements");
-      showToast("success", "¡Éxito!", "Transacción agregada correctamente");
-    },
-    onError: (error) => {
-      // 🎯 HAPTIC FEEDBACK DE ERROR
-      if (Platform.OS === 'ios') {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      }
-      
-      showToast("error", "Error", error.message);
-    },
-  });
-
-  // 🎯 TRANSFORMACIÓN OPTIMIZADA DE TRANSACCIONES FRECUENTES
-  const frequentTransactions = useMemo(() => {
-    if (!frequentData?.frequentTransactions) return [];
-
-    return frequentData.frequentTransactions.map(transaction => ({
-      id: transaction.id.toString(),
-      title: transaction.title,
-      description: transaction.description || "",
-      type: transaction.type,
-      amount: `S/ ${transaction.amount.toFixed(2)}`,
-      icon: getCategoryIcon(transaction.category, transaction.type), // 🔥 Usar nueva función
-      backgroundColor: transaction.type === "gasto" ? "#FCE4EC" : "#E3F2FD",
-    }));
-  }, [frequentData]);
-
-  // 🎯 CREACIÓN DE TRANSACCIÓN MEJORADA
+  // 🎯 CREACIÓN DE TRANSACCIÓN SIMPLIFICADA
   const handleCreateTransaction = useCallback(async () => {
-    if (!formValidation.isValid) {
-      const errorMessage = formValidation.errors.join(", ");
+    if (!validation.isValid) {
+      const errorMessage = validation.errors.join(", ");
       showToast("error", "Formulario incompleto", errorMessage);
       
-      // 🎯 SCROLL TO ERROR Y FOCUS
       scrollRef.current?.scrollTo({ y: 0, animated: true });
-      if (!formValidation.fieldValidation.amount) {
+      if (!validation.fieldValidation.amount) {
         setTimeout(() => amountInputRef.current?.focus(), 300);
       }
       return;
     }
 
-    setIsSubmitting(true);
     buttonScale.value = withSpring(0.95);
 
     try {
@@ -309,25 +229,7 @@ export default function AddTransaction() {
       }
 
       const userId = parseInt(storedUserId, 10);
-      
-      // 🎯 VALIDACIÓN ADICIONAL DE MONTO
-      const amount = parseFloat(formState.amount);
-      if (isNaN(amount) || amount <= 0) {
-        throw new Error("El monto debe ser un número válido mayor a 0");
-      }
-
-      const transactionInput: CreateTransactionInput = {
-        userId,
-        title: formState.category,
-        description: formState.description || `${formState.selectedOption} en ${formState.category}`,
-        amount,
-        type: TRANSACTION_MAPPING[formState.selectedOption],
-        frequent: formState.frequent,
-        paymentmethod: formState.paymentmethod,
-        category: formState.category,
-        status: formState.isPaid ? "completed" : "pending",
-        dueDate: new Date(formState.isPaid ? formState.date : formState.dueDate),
-      };
+      const transactionInput = prepareTransactionData(userId);
 
       await createTransaction({ variables: { input: transactionInput } });
       
@@ -335,95 +237,17 @@ export default function AddTransaction() {
       console.error("❌ Error al crear transacción:", error);
       showToast("error", "Error", error.message || "Hubo un problema al agregar la transacción");
     } finally {
-      setIsSubmitting(false);
       buttonScale.value = withSpring(1);
     }
-  }, [formState, formValidation, createTransaction, showToast]);
+  }, [validation, showToast, prepareTransactionData, createTransaction, buttonScale]);
 
-  // 🎯 MANEJO OPTIMIZADO DE CAMBIO DE ESTADO
-  const handleStatusChange = useCallback((isPaid: boolean) => {
-    if (statusReadOnly) return;
-    
-    updateFormState({ isPaid });
-    
-    if (!isPaid && formState.date === new Date().toISOString()) {
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 7);
-      updateFormState({ dueDate: defaultDueDate.toISOString() });
-    }
-  }, [formState.date, updateFormState, statusReadOnly]);
-
-  // 🎯 SELECCIÓN OPTIMIZADA DE TRANSACCIÓN FRECUENTE
-  const handleSelectFrequent = useCallback((item: any) => {
-    const updates: Partial<FormState> = {
-      amount: item.amount.replace("S/ ", ""),
-      description: item.description || "",
-      category: item.title,
-      frequent: true,
-    };
-    
-    updateFormState(updates);
-    
-    // 🎯 HAPTIC FEEDBACK
-    if (Platform.OS === 'ios') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-  }, [updateFormState]);
-
-  // 🎯 MANEJO MEJORADO DE DATOS OCR
+  // 🎯 MANEJO OPTIMIZADO DE DATOS OCR
   const handleReceiptDataExtracted = useCallback((data: ExtractedReceiptData) => {
-    if (__DEV__) {
-      console.log("📄 [AddTransaction] Datos OCR recibidos:", data);
-    }
-
     setShowScanner(false);
     
-    const updates: Partial<FormState> = {};
-    let fieldsUpdated = 0;
-
-    // 🎯 VALIDACIÓN Y APLICACIÓN DE DATOS
-    if (data.amount && data.amount > 0) {
-      updates.amount = data.amount.toString();
-      fieldsUpdated++;
-    }
-
-    if (data.description?.trim()) {
-      updates.description = data.description.trim();
-      fieldsUpdated++;
-    }
-
-    if (data.category?.trim()) {
-      updates.category = data.category.trim();
-      fieldsUpdated++;
-    }
-
-    if (data.paymentmethod?.trim()) {
-      updates.paymentmethod = data.paymentmethod.trim();
-      fieldsUpdated++;
-    }
-
-    // 🎯 MANEJO MEJORADO DE FECHAS
-    if (data.date) {
-      try {
-        const extractedDate = new Date(data.date);
-        if (!isNaN(extractedDate.getTime())) {
-          const dateField = formState.isPaid ? 'date' : 'dueDate';
-          updates[dateField] = extractedDate.toISOString();
-          fieldsUpdated++;
-        }
-      } catch (error) {
-        console.warn("Error procesando fecha OCR:", error);
-      }
-    }
-
-    // 🎯 APLICAR MERCHANT NAME SI NO HAY DESCRIPCIÓN
-    if (data.merchantName && !updates.description && !formState.description) {
-      updates.description = `Compra en ${data.merchantName}`;
-      fieldsUpdated++;
-    }
-
+    const fieldsUpdated = applyOCRData(data);
+    
     if (fieldsUpdated > 0) {
-      updateFormState(updates);
       showToast(
         "success",
         "¡Datos extraídos!",
@@ -436,25 +260,27 @@ export default function AddTransaction() {
         "No se encontraron datos válidos para completar"
       );
     }
-  }, [updateFormState, formState.isPaid, formState.description, showToast]);
+  }, [applyOCRData, showToast]);
 
-  // 🎯 MANEJO DE SCANNER
-  const handleOpenScanner = useCallback(() => {
-    setShowScanner(true);
-  }, []);
+  // 🎯 HANDLER PARA SELECCIÓN DEL CAROUSEL
+  const handleCarouselSelect = useCallback((item: any) => {
+    // ✅ Crear el objeto que espera handleFrequentSelection
+    const frequentItem: FrequentTransactionItem = {
+      amount: item.amount || "0.00",
+      description: item.description || "",
+      title: item.title,
+    };
+    
+    handleFrequentSelection(frequentItem);
+    
+    if (Platform.OS === 'ios') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+  }, [handleFrequentSelection]);
 
-  const handleScannerClose = useCallback(() => {
-    setShowScanner(false);
-  }, []);
-
-  // 🎯 RESET AL VOLVER A LA PANTALLA
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        // Cleanup si es necesario
-      };
-    }, [])
-  );
+  // 🎯 HANDLERS DE SCANNER
+  const handleOpenScanner = useCallback(() => setShowScanner(true), []);
+  const handleScannerClose = useCallback(() => setShowScanner(false), []);
 
   // 🎯 RENDER PRINCIPAL
   return (
@@ -475,15 +301,13 @@ export default function AddTransaction() {
             <Animated.View style={[styles.headerContainer, animatedHeaderStyle]}>
               <Text style={styles.title}>Agregar</Text>
               
-              {/* 🎯 SLIDER DE TIPOS */}
               <View style={styles.sliderContainer}>
                 <AgregarSlides
                   colors={TRANSACTION_COLORS}
-                  onChange={handleSliderChange}
+                  onChange={handleSliderChangeWithAnimation}
                 />
               </View>
 
-              {/* 🎯 BOTÓN DE SCANNER MEJORADO */}
               <View style={styles.scanButtonContainer}>
                 <TouchableOpacity
                   style={styles.scanButton}
@@ -501,15 +325,14 @@ export default function AddTransaction() {
                 )}
               </View>
 
-              {/* 🎯 CAROUSEL MEJORADO */}
+              {/* ✅ CAROUSEL CON HANDLER SIMPLIFICADO */}
               <View style={styles.carouselContainer}>
                 <Carousel
                   title={`${formState.selectedOption} Frecuentes`}
                   items={frequentTransactions}
-                  onSelectItem={handleSelectFrequent} // 🔥 Mejor prop name
+                  onSelectItem={handleCarouselSelect}
                   emptyMessage={`No hay ${formState.selectedOption.toLowerCase()} frecuentes`}
                   hideIfEmpty={true}
-                  loading={loadingFrequent}
                 />
               </View>
             </Animated.View>
@@ -517,56 +340,46 @@ export default function AddTransaction() {
             {/* 🎯 FORMULARIO PRINCIPAL */}
             <View style={styles.formContainer}>
               
-              {/* 🎯 INPUT DE MONTO */}
               <View style={styles.inputSection}>
                 <AmountInput
-                  ref={amountInputRef}
                   value={formState.amount}
                   onChangeText={(value) => updateFormState({ amount: value })}
-                  isValid={formValidation.fieldValidation.amount}
                 />
               </View>
 
-              {/* 🎯 INPUT DE DESCRIPCIÓN */}
               <View style={styles.inputSection}>
                 <DescriptionInput
                   value={formState.description}
                   onChangeText={(value) => updateFormState({ description: value })}
-                  placeholder={`Describe tu ${formState.selectedOption.toLowerCase()}...`}
                 />
               </View>
 
-              {/* 🎯 OPCIONES DE TRANSACCIÓN */}
               <TransactionOptions
-                type={TRANSACTION_MAPPING[formState.selectedOption]}
+                type={transactionType}
                 onSelectFrequent={(frequent) => updateFormState({ frequent })}
-                onSelectStatus={handleStatusChange}
+                onSelectStatus={(isPaid) => handleStatusChange(isPaid, statusReadOnly)}
                 initialFrequent={formState.frequent}
                 initialStatus={formState.isPaid}
                 statusReadOnly={statusReadOnly}
               />
 
-              {/* 🎯 SELECTOR DE CATEGORÍA */}
               <View style={styles.inputSection}>
                 <CategorySelector
-                  type={TRANSACTION_MAPPING[formState.selectedOption]}
+                  type={transactionType}
                   onSelect={(category) => updateFormState({ category })}
                   selectedCategory={formState.category}
-                  isValid={formValidation.fieldValidation.category}
                 />
               </View>
 
-              {/* 🎯 SELECTOR DE MÉTODO DE PAGO */}
               <View style={styles.inputSection}>
                 <PaymentMethodSelector
-                  type={TRANSACTION_MAPPING[formState.selectedOption]}
+                  type={transactionType}
                   onSelect={(paymentmethod) => updateFormState({ paymentmethod })}
                   isPending={!formState.isPaid}
                   selectedPaymentMethod={formState.paymentmethod}
                 />
               </View>
 
-              {/* 🎯 SELECTOR DE FECHA */}
               <View style={styles.inputSection}>
                 <DateTimeSelector
                   selectedDate={formState.isPaid ? formState.date : formState.dueDate}
@@ -580,18 +393,17 @@ export default function AddTransaction() {
                 />
               </View>
 
-              {/* 🎯 BOTÓN DE AGREGAR MEJORADO */}
               <Animated.View style={[styles.addButtonContainer, animatedButtonStyle]}>
                 <TouchableOpacity
                   style={[
                     styles.addButton,
                     {
                       backgroundColor: TRANSACTION_COLORS[formState.selectedOption],
-                      opacity: (!formValidation.isValid || isSubmitting) ? 0.6 : 1,
+                      opacity: (!validation.isValid || creating) ? 0.6 : 1,
                     },
                   ]}
                   onPress={handleCreateTransaction}
-                  disabled={creating || !formValidation.isValid || isSubmitting}
+                  disabled={creating || !validation.isValid}
                   activeOpacity={0.8}
                 >
                   <View style={styles.addButtonContent}>
@@ -613,7 +425,6 @@ export default function AddTransaction() {
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* 🎯 SCANNER MODAL */}
       <ReceiptScanner
         visible={showScanner}
         onClose={handleScannerClose}

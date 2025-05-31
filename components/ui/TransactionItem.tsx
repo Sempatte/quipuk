@@ -40,7 +40,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
     try {
       const date = parseDate(dateValue);
       if (!date) return '';
-      
+      // Mostrar hora con segundos
       return format(date, 'HH:mm', { locale: es });
     } catch (error) {
       return '';
@@ -53,7 +53,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       const date = parseDate(dateValue);
       if (!date) return '';
       
-      return format(date, 'dd MMM yyyy', { locale: es });
+      return format(date, 'dd MMM', { locale: es });
     } catch (error) {
       return '';
     }
@@ -98,7 +98,7 @@ const TransactionItem: React.FC<TransactionItemProps> = ({
       {/* 🎯 INFORMACIÓN DE LA TRANSACCIÓN */}
       <View style={styles.infoContainer}>
         <Text style={styles.title} numberOfLines={1}>
-          {transaction.title || transaction.category}
+          {transaction.description}
         </Text>
         
         <View style={styles.detailsRow}>

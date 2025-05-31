@@ -114,39 +114,9 @@ export default function DateTimeSelector({
     return true;
   }, [isPaid]);
 
-  // 🔥 FUNCIÓN CORREGIDA: Crear fecha con compensación para zona horaria de Perú (UTC-5)
-  const createLocalDateTime = useCallback((date: Date, time?: Date): string => {
-    const year = date.getFullYear().toString();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    
-    let hours = '12';
-    let minutes = '00';
-    
-    if (time) {
-      hours = String(time.getHours()).padStart(2, '0');
-      minutes = String(time.getMinutes()).padStart(2, '0');
-    } else if (date) {
-      hours = String(date.getHours()).padStart(2, '0');
-      minutes = String(date.getMinutes()).padStart(2, '0');
-    }
-    
-    // Crear fecha local usando el constructor de Date con un string ISO
-    const localDate = new Date(`${year}-${month}-${day}T${hours}:${minutes}:00`);
-    
-    // 🔥 SOLUCIÓN: Restar 5 horas para compensar la zona horaria de Perú
-    const adjustedDate = new Date(localDate.getTime() - (5 * 60 * 60 * 1000));
-    const isoString = adjustedDate.toISOString();
-    
-    console.log('📅 [DateTimeSelector] Fecha ajustada para Perú:', {
-      horaSeleccionada: `${hours}:${minutes}`,
-      fechaLocal: localDate.toLocaleString('es-PE'),
-      fechaAjustada: adjustedDate.toLocaleString('es-PE'),
-      paraBackend: isoString,
-      explicacion: 'Se restaron 5 horas para compensar UTC-5'
-    });
-    
-    return isoString;
+  // �� FUNCIÓN CORREGIDA: Usar la hora seleccionada tal cual, sin manipulación manual de zona horaria
+  const createLocalDateTime = useCallback((date: Date): string => {
+    return date.toISOString();
   }, []);
 
   // Manejar cambio de fecha

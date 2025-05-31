@@ -25,13 +25,14 @@ interface CarouselProps {
   onAddPress?: () => void;
   emptyMessage?: string;
   hideIfEmpty?: boolean; // Nueva prop para controlar si se oculta completamente cuando está vacío
+  onSelectItem?: (item: CarouselItem) => void; // NUEVO: callback para selección de ítem
 }
 
 const SCREEN_WIDTH = Dimensions.get("window").width;
 
 // Componente de tarjeta del carrusel (memoizado para mejorar rendimiento)
 const CarouselCard = memo(
-  ({ item, onAddPress }: { item: CarouselItem; onAddPress?: () => void }) => {
+  ({ item, onAddPress, onPress }: { item: CarouselItem; onAddPress?: () => void; onPress?: () => void }) => {
     if (item.isAddButton) {
       return (
         <TouchableOpacity style={styles.addButton} onPress={onAddPress}>
@@ -46,7 +47,7 @@ const CarouselCard = memo(
     }
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
         <View style={styles.iconAndTextContainer}>
           <View
             style={[
@@ -74,7 +75,7 @@ const CarouselCard = memo(
           </View>
         </View>
         <Text style={styles.cardAmount}>{item.amount}</Text>
-      </View>
+      </TouchableOpacity>
     );
   }
 );
@@ -85,6 +86,7 @@ const Carousel: React.FC<CarouselProps> = ({
   onAddPress,
   emptyMessage = "No hay elementos disponibles",
   hideIfEmpty = false, // Valor predeterminado: false (mostrar mensaje vacío)
+  onSelectItem,
 }) => {
   // Si no hay elementos y se debe ocultar, no renderizar nada
   if (items.length === 0 && hideIfEmpty) {
@@ -133,7 +135,11 @@ const Carousel: React.FC<CarouselProps> = ({
         initialNumToRender={carouselItems.length}
         removeClippedSubviews={false}
         renderItem={({ item }) => (
-          <CarouselCard item={item} onAddPress={onAddPress} />
+          <CarouselCard
+            item={item}
+            onAddPress={onAddPress}
+            onPress={item.isAddButton ? undefined : () => onSelectItem && onSelectItem(item)}
+          />
         )}
       />
     </View>

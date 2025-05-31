@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions, 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useQuery } from "@apollo/client";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 import { format, startOfMonth, endOfMonth, isSameMonth, addDays, isLastDayOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
@@ -154,6 +154,13 @@ export default function Movements() {
       }, 300);
     }
   }, [days, referenceDay]);
+
+  // Refrescar movimientos al volver a la pantalla
+  useFocusEffect(
+    React.useCallback(() => {
+      refetch();
+    }, [refetch])
+  );
 
   if (loading) return <Loader visible fullScreen text="Cargando movimientos..." />;
   if (error) return (
