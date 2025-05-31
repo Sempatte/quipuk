@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx - CORREGIDO
+// app/(tabs)/profile.tsx - LOGOUT CORREGIDO
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
@@ -13,7 +13,9 @@ import {
 import { useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router"; // 🔥 AGREGAR
 import { Ionicons } from '@expo/vector-icons';
+import client from "@/app/apolloClient"; // 🔥 AGREGAR PARA RESET DEL CACHE
 
 import { RootStackNavigationProp } from "../interfaces/navigation";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
@@ -33,6 +35,7 @@ interface UserProfile {
 
 export default function Profile() {
   const navigation = useNavigation<RootStackNavigationProp<"(tabs)">>();
+  const router = useRouter(); // 🔥 NUEVO HOOK
 
   // 📌 Consulta GraphQL del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
@@ -51,7 +54,7 @@ export default function Profile() {
     deleteProfilePicture 
   } = useProfilePicture();
 
-  // 📌 Función de logout con `useCallback` para evitar recreaciones innecesarias
+  // 🔥 FUNCIÓN DE LOGOUT COMPLETAMENTE CORREGIDA
   const handleLogout = useCallback(async () => {
     try {
       Alert.alert(
@@ -62,18 +65,39 @@ export default function Profile() {
           {
             text: "Cerrar Sesión",
             onPress: async () => {
-              await AsyncStorage.multiRemove(["token", "userId"]);
-              navigation.navigate("LoginScreen");
+              try {
+                console.log("🔄 [Profile] Iniciando proceso de logout...");
+                
+                // 1. Limpiar AsyncStorage
+                await AsyncStorage.multiRemove(["token", "userId"]);
+                console.log("✅ [Profile] AsyncStorage limpiado");
+                
+                // 2. Resetear completamente el Apollo Client cache
+                await client.resetStore();
+                console.log("✅ [Profile] Apollo Client cache reseteado");
+                
+                // 3. Pequeña pausa para asegurar que todo se limpie
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // 4. Navegación con reset completo usando router.replace()
+                // Esto limpia completamente el stack de navegación
+                router.replace("/LoginScreen");
+                console.log("✅ [Profile] Navegación a LoginScreen completada");
+                
+              } catch (error) {
+                console.error("❌ [Profile] Error durante logout:", error);
+                Alert.alert("Error", "Hubo un problema al cerrar sesión. Intenta nuevamente.");
+              }
             },
             style: "destructive"
           }
         ]
       );
     } catch (error) {
+      console.error("❌ [Profile] Error en logout:", error);
       Alert.alert("Error", "No se pudo cerrar sesión.");
-      console.error("Error en logout:", error);
     }
-  }, [navigation]);
+  }, [router]); // 🔥 DEPENDENCIA ACTUALIZADA
 
   // 📌 Manejar acciones del avatar
   const handleAvatarPress = useCallback(() => {
@@ -246,7 +270,9 @@ export default function Profile() {
   );
 }
 
+// Estilos sin cambios...
 const styles = StyleSheet.create({
+  // Todos los estilos existentes se mantienen igual
   mainContainer: {
     flex: 1,
     backgroundColor: "#F8F8F8",

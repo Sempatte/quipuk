@@ -1,5 +1,5 @@
-// app/_layout.tsx - VERSION CORREGIDA
-import React, { useEffect } from "react";
+// app/_layout.tsx - VERSION CORREGIDA COMPLETA
+import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
   DefaultTheme,
@@ -10,6 +10,7 @@ import * as SplashScreen from "expo-splash-screen";
 import { StatusBar, Platform } from "react-native";
 import { ApolloProvider } from "@apollo/client";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from "./apolloClient";
 import { FontProvider } from "./providers/FontProvider";
 import { useColorScheme } from "@/hooks/useColorScheme";
@@ -36,6 +37,10 @@ function MainLayout() {
     retryInterval: 60000,
   });
 
+  // 🔥 NUEVO ESTADO PARA MANEJAR AUTENTICACIÓN INICIAL
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
   const [fontsLoaded] = useFonts({
     Outfit_100Thin,
     Outfit_200ExtraLight,
@@ -55,13 +60,41 @@ function MainLayout() {
     }
   }, []);
 
+  // 🔥 VERIFICACIÓN DE AUTENTICACIÓN INICIAL
   useEffect(() => {
-    if (fontsLoaded && !isLoading) {
+    const checkInitialAuth = async () => {
+      try {
+        console.log("🔍 [RootLayout] Verificando autenticación inicial...");
+        
+        const token = await AsyncStorage.getItem("token");
+        const userId = await AsyncStorage.getItem("userId");
+        
+        if (token && userId) {
+          console.log("✅ [RootLayout] Usuario autenticado");
+          setIsAuthenticated(true);
+        } else {
+          console.log("❌ [RootLayout] No autenticado");
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error("❌ [RootLayout] Error verificando auth inicial:", error);
+        setIsAuthenticated(false);
+      } finally {
+        setIsCheckingAuth(false);
+      }
+    };
+
+    checkInitialAuth();
+  }, []);
+
+  useEffect(() => {
+    if (fontsLoaded && !isLoading && !isCheckingAuth) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, isLoading]);
+  }, [fontsLoaded, isLoading, isCheckingAuth]);
 
-  if (!fontsLoaded || isLoading) {
+  // 🔥 NO RENDERIZAR HASTA QUE TODO ESTÉ LISTO
+  if (!fontsLoaded || isLoading || isCheckingAuth) {
     return null;
   }
 
@@ -78,12 +111,56 @@ function MainLayout() {
         translucent={Platform.OS === 'ios'}
       />
       
-      <Stack initialRouteName="LoginScreen">
-        <Stack.Screen name="LoginScreen" options={{ headerShown: false }} />
-        <Stack.Screen name="RegisterScreen" options={{ headerShown: false }} />
-        <Stack.Screen name="EmailVerificationScreen" options={{ headerShown: false }} />
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="+not-found" options={{ headerShown: false }} />
+      <Stack 
+        // 🔥 SOLUCIÓN: Configuración inicial basada en autenticación
+        initialRouteName={isAuthenticated ? "(tabs)" : "LoginScreen"}
+        screenOptions={{
+          headerShown: false,
+          // 🔥 PREVENIR ANIMACIONES CONFLICTIVAS
+          animation: 'slide_from_right',
+          gestureEnabled: false, // Deshabilitar gestos para evitar navegación accidental
+        }}
+      >
+        <Stack.Screen 
+          name="LoginScreen" 
+          options={{ 
+            headerShown: false,
+            // 🔥 IMPORTANTE: No permitir ir atrás desde login
+            gestureEnabled: false,
+            // 🔥 ADICIONAL: Reset del stack al llegar aquí
+            animationTypeForReplace: 'pop',
+          }} 
+        />
+        <Stack.Screen 
+          name="RegisterScreen" 
+          options={{ 
+            headerShown: false,
+            gestureEnabled: true, // Permitir volver atrás desde registro
+          }} 
+        />
+        <Stack.Screen 
+          name="EmailVerificationScreen" 
+          options={{ 
+            headerShown: false,
+            gestureEnabled: false, // No permitir ir atrás desde verificación
+          }} 
+        />
+        <Stack.Screen 
+          name="(tabs)" 
+          options={{ 
+            headerShown: false,
+            // 🔥 IMPORTANTE: No permitir ir atrás desde tabs (evita volver a login)
+            gestureEnabled: false,
+            // 🔥 ADICIONAL: Reset del stack al llegar aquí
+            animationTypeForReplace: 'pop',
+          }} 
+        />
+        <Stack.Screen 
+          name="+not-found" 
+          options={{ 
+            headerShown: false 
+          }} 
+        />
       </Stack>
     </ThemeProvider>
   );

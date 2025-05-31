@@ -8,7 +8,6 @@ import { Calendar } from "react-native-calendars";
 import { format, startOfMonth, endOfMonth, isSameMonth, addDays, isLastDayOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import TransactionItem from "@/components/ui/TransactionItem";
 import BalanceHeader from "@/components/ui/BalancerHeader";

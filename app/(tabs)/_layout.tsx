@@ -1,23 +1,70 @@
+// app/(tabs)/_layout.tsx - VERIFICACIÓN DE AUTH MEJORADA
 import { Tabs, useRouter } from "expo-router";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { StatusBar, Platform } from "react-native";
 import { useColorScheme } from "@/hooks/useColorScheme";
 import { TabBar } from "@/components/TabBar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
   const router = useRouter();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
+  // 🔥 VERIFICACIÓN DE AUTH MEJORADA - Solo al montar
   useEffect(() => {
     const checkAuth = async () => {
-      const token = await AsyncStorage.getItem("token");
-      if (!token) {
+      try {
+        console.log("🔍 [TabLayout] Verificando autenticación...");
+        
+        const token = await AsyncStorage.getItem("token");
+        const userId = await AsyncStorage.getItem("userId");
+        
+        if (!token || !userId) {
+          console.log("❌ [TabLayout] No hay token o userId, redirigiendo a login");
+          router.replace("/LoginScreen");
+          return;
+        }
+        
+        console.log("✅ [TabLayout] Usuario autenticado correctamente");
+      } catch (error) {
+        console.error("❌ [TabLayout] Error verificando auth:", error);
         router.replace("/LoginScreen");
+      } finally {
+        setIsCheckingAuth(false);
       }
     };
+
     checkAuth();
-  }, [router]);
+  }, []); // 🔥 Solo se ejecuta al montar
+
+  // 🔥 VERIFICACIÓN ADICIONAL AL ENFOCAR - más ligera
+  useFocusEffect(
+    React.useCallback(() => {
+      const quickAuthCheck = async () => {
+        try {
+          const token = await AsyncStorage.getItem("token");
+          if (!token) {
+            console.log("⚠️ [TabLayout] Token perdido durante navegación, redirigiendo...");
+            router.replace("/LoginScreen");
+          }
+        } catch (error) {
+          console.error("❌ [TabLayout] Error en quick auth check:", error);
+        }
+      };
+
+      // Solo hacer la verificación rápida si ya no estamos verificando
+      if (!isCheckingAuth) {
+        quickAuthCheck();
+      }
+    }, [router, isCheckingAuth])
+  );
+
+  // 🔥 NO RENDERIZAR NADA MIENTRAS SE VERIFICA
+  if (isCheckingAuth) {
+    return null; // Esto evitará el flasheo y problemas de navegación
+  }
 
   return (
     <>
@@ -28,7 +75,14 @@ export default function TabLayout() {
         translucent={Platform.OS === 'ios'} // 🔥 Diferente para iOS
       />
       
-      <Tabs tabBar={(props) => <TabBar {...props} />}>
+      <Tabs 
+        tabBar={(props) => <TabBar {...props} />}
+        screenOptions={{
+          // 🔥 OPCIONES ADICIONALES PARA PREVENIR BUGS
+          headerShown: false,
+          lazy: false, // Asegura que las pantallas se carguen correctamente
+        }}
+      >
         <Tabs.Screen
           name="index"
           options={{

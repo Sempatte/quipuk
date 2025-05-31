@@ -1,3 +1,4 @@
+// app/LoginScreen.tsx - CORREGIDO
 import React, { useState } from "react";
 import {
   View,
@@ -13,6 +14,7 @@ import {
 } from "react-native";
 import { useMutation } from "@apollo/client";
 import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router"; // 🔥 AGREGAR
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -27,6 +29,7 @@ type LoginScreenNavigationProp = NativeStackNavigationProp<
 
 export default function LoginScreen() {
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const router = useRouter(); // 🔥 NUEVO HOOK
   const { showToast } = useToast();
 
   const [email, setEmail] = useState("");
@@ -40,7 +43,10 @@ export default function LoginScreen() {
         await AsyncStorage.setItem("token", token);
         await AsyncStorage.setItem("userId", data.login.user.id.toString());
         showToast("success", "¡Bienvenido!", "Has iniciado sesión correctamente");
-        navigation.navigate("(tabs)");
+        
+        // 🔥 SOLUCIÓN: Usar router.replace() con reset completo
+        // Esto limpia completamente el stack y navega al home
+        router.replace("/(tabs)");
       }
     },
     onError: (error) => {
@@ -192,6 +198,7 @@ export default function LoginScreen() {
     </KeyboardAvoidingView>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
