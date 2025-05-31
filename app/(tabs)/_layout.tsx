@@ -10,59 +10,58 @@ export default function TabLayout() {
   const router = useRouter();
 
   useEffect(() => {
-
     const checkAuth = async () => {
       const token = await AsyncStorage.getItem("token");
       if (!token) {
-        router.replace("/LoginScreen"); // Redirige al login si no hay token
+        router.replace("/LoginScreen");
       }
     };
     checkAuth();
-  }, []);
-
-  
+  }, [router]);
 
   return (
     <>
+      {/* 🔥 StatusBar global para todas las tabs - solo una configuración */}
       <StatusBar
         barStyle="light-content"
         backgroundColor="#000000"
-        translucent={false}
+        translucent={Platform.OS === 'ios'} // 🔥 Diferente para iOS
       />
+      
       <Tabs tabBar={(props) => <TabBar {...props} />}>
         <Tabs.Screen
           name="index"
           options={{
             title: "Inicio",
-            headerShown: false, // Oculta el encabezado en esta pantalla
+            headerShown: false,
           }}
         />
         <Tabs.Screen
           name="movements"
           options={{
             title: "Movimientos",
-            headerShown: false, // Oculta el encabezado en esta pantalla
+            headerShown: false,
           }}
         />
         <Tabs.Screen
           name="add"
           options={{
             title: "Agregar",
-            headerShown: false, // Oculta el encabezado en esta pantalla
+            headerShown: false,
           }}
         />
         <Tabs.Screen
           name="board"
           options={{
             title: "Board",
-            headerShown: false, // Oculta el encabezado en esta pantalla
+            headerShown: false,
           }}
         />
         <Tabs.Screen
           name="profile"
           options={{
             title: "Perfil",
-            headerShown: false, // Oculta el encabezado en esta pantalla
+            headerShown: false,
           }}
         />
       </Tabs>

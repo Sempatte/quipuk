@@ -12,10 +12,10 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import TransactionItem from "@/components/ui/TransactionItem";
 import BalanceHeader from "@/components/ui/BalancerHeader";
+import TransactionSkeleton from "@/components/ui/TransactionSkeleton"; // 🎨 Importar skeleton
 import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
 import { RootStackParamList } from "../interfaces/navigation";
 import { Transaction } from "../interfaces/transaction.interface";
-import Loader from "@/components/ui/Loader";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 const { width } = Dimensions.get("window");
@@ -111,11 +111,15 @@ function useTransactionData(transactions: Transaction[], selectedDate: Date | nu
 }
 
 export default function Movements() {
-  const { loading, error, data, refetch } = useQuery(GET_TRANSACTIONS_BY_USER, { fetchPolicy: 'cache-first' });
+  const { loading, error, data, refetch } = useQuery(GET_TRANSACTIONS_BY_USER, { 
+    fetchPolicy: 'cache-first',
+    errorPolicy: 'all' // 🎨 Mejor manejo de errores
+  });
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "LoginScreen">>();
   const [referenceDay, setReferenceDay] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false); // 🎨 Estado para pull-to-refresh
   const daysListRef = useRef<FlatList<Date>>(null);
 
   const transactions = useMemo(() => {
@@ -125,6 +129,7 @@ export default function Movements() {
       dueDate: t.dueDate || t.duedate || t.due_date
     }));
   }, [data]);
+  
   const days = useMonthDays(referenceDay);
   const { dayMap, stats, grouped } = useTransactionData(transactions, selectedDate, referenceDay);
   const monthYear = useMemo(() => capitalize(format(selectedDate || referenceDay, "MMMM yyyy", { locale: es })), [selectedDate, referenceDay]);
@@ -142,6 +147,18 @@ export default function Movements() {
     setReferenceDay(newDate);
     setSelectedDate(null);
   }, [referenceDay]);
+
+  // 🎨 Función de refresh mejorada
+  const handleRefresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refetch();
+    } catch (error) {
+      console.error('Error refreshing transactions:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [refetch]);
 
   // Scroll automático al día actual cuando cambian los días o el mes
   useEffect(() => {
@@ -162,13 +179,77 @@ export default function Movements() {
     }, [refetch])
   );
 
-  if (loading) return <Loader visible fullScreen text="Cargando movimientos..." />;
-  if (error) return (
-    <View style={styles.errorContainer}>
-      <StatusBar style="light" backgroundColor="#000000" />
-      <Text style={styles.errorText}>Error: {error.message}</Text>
-    </View>
-  );
+  // 🎨 MANEJO DE ESTADOS DE CARGA Y ERROR MEJORADO
+  if (error) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="light" backgroundColor="#000000" />
+        <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Transacciones</Text>
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>Error al cargar las transacciones</Text>
+              <Text style={styles.errorSubtext}>{error.message}</Text>
+              <TouchableOpacity onPress={handleRefresh} style={styles.retryButton}>
+                <Text style={styles.retryButtonText}>Reintentar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </SafeAreaView>
+      </View>
+    );
+  }
+
+  // 🎨 MOSTRAR SKELETON DURANTE LA CARGA
+  if (loading && !data) {
+    return (
+      <View style={styles.container}>
+        <StatusBar style="light" backgroundColor="#000000" />
+        <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
+          <View style={styles.header}>
+            <Text style={styles.title}>Transacciones</Text>
+            <View style={styles.monthContainer}>
+              <TouchableOpacity onPress={() => changeMonth(-1)} style={styles.arrow}>
+                <Text style={styles.arrowText}>{"<"}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => setCalendarVisible(true)} style={styles.monthButton}>
+                <Text style={styles.monthText}>{monthYear}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => changeMonth(1)} style={styles.arrow}>
+                <Text style={styles.arrowText}>{">"}</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* 🎨 Skeleton para los días del header */}
+            <View style={styles.daysWrapper}>
+              <View style={styles.daysSkeletonContainer}>
+                {Array.from({ length: 7 }).map((_, index) => (
+                  <View key={index} style={styles.daySkeletonItem}>
+                    <View style={styles.daySkeletonBox} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        </SafeAreaView>
+        
+        {/* 🎨 SKELETON PARA EL CONTENIDO PRINCIPAL */}
+        <View style={styles.listContainer}>
+          {/* Skeleton para BalanceHeader */}
+          <View style={styles.balanceHeaderSkeleton}>
+            <View style={styles.balanceSkeletonRow}>
+              <View style={styles.balanceSkeletonBox} />
+              <View style={styles.balanceSkeletonBox} />
+              <View style={styles.balanceSkeletonBox} />
+            </View>
+          </View>
+          
+          {/* Skeleton para las transacciones */}
+          <TransactionSkeleton count={8} />
+        </View>
+      </View>
+    );
+  }
 
   const today = new Date();
   const canNext = referenceDay.getMonth() < today.getMonth() || referenceDay.getFullYear() < today.getFullYear();
@@ -238,6 +319,7 @@ export default function Movements() {
           </View>
         </View>
       </SafeAreaView>
+      
       <View style={styles.listContainer}>
         <FlatList
           data={grouped}
@@ -260,8 +342,12 @@ export default function Movements() {
           initialNumToRender={4}
           style={styles.flatList}
           contentContainerStyle={styles.flatListContent}
+          // 🎨 PULL TO REFRESH
+          refreshing={isRefreshing}
+          onRefresh={handleRefresh}
         />
       </View>
+      
       <Modal visible={calendarVisible} transparent animationType="fade">
         <View style={styles.modal}>
           <View style={styles.calendarBox}>
@@ -329,19 +415,43 @@ const styles = StyleSheet.create({
     paddingBottom: 20
   },
   
+  // 🎨 ESTILOS PARA ERROR MEJORADOS
   errorContainer: { 
     flex: 1, 
     justifyContent: "center", 
     alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    padding: 20
+    paddingHorizontal: 20,
+    paddingVertical: 40,
   },
   
   errorText: {
-    fontSize: 16,
+    fontSize: 18,
     color: "#E74C3C",
     textAlign: "center",
-    fontFamily: "Outfit_500Medium"
+    fontFamily: "Outfit_600SemiBold",
+    marginBottom: 8,
+  },
+  
+  errorSubtext: {
+    fontSize: 14,
+    color: "#CCCCCC",
+    textAlign: "center",
+    fontFamily: "Outfit_400Regular",
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  
+  retryButton: {
+    backgroundColor: "#00DC5A",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  
+  retryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Outfit_600SemiBold",
   },
 
   title: { 
@@ -523,5 +633,52 @@ const styles = StyleSheet.create({
   closeBtnText: { 
     color: "#fff", 
     fontWeight: "bold" 
+  },
+  
+  // 🎨 ESTILOS PARA SKELETON LOADING
+  daysSkeletonContainer: {
+    flexDirection: 'row',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    justifyContent: 'space-around',
+  },
+  
+  daySkeletonItem: {
+    alignItems: 'center',
+  },
+  
+  daySkeletonBox: {
+    width: DAY_WIDTH,
+    height: 70,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 10,
+    opacity: 0.7,
+  },
+  
+  balanceHeaderSkeleton: {
+    backgroundColor: '#FFF',
+    marginHorizontal: 15,
+    marginVertical: 10,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  
+  balanceSkeletonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  
+  balanceSkeletonBox: {
+    width: 80,
+    height: 24,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 6,
+    opacity: 0.7,
   },
 });

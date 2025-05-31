@@ -5,27 +5,31 @@ import {
   StyleSheet,
   KeyboardAvoidingView,
   ScrollView,
+  Platform,
 } from "react-native";
 import { useQuery } from "@apollo/client";
-import BellIcon from "@/assets/images/icons/mdi_bell.svg";
-import SettingsIcon from "@/assets/images/icons/settings.svg";
-import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import QuipukLogo from "@/assets/images/LogoV2.svg";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../interfaces/navigation";
+
+// Importaciones de componentes
+import BellIcon from "@/assets/images/icons/mdi_bell.svg";
+import SettingsIcon from "@/assets/images/icons/settings.svg";
+import QuipukLogo from "@/assets/images/LogoV2.svg";
 import Loader from "@/components/ui/Loader";
-import RecentTransactions from "@/components/ui/RecentTransactions"; // Importamos el nuevo componente
+import RecentTransactions from "@/components/ui/RecentTransactions";
 import UpcomingPayments from "@/components/ui/UpcomingPayments";
 import QuipuTip from "@/components/ui/QuipuTip";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "react-native";
+
+// Importaciones de GraphQL y tipos
+import { GET_USER_PROFILE } from "../graphql/users.graphql";
+import { RootStackParamList } from "../interfaces/navigation";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
-  "LoginScreen",
-  "movements"
+  "LoginScreen" | "movements"
 >;
 
 export default function Index() {
@@ -46,68 +50,75 @@ export default function Index() {
   }
 
   return (
-    <>
-      <SafeAreaView style={{ backgroundColor: "#000" }} edges={["top"]}>
-        <KeyboardAvoidingView style={styles.container}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <QuipukLogo width={70} height={70} />
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      {/* 🔥 StatusBar configurado específicamente para esta pantalla */}
+      <StatusBar 
+        style="light" 
+        backgroundColor="#000000" 
+        translucent={false}
+      />
+      
+      {/* 🔥 Header con fondo negro y padding superior seguro */}
+      <View style={styles.header}>
+        <View style={styles.headerContent}>
+          <View style={styles.logoContainer}>
+            <QuipukLogo width={70} height={70} />
+          </View>
+          <View style={styles.iconContainer}>
+            <View style={styles.iconButton}>
+              <BellIcon width={24} height={24} fill="#00c450" />
             </View>
-            <View style={styles.iconContainer}>
-              <View style={styles.iconButton}>
-                <BellIcon width={24} height={24} fill="#00c450" />
-              </View>
-              <View style={styles.iconButton}>
-                <SettingsIcon width={24} height={24} fill="#00c450" />
-              </View>
+            <View style={styles.iconButton}>
+              <SettingsIcon width={24} height={24} fill="#00c450" />
             </View>
           </View>
-          {/* Welcome Message */}
-          <View style={styles.welcomeContainer}>
-            <Text style={styles.welcome}>
-              Hola,{" "}
-              <Text style={styles.username}>
-                {loading ? "..." : data?.getUserProfile.fullName || "Usuario"}
-              </Text>
-            </Text>
-          </View>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-      <ScrollView style={styles.scrollView}>
-        <View style={styles.contentContainer}>
-          {/* Componente de Últimos Movimientos */}
-          <RecentTransactions />
-          <UpcomingPayments />
-          <QuipuTip/>
-          {/* Aquí puedes añadir más componentes */}
         </View>
+        
+        {/* Welcome Message */}
+        <View style={styles.welcomeContainer}>
+          <Text style={styles.welcome}>
+            Hola,{" "}
+            <Text style={styles.username}>
+              {loading ? "..." : data?.getUserProfile.fullName || "Usuario"}
+            </Text>
+          </Text>
+        </View>
+      </View>
+
+      {/* 🔥 Contenido scrollable */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        <RecentTransactions />
+        <UpcomingPayments />
+        <QuipuTip />
       </ScrollView>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
   container: {
-    backgroundColor: "#000",
+    flex: 1,
+    backgroundColor: "#000000", // 🔥 Fondo negro para evitar flasheo
+  },
+  header: {
+    backgroundColor: "#000000",
+    paddingHorizontal: 20,
     paddingBottom: 30,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
+    // 🔥 Eliminamos paddingTop ya que SafeAreaView se encarga
   },
-  contentContainer: {
-    flex: 1,
-    paddingTop: 15,
-    paddingBottom: 30,
-  },
-  header: {
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20
+    paddingTop: 10, // 🔥 Padding interno mínimo
   },
   logoContainer: {
     flex: 1,
@@ -127,7 +138,6 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   welcomeContainer: {
-    paddingHorizontal: 20,
     marginTop: 20,
   },
   welcome: {
@@ -139,5 +149,13 @@ const styles = StyleSheet.create({
     color: "#00DC5A",
     fontFamily: "Outfit_700Bold",
     fontSize: 32,
+  },
+  scrollView: {
+    flex: 1,
+    backgroundColor: "#F5F5F5",
+  },
+  scrollContent: {
+    paddingTop: 15,
+    paddingBottom: 30,
   },
 });
