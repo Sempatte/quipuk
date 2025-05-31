@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx - LOGOUT CORREGIDO
+// app/(tabs)/profile.tsx - CORRECCIÓN CRÍTICA: USAR CACHE BUSTED URL
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
@@ -13,9 +13,9 @@ import {
 import { useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { useRouter } from "expo-router"; // 🔥 AGREGAR
+import { useRouter } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
-import client from "@/app/apolloClient"; // 🔥 AGREGAR PARA RESET DEL CACHE
+import client from "@/app/apolloClient";
 
 import { RootStackNavigationProp } from "../interfaces/navigation";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
@@ -24,7 +24,6 @@ import Avatar from "@/components/ui/Avatar";
 
 const { width } = Dimensions.get('window');
 
-// 📌 Definir interfaz para el usuario
 interface UserProfile {
   fullName: string;
   phone: string;
@@ -35,9 +34,9 @@ interface UserProfile {
 
 export default function Profile() {
   const navigation = useNavigation<RootStackNavigationProp<"(tabs)">>();
-  const router = useRouter(); // 🔥 NUEVO HOOK
+  const router = useRouter();
 
-  // 📌 Consulta GraphQL del perfil
+  // Query del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
     GET_USER_PROFILE,
     {
@@ -47,14 +46,51 @@ export default function Profile() {
     }
   );
 
-  // 📌 Hook personalizado para manejar foto de perfil
+  // Hook personalizado para foto de perfil
   const { 
     state: profilePictureState, 
     selectAndUploadImage, 
-    deleteProfilePicture 
+    deleteProfilePicture,
+    forceRefresh,
+    retryImageLoad // 🆕 Para reintentar
   } = useProfilePicture();
 
-  // 🔥 FUNCIÓN DE LOGOUT COMPLETAMENTE CORREGIDA
+  // 🆕 FUNCIÓN DE DEBUG MEJORADA
+  const debugProfilePicture = useCallback(() => {
+    const debugInfo = {
+      // Datos del query
+      loading,
+      error: error?.message,
+      profileFromQuery: data?.getUserProfile?.profilePictureUrl,
+      
+      // Estado del hook
+      profileFromHook: profilePictureState.profilePictureUrl,
+      cacheBustedUrl: profilePictureState.cacheBustedUrl, // 🔥 NUEVO CAMPO
+      isUploading: profilePictureState.isUploading,
+      isDeleting: profilePictureState.isDeleting,
+      hasInitiallyLoaded: profilePictureState.hasInitiallyLoaded,
+      isInitialLoading: profilePictureState.isInitialLoading,
+      lastUpdated: new Date(profilePictureState.lastUpdated).toLocaleTimeString(),
+      
+      // Comparación
+      urlsMatch: data?.getUserProfile?.profilePictureUrl === profilePictureState.profilePictureUrl,
+      hasCacheBustedUrl: !!profilePictureState.cacheBustedUrl,
+    };
+
+    console.log('🔍 [Profile Debug] Estado completo:', debugInfo);
+    
+    Alert.alert(
+      'Debug Info',
+      JSON.stringify(debugInfo, null, 2),
+      [
+        { text: 'Cerrar' },
+        { text: 'Force Refresh', onPress: forceRefresh },
+        { text: 'Retry Image', onPress: retryImageLoad }, // 🆕 Opción para reintentar
+      ]
+    );
+  }, [loading, error, data, profilePictureState, forceRefresh, retryImageLoad]);
+
+  // Función de logout
   const handleLogout = useCallback(async () => {
     try {
       Alert.alert(
@@ -68,21 +104,12 @@ export default function Profile() {
               try {
                 console.log("🔄 [Profile] Iniciando proceso de logout...");
                 
-                // 1. Limpiar AsyncStorage
                 await AsyncStorage.multiRemove(["token", "userId"]);
-                console.log("✅ [Profile] AsyncStorage limpiado");
-                
-                // 2. Resetear completamente el Apollo Client cache
                 await client.resetStore();
-                console.log("✅ [Profile] Apollo Client cache reseteado");
-                
-                // 3. Pequeña pausa para asegurar que todo se limpie
                 await new Promise(resolve => setTimeout(resolve, 100));
                 
-                // 4. Navegación con reset completo usando router.replace()
-                // Esto limpia completamente el stack de navegación
                 router.replace("/LoginScreen");
-                console.log("✅ [Profile] Navegación a LoginScreen completada");
+                console.log("✅ [Profile] Logout completado");
                 
               } catch (error) {
                 console.error("❌ [Profile] Error durante logout:", error);
@@ -97,12 +124,11 @@ export default function Profile() {
       console.error("❌ [Profile] Error en logout:", error);
       Alert.alert("Error", "No se pudo cerrar sesión.");
     }
-  }, [router]); // 🔥 DEPENDENCIA ACTUALIZADA
+  }, [router]);
 
-  // 📌 Manejar acciones del avatar
+  // Manejar acciones del avatar
   const handleAvatarPress = useCallback(() => {
     if (profilePictureState.profilePictureUrl) {
-      // Si hay imagen, mostrar opciones
       Alert.alert(
         'Foto de perfil',
         'Selecciona una acción',
@@ -117,24 +143,30 @@ export default function Profile() {
             onPress: deleteProfilePicture,
             style: 'destructive' 
           },
+          // 🆕 OPCIONES DE DEBUG
+          { 
+            text: 'Debug Info', 
+            onPress: debugProfilePicture,
+            style: 'default'
+          },
+          { 
+            text: 'Retry Load', 
+            onPress: retryImageLoad,
+            style: 'default'
+          },
         ]
       );
     } else {
-      // Si no hay imagen, directamente seleccionar
       selectAndUploadImage();
     }
-  }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
+  }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture, debugProfilePicture, retryImageLoad]);
 
-  // 🔧 SOLUCIÓN: Lógica mejorada para determinar cuándo mostrar loading en el avatar
+  // Determinar estados de loading
   const shouldShowAvatarLoading = useCallback(() => {
-    // Solo mostrar loading durante operaciones reales (subir/eliminar)
-    // NO durante la carga inicial del perfil
     return profilePictureState.isUploading || profilePictureState.isDeleting;
   }, [profilePictureState.isUploading, profilePictureState.isDeleting]);
 
-  // 🔧 SOLUCIÓN: Determinar si mostrar loading general de la pantalla
   const shouldShowGeneralLoading = useCallback(() => {
-    // Solo mostrar loading general si es la primera carga Y no hay datos
     return profilePictureState.isInitialLoading && !data?.getUserProfile;
   }, [profilePictureState.isInitialLoading, data?.getUserProfile]);
 
@@ -145,6 +177,11 @@ export default function Profile() {
           <Ionicons name="alert-circle" size={50} color="#E86F51" />
           <Text style={styles.errorText}>Error al cargar el perfil</Text>
           <Text style={styles.errorSubtext}>{error.message}</Text>
+          
+          <TouchableOpacity style={styles.debugButton} onPress={debugProfilePicture}>
+            <Text style={styles.debugButtonText}>Debug Info</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutText}>Cerrar Sesión</Text>
           </TouchableOpacity>
@@ -157,23 +194,47 @@ export default function Profile() {
     <View style={styles.mainContainer}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mi Perfil</Text>
+        
+        {/* 🆕 BOTÓN DE DEBUG EN HEADER (SOLO EN DEV) */}
+        {__DEV__ && (
+          <TouchableOpacity style={styles.debugButtonHeader} onPress={debugProfilePicture}>
+            <Ionicons name="bug" size={20} color="#00DC5A" />
+          </TouchableOpacity>
+        )}
       </View>
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* Avatar Section */}
         <View style={styles.avatarContainer}>
           <Avatar
-            imageUrl={profilePictureState.profilePictureUrl}
+            imageUrl={profilePictureState.cacheBustedUrl} // 🔥 CAMBIO CRÍTICO: Usar cacheBustedUrl
             name={data?.getUserProfile?.fullName}
             size="xlarge"
             editable={true}
             onPress={handleAvatarPress}
             onEdit={selectAndUploadImage}
-            loading={shouldShowAvatarLoading()} // 🔧 SOLUCIÓN: Lógica mejorada
+            loading={shouldShowAvatarLoading()}
             progress={profilePictureState.uploadProgress}
           />
           
-          {/* 🔧 SOLUCIÓN: Mensajes de estado más específicos y condicionales */}
+          {/* 🆕 INFORMACIÓN DE DEBUG VISUAL */}
+          {__DEV__ && (
+            <View style={styles.debugInfo}>
+              <Text style={styles.debugText}>
+                Original URL: {profilePictureState.profilePictureUrl ? '✅' : '❌'}
+              </Text>
+              <Text style={styles.debugText}>
+                Cache Busted: {profilePictureState.cacheBustedUrl ? '✅' : '❌'}
+              </Text>
+              <Text style={styles.debugText}>
+                Loading: {shouldShowAvatarLoading() ? '⏳' : '✅'}
+              </Text>
+              <Text style={styles.debugText}>
+                Updated: {new Date(profilePictureState.lastUpdated).toLocaleTimeString()}
+              </Text>
+            </View>
+          )}
+          
           {profilePictureState.isUploading && (
             <Text style={styles.uploadingText}>
               Subiendo imagen... {Math.round(profilePictureState.uploadProgress)}%
@@ -186,7 +247,6 @@ export default function Profile() {
         </View>
 
         <View style={styles.contentContainer}>
-          {/* 🔧 SOLUCIÓN: Loading general mejorado */}
           {shouldShowGeneralLoading() ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#00DC5A" />
@@ -253,6 +313,22 @@ export default function Profile() {
                   </TouchableOpacity>
                 </View>
                 
+                {/* 🆕 SECCIÓN DE DEBUG EXPANDIDA (solo en dev) */}
+                {__DEV__ && (
+                  <View style={styles.debugCard}>
+                    <Text style={styles.debugCardTitle}>🐛 Debug Information</Text>
+                    <TouchableOpacity style={styles.debugOption} onPress={debugProfilePicture}>
+                      <Text style={styles.debugOptionText}>📊 Ver Debug Completo</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.debugOption} onPress={retryImageLoad}>
+                      <Text style={styles.debugOptionText}>🔄 Reintentar Carga de Imagen</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.debugOption} onPress={forceRefresh}>
+                      <Text style={styles.debugOptionText}>⚡ Force Refresh</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+                
                 {/* Botón de cierre de sesión */}
                 <TouchableOpacity 
                   style={styles.logoutButton} 
@@ -270,9 +346,7 @@ export default function Profile() {
   );
 }
 
-// Estilos sin cambios...
 const styles = StyleSheet.create({
-  // Todos los estilos existentes se mantienen igual
   mainContainer: {
     flex: 1,
     backgroundColor: "#F8F8F8",
@@ -288,12 +362,73 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
+    position: 'relative',
   },
   headerTitle: {
     fontSize: 35,
     fontWeight: "bold",
     color: "#FFF",
     fontFamily: "Outfit_600SemiBold",
+  },
+  // 🆕 ESTILOS PARA DEBUG MEJORADOS
+  debugButtonHeader: {
+    position: 'absolute',
+    top: 60,
+    right: 20,
+    backgroundColor: 'rgba(0, 220, 90, 0.2)',
+    padding: 8,
+    borderRadius: 20,
+  },
+  debugButton: {
+    backgroundColor: "#2196F3",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  debugButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  debugInfo: {
+    marginTop: 10,
+    padding: 12,
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  debugText: {
+    fontSize: 11,
+    color: "#666",
+    fontFamily: "Outfit_400Regular",
+    marginVertical: 1,
+  },
+  debugCard: {
+    backgroundColor: "#FFF3CD",
+    borderRadius: 16,
+    padding: 15,
+    marginBottom: 24,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FFC107",
+  },
+  debugCardTitle: {
+    fontSize: 16,
+    fontFamily: "Outfit_600SemiBold",
+    color: "#856404",
+    marginBottom: 10,
+  },
+  debugOption: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255, 193, 7, 0.1)",
+    borderRadius: 8,
+    marginVertical: 3,
+  },
+  debugOptionText: {
+    fontSize: 14,
+    color: "#856404",
+    fontFamily: "Outfit_500Medium",
   },
   scrollContainer: {
     flex: 1,
