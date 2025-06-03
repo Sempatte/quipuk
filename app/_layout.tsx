@@ -64,16 +64,16 @@ function MainLayout() {
   useEffect(() => {
     const checkInitialAuth = async () => {
       try {
-        
+        console.log("🔍 [RootLayout] Verificando autenticación inicial...");
         
         const token = await AsyncStorage.getItem("token");
         const userId = await AsyncStorage.getItem("userId");
         
         if (token && userId) {
-          
+          console.log("✅ [RootLayout] Usuario autenticado encontrado");
           setIsAuthenticated(true);
         } else {
-          
+          console.log("❌ [RootLayout] No hay usuario autenticado");
           setIsAuthenticated(false);
         }
       } catch (error) {
@@ -112,7 +112,7 @@ function MainLayout() {
       />
       
       <Stack 
-        // 🔥 SOLUCIÓN: Configuración inicial basada en autenticación
+        // 🔥 SOLUCIÓN: Configuración inicial basada en autenticación usando nombres exactos de archivo
         initialRouteName={isAuthenticated ? "(tabs)" : "LoginScreen"}
         screenOptions={{
           headerShown: false,
@@ -122,7 +122,7 @@ function MainLayout() {
         }}
       >
         <Stack.Screen 
-          name="LoginScreen" 
+          name="LoginScreen" // Usar nombre exacto del archivo
           options={{ 
             headerShown: false,
             // 🔥 IMPORTANTE: No permitir ir atrás desde login
@@ -132,14 +132,14 @@ function MainLayout() {
           }} 
         />
         <Stack.Screen 
-          name="RegisterScreen" 
+          name="RegisterScreen" // Usar nombre exacto del archivo
           options={{ 
             headerShown: false,
             gestureEnabled: true, // Permitir volver atrás desde registro
           }} 
         />
         <Stack.Screen 
-          name="EmailVerificationScreen" 
+          name="EmailVerificationScreen" // Usar nombre exacto del archivo
           options={{ 
             headerShown: false,
             gestureEnabled: false, // No permitir ir atrás desde verificación

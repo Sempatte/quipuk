@@ -21,11 +21,15 @@ interface LoginScreenProps {
   onLogout: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({
+// 🔥 CAMBIO CRÍTICO: Export default en lugar de export const
+export default function LoginScreen({
   user,
   onLoginSuccess,
   onLogout,
-}) => {
+}: LoginScreenProps = {
+  onLoginSuccess: () => {},
+  onLogout: () => {}
+}) {
   const [authMethod, setAuthMethod] = useState<'biometric' | 'pin' | 'password' | 'setup'>('biometric');
   const [showManualLogin, setShowManualLogin] = useState(false);
   const [pinError, setPinError] = useState<string>('');
@@ -231,14 +235,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({
       </KeyboardAvoidingView>
 
       {/* Modales */}
-      <BiometricSetupModal
-        visible={showBiometricSetup}
-        user={user!}
-        onComplete={handleBiometricSetupComplete}
-      />
+      {user && (
+        <BiometricSetupModal
+          visible={showBiometricSetup}
+          user={user}
+          onComplete={handleBiometricSetupComplete}
+        />
+      )}
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {

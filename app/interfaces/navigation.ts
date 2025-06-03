@@ -1,12 +1,12 @@
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 // 📌 Define los nombres de las rutas EXACTAMENTE como en _layout.tsx
-// En navigation.ts, modifica la definición de RootStackParamList:
+// Actualizado para usar nombres de archivo de Expo Router
 
 export type RootStackParamList = {
-  LoginScreen: undefined;
-  RegisterScreen: undefined;
-  EmailVerificationScreen: {
+  LoginScreen: undefined; // Volver al nombre original del archivo
+  RegisterScreen: undefined; // Volver al nombre original del archivo
+  EmailVerificationScreen: { // Volver al nombre original del archivo
     email: string;
     userId?: number;
     fromRegistration?: boolean;
