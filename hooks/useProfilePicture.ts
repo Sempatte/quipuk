@@ -49,24 +49,14 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
       if (isMountedRef.current) {
         const hasProfilePicture = !!data?.getUserProfile?.profilePictureUrl;
         const isValidUrl = validateImageUrl(data?.getUserProfile?.profilePictureUrl);
-        
-        console.log('✅ [useProfilePicture] Perfil cargado:', {
-          hasProfilePicture,
-          isValidUrl,
-          url: data?.getUserProfile?.profilePictureUrl?.substring(0, 50) + '...'
-        });
-        
         setHasInitiallyLoaded(true);
         setLastUpdated(Date.now());
-        
-        // 🆕 Incrementar cache buster si hay nueva imagen
         if (hasProfilePicture && isValidUrl) {
           setCacheBusterCount(prev => prev + 1);
         }
       }
     },
     onError: (error) => {
-      console.error('❌ [useProfilePicture] Error cargando perfil:', error);
       if (isMountedRef.current) {
         setHasInitiallyLoaded(true);
       }
@@ -84,10 +74,8 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
   // Efecto para marcar como cargado
   useEffect(() => {
     if (!isMountedRef.current) return;
-    
     if (data?.getUserProfile !== undefined || !loading || error) {
       if (!hasInitiallyLoaded) {
-        console.log('🔄 [useProfilePicture] Marcando como inicialmente cargado');
         setHasInitiallyLoaded(true);
         setLastUpdated(Date.now());
       }
@@ -98,20 +86,22 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
   const cacheBustedUrl = useCallback(() => {
     const originalUrl = data?.getUserProfile?.profilePictureUrl;
     
-    if (!originalUrl || !validateImageUrl(originalUrl)) {
-      return null;
-    }
+    // if (!originalUrl || !validateImageUrl(originalUrl)) { // Ya no se valida aquí para simplificar
+    //   return null;
+    // }
     
-    // Agregar cache buster solo cuando sea necesario
-    return addCacheBuster(originalUrl);
-  }, [data?.getUserProfile?.profilePictureUrl, cacheBusterCount]);
+    // NO MODIFICAR LA URL FIRMADA DE S3
+    // return addCacheBuster(originalUrl);
+    return originalUrl || null; // Devolver la URL original tal cual, o null si es undefined
+
+  }, [data?.getUserProfile?.profilePictureUrl]);
 
   // Mutation para eliminar foto de perfil
   const [deleteProfilePictureMutation] = useMutation(DELETE_PROFILE_PICTURE, {
     refetchQueries: [{ query: GET_USER_PROFILE }],
     onCompleted: () => {
       if (isMountedRef.current) {
-        console.log('✅ [useProfilePicture] Foto eliminada exitosamente');
+        
         showToast('success', 'Éxito', 'Foto de perfil eliminada correctamente');
         setLastUpdated(Date.now());
         setCacheBusterCount(0); // Reset cache buster
@@ -142,62 +132,35 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
    */
   const selectAndUploadImage = useCallback(async (): Promise<void> => {
     if (!isMountedRef.current) return;
-    
     try {
       setIsUploading(true);
       setUploadProgress(0);
-
-      console.log('🚀 [useProfilePicture] Iniciando selección y subida de imagen...');
-      
       setUploadProgress(10);
       await new Promise(resolve => setTimeout(resolve, 100));
-      
       if (!isMountedRef.current) return;
-
       const result = await imageUploadService.selectAndUploadProfilePicture();
-
       if (!isMountedRef.current) return;
-
       setUploadProgress(80);
       await new Promise(resolve => setTimeout(resolve, 200));
-      
       if (!isMountedRef.current) return;
-
-      console.log('📤 [useProfilePicture] Resultado de la subida:', {
-        success: result.success,
-        hasUrl: !!result.profilePictureUrl,
-        error: result.error
-      });
-
       if (result.success) {
-        console.log('✅ [useProfilePicture] Imagen subida exitosamente');
-        
         setUploadProgress(100);
         await new Promise(resolve => setTimeout(resolve, 300));
-        
         if (!isMountedRef.current) return;
-        
-        // Refrescar y forzar cache busting
         try {
           await refetch();
-          setCacheBusterCount(prev => prev + 1); // 🆕 Forzar nuevo cache buster
-          console.log('🔄 [useProfilePicture] Perfil refrescado exitosamente');
-        } catch (refetchError) {
-          console.error('❌ [useProfilePicture] Error refrescando perfil:', refetchError);
-        }
-        
+          setCacheBusterCount(prev => prev + 1);
+        } catch (refetchError) {}
         if (isMountedRef.current) {
           showToast('success', 'Éxito', 'Foto de perfil actualizada correctamente');
           setLastUpdated(Date.now());
         }
       } else {
-        console.error('❌ [useProfilePicture] Error en la subida:', result.error);
         if (isMountedRef.current) {
           showToast('error', 'Error', result.error || 'No se pudo subir la imagen');
         }
       }
     } catch (error) {
-      console.error('💥 [useProfilePicture] Error crítico:', error);
       if (isMountedRef.current) {
         showToast('error', 'Error', 'Ocurrió un error inesperado');
       }
@@ -214,12 +177,10 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
    */
   const deleteProfilePicture = useCallback(async (): Promise<void> => {
     if (!isMountedRef.current) return;
-    
     if (!state.profilePictureUrl) {
       showToast('info', 'Información', 'No hay foto de perfil para eliminar');
       return;
     }
-
     Alert.alert(
       'Eliminar foto de perfil',
       '¿Estás seguro de que deseas eliminar tu foto de perfil?',
@@ -230,20 +191,13 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
           style: 'destructive',
           onPress: async () => {
             if (!isMountedRef.current) return;
-            
             try {
               setIsDeleting(true);
-              console.log('🗑️ [useProfilePicture] Eliminando foto de perfil...');
-              
               await deleteProfilePictureMutation();
-              
               if (isMountedRef.current) {
-                console.log('✅ [useProfilePicture] Foto eliminada exitosamente');
                 setLastUpdated(Date.now());
               }
-            } catch (error) {
-              console.error('💥 [useProfilePicture] Error eliminando foto:', error);
-            } finally {
+            } catch (error) {} finally {
               if (isMountedRef.current) {
                 setIsDeleting(false);
               }
@@ -259,19 +213,13 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
    */
   const refetchProfile = useCallback(async (): Promise<void> => {
     if (!isMountedRef.current) return;
-    
     try {
-      console.log('🔄 [useProfilePicture] Refrescando perfil manualmente...');
       await refetch();
-      
       if (isMountedRef.current) {
         setLastUpdated(Date.now());
-        setCacheBusterCount(prev => prev + 1); // 🆕 Nuevo cache buster
-        console.log('✅ [useProfilePicture] Perfil refrescado exitosamente');
+        setCacheBusterCount(prev => prev + 1);
       }
-    } catch (error) {
-      console.error('❌ [useProfilePicture] Error refrescando perfil:', error);
-    }
+    } catch (error) {}
   }, [refetch]);
 
   /**
@@ -279,8 +227,6 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
    */
   const forceRefresh = useCallback(() => {
     if (!isMountedRef.current) return;
-    
-    console.log('🔄 [useProfilePicture] Forzando actualización...');
     setLastUpdated(Date.now());
     setCacheBusterCount(prev => prev + 1);
   }, []);
@@ -290,24 +236,8 @@ export const useProfilePicture = (): UseProfilePictureReturn => {
    */
   const retryImageLoad = useCallback(() => {
     if (!isMountedRef.current) return;
-    
-    console.log('🔄 [useProfilePicture] Reintentando carga de imagen...');
     setCacheBusterCount(prev => prev + 1);
   }, []);
-
-  // Log de estado para debugging
-  if (__DEV__) {
-    console.log('🖼️ [useProfilePicture] Estado actual:', {
-      hasUrl: !!state.profilePictureUrl,
-      hasCacheBustedUrl: !!state.cacheBustedUrl,
-      isUploading: state.isUploading,
-      isDeleting: state.isDeleting,
-      hasInitiallyLoaded: state.hasInitiallyLoaded,
-      isInitialLoading: state.isInitialLoading,
-      cacheBusterCount,
-      lastUpdated: new Date(state.lastUpdated).toLocaleTimeString(),
-    });
-  }
 
   return {
     state,

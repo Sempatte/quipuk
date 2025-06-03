@@ -27,20 +27,14 @@ class ImageUploadService {
    */
   async requestGalleryPermissions(): Promise<boolean> {
     try {
-      console.log('📋 [ImageUpload] Solicitando permisos de galería...');
-      
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       
-      console.log(`📋 [ImageUpload] Estado de permisos: ${status}`);
-      
       if (status !== 'granted') {
-        console.warn('⚠️ [ImageUpload] Permisos de galería denegados');
         return false;
       }
 
       return true;
     } catch (error) {
-      console.error('💥 [ImageUpload] Error solicitando permisos:', error);
       return false;
     }
   }
@@ -50,15 +44,11 @@ class ImageUploadService {
    */
   async pickImageFromGallery(): Promise<string | null> {
     try {
-      console.log('📷 [ImageUpload] Iniciando selección de imagen...');
-      
       const hasPermission = await this.requestGalleryPermissions();
       if (!hasPermission) {
         throw new Error('Permisos de galería requeridos');
       }
 
-      console.log('📷 [ImageUpload] Abriendo galería...');
-      
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -67,28 +57,14 @@ class ImageUploadService {
         base64: false, // No necesitamos base64 aquí
       });
 
-      console.log('📷 [ImageUpload] Resultado de selección:', {
-        canceled: result.canceled,
-        hasAssets: !!result.assets,
-        assetsLength: result.assets?.length || 0,
-      });
-
       if (result.canceled || !result.assets?.[0]) {
-        console.log('📷 [ImageUpload] Selección cancelada por el usuario');
         return null;
       }
 
       const selectedImage = result.assets[0];
-      console.log('📷 [ImageUpload] Imagen seleccionada:', {
-        uri: selectedImage.uri.substring(0, 50) + '...',
-        width: selectedImage.width,
-        height: selectedImage.height,
-        fileSize: selectedImage.fileSize,
-      });
 
       return selectedImage.uri;
     } catch (error) {
-      console.error('💥 [ImageUpload] Error seleccionando imagen:', error);
       throw error;
     }
   }
@@ -98,17 +74,12 @@ class ImageUploadService {
    */
   async processImage(imageUri: string): Promise<ProcessedImage> {
     try {
-      console.log('🔄 [ImageUpload] Iniciando procesamiento de imagen...');
-      console.log('🔄 [ImageUpload] URI original:', imageUri.substring(0, 80) + '...');
-
       // Verificar que la URI sea válida
       if (!imageUri || typeof imageUri !== 'string') {
         throw new Error('URI de imagen inválida');
       }
 
       const MAX_SIZE = 800; // Tamaño máximo para fotos de perfil
-      
-      console.log('🔄 [ImageUpload] Redimensionando y comprimiendo...');
       
       let processedImage = await ImageManipulator.manipulateAsync(
         imageUri,
@@ -120,13 +91,6 @@ class ImageUploadService {
         }
       );
 
-      console.log('🔄 [ImageUpload] Primera compresión completada:', {
-        width: processedImage.width,
-        height: processedImage.height,
-        hasBase64: !!processedImage.base64,
-        base64Length: processedImage.base64?.length || 0,
-      });
-
       // Verificar que tenemos base64
       if (!processedImage.base64) {
         throw new Error('No se pudo generar base64 de la imagen');
@@ -134,12 +98,9 @@ class ImageUploadService {
 
       // Calcular tamaño del base64
       const base64Size = (processedImage.base64.length * 3) / 4;
-      console.log(`📊 [ImageUpload] Tamaño base64: ${Math.round(base64Size / 1024)}KB`);
 
       // Si es muy grande, comprimir más agresivamente
       if (base64Size > this.MAX_IMAGE_SIZE) {
-        console.log('🗜️ [ImageUpload] Imagen muy grande, aplicando compresión adicional...');
-        
         processedImage = await ImageManipulator.manipulateAsync(
           imageUri,
           [{ resize: { width: 600, height: 600 } }],
@@ -155,12 +116,9 @@ class ImageUploadService {
         }
 
         const newSize = (processedImage.base64.length * 3) / 4;
-        console.log(`📊 [ImageUpload] Nuevo tamaño base64: ${Math.round(newSize / 1024)}KB`);
         
         // Verificación final
         if (newSize > this.MAX_IMAGE_SIZE) {
-          console.log('🗜️ [ImageUpload] Aplicando compresión máxima...');
-          
           processedImage = await ImageManipulator.manipulateAsync(
             imageUri,
             [{ resize: { width: 400, height: 400 } }],
@@ -185,16 +143,8 @@ class ImageUploadService {
         base64: processedImage.base64,
       };
 
-      console.log('✅ [ImageUpload] Imagen procesada exitosamente:', {
-        width: result.width,
-        height: result.height,
-        sizeKB: Math.round(result.size / 1024),
-        base64Length: result.base64.length,
-      });
-      
       return result;
     } catch (error) {
-      console.error('💥 [ImageUpload] Error procesando imagen:', error);
       throw new Error(`Error procesando imagen: ${error instanceof Error ? error.message : 'Desconocido'}`);
     }
   }
@@ -204,9 +154,6 @@ class ImageUploadService {
    */
   async uploadProfilePictureBase64(processedImage: ProcessedImage): Promise<ImageUploadResult> {
     try {
-      console.log('⬆️ [ImageUpload] Iniciando subida con base64...');
-      console.log('⬆️ [ImageUpload] Endpoint:', this.UPLOAD_BASE64_ENDPOINT);
-      
       // Verificar configuración
       if (!env.API_URL) {
         throw new Error('API_URL no configurada');
@@ -221,14 +168,6 @@ class ImageUploadService {
         throw new Error('Token de autenticación no encontrado');
       }
 
-      console.log('📤 [ImageUpload] Preparando payload...', {
-        width: processedImage.width,
-        height: processedImage.height,
-        sizeKB: Math.round(processedImage.size / 1024),
-        base64Length: processedImage.base64.length,
-        hasToken: !!token,
-      });
-
       const payload = {
         profilePicture: processedImage.base64,
         filename: 'profile-picture.jpg',
@@ -237,8 +176,6 @@ class ImageUploadService {
         height: processedImage.height,
       };
 
-      console.log('📤 [ImageUpload] Enviando request...');
-      
       const response = await fetch(this.UPLOAD_BASE64_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -249,15 +186,8 @@ class ImageUploadService {
         body: JSON.stringify(payload),
       });
 
-      console.log('⬆️ [ImageUpload] Response recibida:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-      });
-      
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ [ImageUpload] Error response body:', errorText.substring(0, 500));
         
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         
@@ -290,29 +220,12 @@ class ImageUploadService {
 
       const responseData = await response.json();
       
-      console.log('✅ [ImageUpload] Upload exitoso:', {
-        success: responseData.success,
-        hasProfilePictureUrl: !!responseData.profilePictureUrl,
-        profilePictureUrl: responseData.profilePictureUrl?.substring(0, 50) + '...',
-      });
-
-      // Validar respuesta
-      if (!responseData.profilePictureUrl) {
-        console.warn('⚠️ [ImageUpload] Respuesta exitosa pero sin URL de imagen');
-        return {
-          success: false,
-          error: 'El servidor no devolvió una URL de imagen válida',
-        };
-      }
-
       return {
-        success: true,
-        profilePictureUrl: responseData.profilePictureUrl,
+        success: responseData.success,
+        profilePictureUrl: responseData.data?.profilePictureUrl,
       };
 
     } catch (error) {
-      console.error('💥 [ImageUpload] Error en subida base64:', error);
-      
       let errorMessage = 'Error desconocido';
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -330,40 +243,21 @@ class ImageUploadService {
    */
   async selectAndUploadProfilePicture(): Promise<ImageUploadResult> {
     try {
-      console.log('🔄 [ImageUpload] ===== INICIANDO FLUJO COMPLETO =====');
-      
       // 1. Seleccionar imagen
-      console.log('📷 [ImageUpload] Paso 1: Seleccionar imagen');
       const imageUri = await this.pickImageFromGallery();
       
       if (!imageUri) {
-        console.log('📷 [ImageUpload] Usuario canceló la selección');
         return { success: false, error: 'No se seleccionó ninguna imagen' };
       }
 
-      console.log('📷 [ImageUpload] Imagen seleccionada exitosamente');
-
       // 2. Procesar imagen
-      console.log('✂️ [ImageUpload] Paso 2: Procesar imagen');
       const processedImage = await this.processImage(imageUri);
       
-      console.log('✂️ [ImageUpload] Imagen procesada exitosamente');
-
       // 3. Subir imagen
-      console.log('⬆️ [ImageUpload] Paso 3: Subir imagen');
       const result = await this.uploadProfilePictureBase64(processedImage);
-
-      console.log('🔄 [ImageUpload] ===== FLUJO COMPLETADO =====');
-      console.log('🔄 [ImageUpload] Resultado final:', {
-        success: result.success,
-        hasUrl: !!result.profilePictureUrl,
-        error: result.error,
-      });
 
       return result;
     } catch (error) {
-      console.error('💥 [ImageUpload] Error en flujo completo:', error);
-      
       let errorMessage = 'Error procesando la imagen';
       if (error instanceof Error) {
         errorMessage = error.message;
@@ -397,11 +291,7 @@ class ImageUploadService {
    */
   async testService(): Promise<{ success: boolean; message: string; details?: any }> {
     try {
-      console.log('🧪 [ImageUpload] ===== INICIANDO TEST DEL SERVICIO =====');
-      
       const info = this.getServiceInfo();
-      
-      console.log('🧪 [ImageUpload] Información del servicio:', info);
       
       // Verificar configuración básica
       if (!env.API_URL) {
@@ -432,18 +322,11 @@ class ImageUploadService {
 
       // Test de conectividad básica
       try {
-        console.log('🧪 [ImageUpload] Probando conectividad con el servidor...');
-        
         const testResponse = await fetch(`${env.API_URL}/health`, {
           method: 'GET',
           headers: {
             'Accept': 'application/json',
           }
-        });
-
-        console.log('🧪 [ImageUpload] Test de conectividad:', {
-          status: testResponse.status,
-          ok: testResponse.ok,
         });
 
         return {
@@ -459,8 +342,6 @@ class ImageUploadService {
           }
         };
       } catch (connectivityError) {
-        console.error('🧪 [ImageUpload] Error de conectividad:', connectivityError);
-        
         return {
           success: false,
           message: 'Error de conectividad con el servidor',
@@ -473,7 +354,6 @@ class ImageUploadService {
       }
       
     } catch (error) {
-      console.error('💥 [ImageUpload] Error en test:', error);
       return {
         success: false,
         message: `Error en test: ${error instanceof Error ? error.message : 'Error desconocido'}`,

@@ -84,7 +84,7 @@ export default function EmailVerificationScreen() {
         }
       }
     } catch (error) {
-      console.log('Error loading verification status:', error);
+      
     }
   };
 

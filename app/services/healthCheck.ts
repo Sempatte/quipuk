@@ -27,7 +27,7 @@ export const checkBackendHealth = async (retries = 2): Promise<boolean> => {
   try {
     // Se ha aumentado el timeout para entornos de producción
     const timeout = env.isProduction ? 8000 : 5000;
-    console.log(env.API_URL)
+    
     const response = await axios.get<HealthCheckResponse>(`${env.API_URL}/health`, {
       timeout,
       // Headers básicos
@@ -39,7 +39,7 @@ export const checkBackendHealth = async (retries = 2): Promise<boolean> => {
     
     // Logging solo en desarrollo
     if (env.isDevelopment) {
-      console.log('🏥 Health Check Response:', response.data);
+      
     }
     
     return (
@@ -50,7 +50,7 @@ export const checkBackendHealth = async (retries = 2): Promise<boolean> => {
   } catch (error) {
     // Intenta nuevamente si hay retries disponibles
     if (retries > 0) {
-      console.log(`⚠️ Health check failed, retrying... (${retries} attempts left)`);
+      
       await new Promise(resolve => setTimeout(resolve, 1000)); // Espera 1 segundo
       return checkBackendHealth(retries - 1);
     }

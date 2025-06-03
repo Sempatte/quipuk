@@ -69,12 +69,7 @@ export default ({ config }) => {
     console.warn(`⚠️ Check your .env.${ENV} file or environment variables`);
   }
   
-  // Logs informativos
-  console.log(`📦 Building app for ${ENV.toUpperCase()} environment`);
-  console.log(`API URL: ${apiUrl}`);
-  console.log(`GraphQL URL: ${graphqlUrl}`);
-  console.log(`OCR Enabled: ${ocrEnabled}`);
-  console.log(`Google Vision API Key: ${googleVisionApiKey ? 'CONFIGURED' : 'NOT_SET'}`);
+
   
   return {
     ...config, // Preservar configuración existente

@@ -51,18 +51,11 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* 🔥 StatusBar configurado específicamente para esta pantalla */}
-      <StatusBar 
-        style="light" 
-        backgroundColor="#000000" 
-        translucent={false}
-      />
-      
-      {/* 🔥 Header con fondo negro y padding superior seguro */}
+
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.logoContainer}>
-            <QuipukLogo width={70} height={70} />
+            <QuipukLogo width={50} height={50} />
           </View>
           <View style={styles.iconContainer}>
             <View style={styles.iconButton}>
@@ -118,10 +111,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingTop: 10, // 🔥 Padding interno mínimo
+    paddingTop: 10,
   },
   logoContainer: {
-    flex: 1,
+    width: 50,
+    height: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   iconContainer: {
     flexDirection: "row",

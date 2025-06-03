@@ -78,10 +78,7 @@ export const useTransactionForm = (options: UseTransactionFormOptions = {}) => {
           newState.dueDate = defaultDueDate.toISOString();
         }
       }
-      
-      if (__DEV__) {
-        console.log("🔄 [useTransactionForm] Estado actualizado:", updates);
-      }
+  
       
       return newState;
     });

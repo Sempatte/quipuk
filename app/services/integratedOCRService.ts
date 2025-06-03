@@ -32,13 +32,7 @@ class IntegratedOCRService {
 
       let result: OCRResult;
       const status = this.getOCRServiceStatus();
-      
-      console.log('🔍 [OCR] Estado del servicio:', {
-        googleVisionConfigured: status.googleVisionConfigured,
-        ocrEnabled: status.ocrEnabled,
-        activeService: status.activeService,
-        environment: env.ENV
-      });
+
       
       // Verificar si Google Vision está configurado y habilitado
       if (env.OCR_ENABLED && googleVisionOCR.isConfigured()) {

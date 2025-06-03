@@ -58,10 +58,8 @@ export const useCustomToast = () => {
       bottomOffset,
       // 🎨 Animaciones suaves
       onShow: () => {
-        if (__DEV__) console.log(`📢 Toast mostrado: ${type} - ${text1}`);
       },
       onHide: () => {
-        if (__DEV__) console.log(`🫥 Toast ocultado: ${type}`);
       },
     });
   }, [insets]);

@@ -64,16 +64,16 @@ function MainLayout() {
   useEffect(() => {
     const checkInitialAuth = async () => {
       try {
-        console.log("🔍 [RootLayout] Verificando autenticación inicial...");
+        
         
         const token = await AsyncStorage.getItem("token");
         const userId = await AsyncStorage.getItem("userId");
         
         if (token && userId) {
-          console.log("✅ [RootLayout] Usuario autenticado");
+          
           setIsAuthenticated(true);
         } else {
-          console.log("❌ [RootLayout] No autenticado");
+          
           setIsAuthenticated(false);
         }
       } catch (error) {

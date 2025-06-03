@@ -23,7 +23,7 @@ class EmailVerificationService {
    */
   async sendVerificationCode(email: string): Promise<VerificationResult> {
     try {
-      console.log('📧 [EmailVerification] Sending verification code to:', email);
+      
       
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -41,7 +41,7 @@ class EmailVerificationService {
 
       const result = await response.json();
       
-      console.log('📧 [EmailVerification] Send verification response:', result);
+      
       
       if (!response.ok) {
         throw new Error(result.message || 'Failed to send verification code');
@@ -66,7 +66,7 @@ class EmailVerificationService {
    */
   async verifyCode(code: string): Promise<VerificationResult> {
     try {
-      console.log('✅ [EmailVerification] Verifying code:', code);
+      
       
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -84,7 +84,7 @@ class EmailVerificationService {
 
       const result = await response.json();
       
-      console.log('✅ [EmailVerification] Verify code response:', result);
+      
       
       return {
         success: result.success,
@@ -105,7 +105,7 @@ class EmailVerificationService {
    */
   async resendVerificationCode(): Promise<VerificationResult> {
     try {
-      console.log('🔄 [EmailVerification] Resending verification code');
+      
       
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -122,7 +122,7 @@ class EmailVerificationService {
 
       const result = await response.json();
       
-      console.log('🔄 [EmailVerification] Resend verification response:', result);
+      
       
       return {
         success: result.success,
@@ -143,7 +143,7 @@ class EmailVerificationService {
    */
   async getVerificationStatus(): Promise<VerificationStatus | null> {
     try {
-      console.log('📊 [EmailVerification] Getting verification status');
+      
       
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -160,7 +160,7 @@ class EmailVerificationService {
 
       const result = await response.json();
       
-      console.log('📊 [EmailVerification] Verification status response:', result);
+      
       
       if (!response.ok || !result.success) {
         throw new Error(result.message || 'Failed to get verification status');
@@ -190,7 +190,7 @@ class EmailVerificationService {
     emailError?: boolean;
   }> {
     try {
-      console.log('📝 [EmailVerification] Registering user:', userData.email);
+      
 
       const response = await fetch(`${this.API_URL}/auth/register-with-verification`, {
         method: 'POST',
@@ -202,7 +202,7 @@ class EmailVerificationService {
 
       const result = await response.json();
       
-      console.log('📝 [EmailVerification] Register response:', result);
+      
       
       if (!response.ok) {
         throw new Error(result.message || 'Registration failed');
@@ -228,7 +228,7 @@ class EmailVerificationService {
     message?: string;
   }> {
     try {
-      console.log('🔑 [EmailVerification] Login after verification for user:', userId);
+      
 
       const response = await fetch(`${this.API_URL}/auth/login-after-verification`, {
         method: 'POST',
@@ -240,7 +240,7 @@ class EmailVerificationService {
 
       const result = await response.json();
       
-      console.log('🔑 [EmailVerification] Login after verification response:', result);
+      
       
       if (!response.ok) {
         throw new Error(result.message || 'Login failed');

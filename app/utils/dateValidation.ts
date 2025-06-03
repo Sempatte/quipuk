@@ -161,7 +161,7 @@ export class DateParsingUtils {
     }
     
     const bestDate = dates[0];
-    console.log(`📅 [DateUtils] Mejor fecha encontrada: ${bestDate.date.toLocaleDateString('es-PE')} (${bestDate.format}, confianza: ${bestDate.confidence})`);
+    
     
     return bestDate.date.toISOString();
   }

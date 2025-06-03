@@ -50,7 +50,7 @@ export default function Board() {
         refetch().then(() => {
           if (!isCancelled) {
             setRefreshTrigger(prev => prev + 1);
-            if (__DEV__) console.log('Refresco único ejecutado al entrar a Board');
+            
           }
         }).catch(error => {
           if (!isCancelled) {

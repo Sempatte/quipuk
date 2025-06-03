@@ -195,12 +195,7 @@ export default function RegisterScreen() {
     setLoading(true);
 
     try {
-      console.log('📝 Registrando usuario con datos:', {
-        fullName: formData.fullName,
-        email: formData.email,
-        username: formData.username,
-        phoneNumber: formData.phoneNumber
-      });
+      
 
       const result = await emailVerificationService.registerWithEmailVerification({
         fullName: formData.fullName,

@@ -40,7 +40,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({
   // 🔧 CORRECCIÓN: Aplicar fecha inicial del OCR
   useEffect(() => {
     if (initialDate) {
-      console.log('📅 [DateSelector] Aplicando fecha inicial del OCR:', initialDate);
+      
       const ocrDate = new Date(initialDate);
       const today = new Date();
       

@@ -545,3 +545,5 @@ const styles = StyleSheet.create({
     color: "#FFF",
   },
 });
+
+// TODO: 1. Si la categoria se detecta en automatico, mostrar el icono de la categoria automaticamente (ya scrolleado). 2. Salga punto indicador de la categoria. 3. En ingresos, cuando se quiera escanear comprobante,debe permitir escanear documentos pdf, por si es un recibo de honorario u otro.

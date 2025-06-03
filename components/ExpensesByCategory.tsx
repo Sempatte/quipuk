@@ -41,7 +41,7 @@ const ExpensesByCategory: React.FC<ExpensesByCategoryProps> = ({ refreshTrigger 
       
       refetch().finally(() => {
         setIsRefreshing(false);
-        if (__DEV__) console.log('ExpensesByCategory refrescado por trigger:', refreshTrigger);
+    
       });
     }
   }, [refreshTrigger, refetch]);

@@ -47,7 +47,6 @@ const FinancialSituation: React.FC<FinancialSituationProps> = ({ refreshTrigger 
       
       refetch().finally(() => {
         setIsRefreshing(false);
-        if (__DEV__) console.log('FinancialSituation refrescado por trigger:', refreshTrigger);
       });
     }
   }, [refreshTrigger, refetch]);

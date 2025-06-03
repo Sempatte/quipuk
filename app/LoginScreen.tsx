@@ -1,327 +1,365 @@
-// app/LoginScreen.tsx - CORREGIDO
-import React, { useState } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
+import React, { useState, useEffect } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert,
+  SafeAreaView,
   KeyboardAvoidingView,
-  Platform,
-  TouchableWithoutFeedback,
-  Keyboard,
-  ActivityIndicator,
-} from "react-native";
-import { useMutation } from "@apollo/client";
-import { useNavigation } from "@react-navigation/native";
-import { useRouter } from "expo-router"; // 🔥 AGREGAR
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "./interfaces/navigation";
-import { useToast } from "./providers/ToastProvider";
-import QuipukLogo from "@/assets/images/Logo.svg";
+  Platform
+} from 'react-native';
+import { useBiometricAuth } from '../hooks/useBiometricAuth';
+import { usePinAuth } from '../hooks/usePinAuth';
+import { PinInput } from '../components/ui/PinInput';
+import { BiometricSetupModal } from '../components/BiometricSetupModal';
+import { PinSetup } from '../components/ui/PinSetup';
 
-type LoginScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "LoginScreen"
->;
+interface LoginScreenProps {
+  user?: { id: number; email: string };
+  onLoginSuccess: () => void;
+  onLogout: () => void;
+}
 
-export default function LoginScreen() {
-  const navigation = useNavigation<LoginScreenNavigationProp>();
-  const router = useRouter(); // 🔥 NUEVO HOOK
-  const { showToast } = useToast();
+export const LoginScreen: React.FC<LoginScreenProps> = ({
+  user,
+  onLoginSuccess,
+  onLogout,
+}) => {
+  const [authMethod, setAuthMethod] = useState<'biometric' | 'pin' | 'password' | 'setup'>('biometric');
+  const [showManualLogin, setShowManualLogin] = useState(false);
+  const [pinError, setPinError] = useState<string>('');
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const [showPinSetup, setShowPinSetup] = useState(false);
 
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  const { 
+    isAvailable: biometricAvailable, 
+    isEnabled: biometricEnabled, 
+    authenticate: authenticateBiometric 
+  } = useBiometricAuth();
 
-  const [login, { loading }] = useMutation(LOGIN_MUTATION, {
-    onCompleted: async (data) => {
-      const token = data?.login?.accessToken;
-      if (token) {
-        await AsyncStorage.setItem("token", token);
-        await AsyncStorage.setItem("userId", data.login.user.id.toString());
-        showToast("success", "¡Bienvenido!", "Has iniciado sesión correctamente");
-        
-        // 🔥 SOLUCIÓN: Usar router.replace() con reset completo
-        // Esto limpia completamente el stack y navega al home
-        router.replace("/(tabs)");
-      }
-    },
-    onError: (error) => {
-      console.log("Error al iniciar sesión:", error);
+  const { 
+    pinConfig, 
+    verifyPin, 
+    isLoading: pinLoading 
+  } = usePinAuth(user?.id);
+
+  useEffect(() => {
+    if (user) {
+      determineAuthMethod();
+    }
+  }, [user, biometricEnabled, pinConfig]);
+
+  const determineAuthMethod = () => {
+    // Si usuario recién registrado, mostrar setup
+    if (user && !pinConfig.hasPin && !biometricEnabled) {
+      setAuthMethod('setup');
+      return;
+    }
+
+    // Si tiene biometría habilitada, usarla primero
+    if (biometricEnabled && biometricAvailable) {
+      setAuthMethod('biometric');
+      handleBiometricAuth();
+      return;
+    }
+
+    // Si tiene PIN, usarlo
+    if (pinConfig.hasPin) {
+      setAuthMethod('pin');
+      return;
+    }
+
+    // Fallback a contraseña
+    setAuthMethod('password');
+  };
+
+  const handleBiometricAuth = async () => {
+    try {
+      const result = await authenticateBiometric();
       
-      // ✅ NUEVO: Manejo específico de errores de verificación
-      if (error.message.includes('EMAIL_NOT_VERIFIED')) {
-        try {
-          // Intentar extraer información adicional del error
-          const errorData = JSON.parse(error.message);
-          
-          showToast(
-            "info", 
-            "Email no verificado", 
-            "Necesitas verificar tu email antes de iniciar sesión"
-          );
-          
-          // Navegar a la pantalla de verificación
-          navigation.navigate("EmailVerificationScreen", {
-            email: email,
-            userId: errorData.userId,
-            fromRegistration: false,
-          });
-        } catch (parseError) {
-          // Si no se puede parsear el error, mostrar mensaje genérico
-          showToast(
-            "info",
-            "Email no verificado",
-            "Por favor verifica tu email antes de iniciar sesión"
+      if (result.success) {
+        onLoginSuccess();
+      } else if (result.requiresManualLogin) {
+        setShowManualLogin(true);
+        setAuthMethod(pinConfig.hasPin ? 'pin' : 'password');
+      } else {
+        Alert.alert('Face ID', result.error || 'Autenticación fallida');
+      }
+    } catch (error) {
+      console.error('Biometric auth error:', error);
+      setAuthMethod(pinConfig.hasPin ? 'pin' : 'password');
+    }
+  };
+
+  const handlePinAuth = async (pin: string) => {
+    if (!user) return;
+
+    try {
+      const result = await verifyPin(pin);
+      
+      if (result.success) {
+        onLoginSuccess();
+      } else {
+        setPinError(result.error || 'PIN incorrecto');
+        
+        if (result.isLocked) {
+          Alert.alert(
+            'Cuenta bloqueada',
+            `Tu cuenta está bloqueada por ${result.lockDuration} minutos debido a múltiples intentos fallidos.`,
+            [
+              { text: 'Usar contraseña', onPress: () => setAuthMethod('password') },
+              { text: 'OK' }
+            ]
           );
         }
-      } else if (error.message.includes('Usuario no encontrado')) {
-        showToast("error", "Usuario no encontrado", "Verifica tu email o regístrate");
-      } else if (error.message.includes('Contraseña incorrecta')) {
-        showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
-      } else {
-        showToast("error", "Error en inicio de sesión", error.message);
       }
-    },
-  });
-
-  const handleLogin = () => {
-    if (!email || !password) {
-      showToast("error", "Error", "Todos los campos son obligatorios.");
-      return;
+    } catch (error) {
+      setPinError('Error al verificar PIN');
     }
+  };
 
-    // Validación básica de email
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      showToast("error", "Error", "Por favor ingresa un email válido.");
-      return;
+  const handleSetupComplete = () => {
+    setShowPinSetup(false);
+    
+    // Después de configurar PIN, ofrecer biometría si está disponible
+    if (biometricAvailable) {
+      setShowBiometricSetup(true);
+    } else {
+      setAuthMethod(pinConfig.hasPin ? 'pin' : 'password');
     }
+  };
 
-    login({ variables: { email, password } });
+  const handleBiometricSetupComplete = (enabled: boolean) => {
+    setShowBiometricSetup(false);
+    setAuthMethod(enabled ? 'biometric' : (pinConfig.hasPin ? 'pin' : 'password'));
+    
+    if (enabled) {
+      handleBiometricAuth();
+    }
+  };
+
+  const renderAuthMethod = () => {
+    switch (authMethod) {
+      case 'setup':
+        return (
+          <PinSetup
+            userId={user!.id}
+            onComplete={handleSetupComplete}
+            onSkip={() => setAuthMethod('password')}
+          />
+        );
+
+      case 'pin':
+        return (
+          <PinInput
+            title="Ingresa tu PIN"
+            subtitle="Usa tu PIN para acceder a Quipuk"
+            maxLength={6}
+            onComplete={handlePinAuth}
+            disabled={pinLoading || pinConfig.isLocked}
+            hasError={!!pinError}
+            errorMessage={pinError}
+            showForgotPin={true}
+            onForgotPin={() => setAuthMethod('password')}
+          />
+        );
+
+      case 'biometric':
+        return (
+          <View style={styles.biometricContainer}>
+            <Text style={styles.biometricTitle}>Accede con Face ID</Text>
+            <TouchableOpacity
+              style={styles.biometricButton}
+              onPress={handleBiometricAuth}
+            >
+              <Text style={styles.biometricIcon}>👤</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.fallbackButton}
+              onPress={() => setAuthMethod(pinConfig.hasPin ? 'pin' : 'password')}
+            >
+              <Text style={styles.fallbackText}>
+                {pinConfig.hasPin ? 'Usar PIN' : 'Usar contraseña'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+
+      case 'password':
+        return (
+          <View style={styles.passwordContainer}>
+            <Text style={styles.passwordTitle}>Iniciar sesión</Text>
+            <Text style={styles.passwordSubtitle}>
+              Ingresa tu email y contraseña
+            </Text>
+            {/* Aquí irían los campos de email y contraseña */}
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => setAuthMethod(pinConfig.hasPin ? 'pin' : 'biometric')}
+            >
+              <Text style={styles.backButtonText}>
+                ← Volver a {pinConfig.hasPin ? 'PIN' : 'Face ID'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        );
+
+      default:
+        return null;
+    }
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.inner}>
-          <View style={styles.logoContainer}>
-            <QuipukLogo width={90} style={styles.logo} />
-          </View>
-
-          <View style={styles.formContainer}>
-            <Text style={styles.label}>Correo</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ingrese su correo"
-              placeholderTextColor="#888"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-              editable={!loading}
-            />
-
-            <Text style={styles.label}>Contraseña</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ingrese su contraseña"
-              placeholderTextColor="#888"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
-            />
-
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity 
-                onPress={() => !loading && setRememberMe(!rememberMe)}
-                disabled={loading}
-              >
-                <View style={styles.checkbox}>
-                  {rememberMe && <View style={styles.checked} />}
-                </View>
-              </TouchableOpacity>
-              <Text style={styles.optionText}>Recordarme</Text>
-              <TouchableOpacity disabled={loading}>
-                <Text style={[
-                  styles.optionText, 
-                  styles.forgotPassword,
-                  loading && styles.disabledText
-                ]}>
-                  ¿Olvidaste tu contraseña?
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loading && styles.loginButtonDisabled
-              ]}
-              onPress={handleLogin}
-              disabled={loading}
-            >
-              {loading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator color="#FFF" />
-                  <Text style={styles.loadingText}>Ingresando...</Text>
-                </View>
-              ) : (
-                <Text style={styles.loginButtonText}>Ingresar</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              onPress={() => navigation.push("RegisterScreen")}
-              disabled={loading}
-              style={styles.registerContainer}
-            >
-              <Text style={[
-                styles.registerText,
-                loading && styles.disabledText
-              ]}>
-                ¿Aún no tienes una cuenta?{" "}
-                <Text style={styles.registerLink}>Regístrate</Text>
-              </Text>
-            </TouchableOpacity>
-
-          </View>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView 
+        style={styles.content}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.header}>
+          <Text style={styles.logo}>Quipuk</Text>
+          <Text style={styles.tagline}>Tus finanzas e impuestos en una app</Text>
         </View>
-      </TouchableWithoutFeedback>
-    </KeyboardAvoidingView>
-  );
-}
 
+        {renderAuthMethod()}
+
+        {user && (
+          <TouchableOpacity style={styles.logoutButton} onPress={onLogout}>
+            <Text style={styles.logoutText}>Cambiar de cuenta</Text>
+          </TouchableOpacity>
+        )}
+      </KeyboardAvoidingView>
+
+      {/* Modales */}
+      <BiometricSetupModal
+        visible={showBiometricSetup}
+        user={user!}
+        onComplete={handleBiometricSetupComplete}
+      />
+    </SafeAreaView>
+  );
+};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "flex-start",
-    width: "100%",
-    maxWidth: "100%",
+    backgroundColor: '#fff',
   },
-  inner: {
-    position: "absolute",
+  content: {
     flex: 1,
-    width: "100%",
-    maxWidth: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 0,
-    top: 0,
+    justifyContent: 'center',
+    padding: 20,
   },
-  logoContainer: {
-    alignSelf: "stretch",
-    height: 200,
-    backgroundColor: "#000",
-    alignItems: "center",
-    justifyContent: "center",
-    borderBottomLeftRadius: 80,
-    overflow: "hidden",
+  header: {
+    alignItems: 'center',
+    marginBottom: 40,
   },
   logo: {
-    marginTop: 30,
-    resizeMode: "contain",
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#007AFF',
+    marginBottom: 8,
   },
-  formContainer: {
-    alignSelf: "stretch",
-    paddingHorizontal: 40,
-    marginTop: 30,
-  },
-  label: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
-  },
-  input: {
-    height: 50,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
+  tagline: {
     fontSize: 16,
-    backgroundColor: "#FFF",
-    marginBottom: 15,
+    color: '#666',
+    textAlign: 'center',
   },
-  optionsContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
+  biometricContainer: {
+    alignItems: 'center',
+    marginVertical: 40,
   },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 5,
-    borderWidth: 2,
-    borderColor: "#00c450",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
+  biometricTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    marginBottom: 30,
+    color: '#333',
   },
-  checked: {
-    width: 12,
-    height: 12,
-    backgroundColor: "#00c450",
-    borderRadius: 3,
+  biometricButton: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#007AFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  optionText: {
-    fontSize: 14,
-    color: "#666",
+  biometricIcon: {
+    fontSize: 40,
+    color: 'white',
   },
-  forgotPassword: {
-    marginLeft: "auto",
-    color: "#00c450",
-    paddingLeft: 15,
+  fallbackButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 24,
   },
-  loginButton: {
-    backgroundColor: "#00c450",
-    height: 50,
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 15,
-  },
-  loginButtonDisabled: {
-    backgroundColor: "#CCC",
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  loadingText: {
-    color: "#FFF",
+  fallbackText: {
+    color: '#007AFF',
     fontSize: 16,
-    marginLeft: 10,
-    fontWeight: "bold",
   },
-  loginButtonText: {
-    fontSize: 18,
-    color: "#FFF",
-    fontWeight: "bold",
+  passwordContainer: {
+    marginVertical: 40,
   },
-  registerContainer: {
-    alignItems: "center",
-    paddingVertical: 10,
+  passwordTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#333',
   },
-  registerText: {
-    textAlign: "center",
+  passwordSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 30,
+  },
+  backButton: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 20,
+  },
+  backButtonText: {
+    color: '#007AFF',
+    fontSize: 16,
+  },
+  logoutButton: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 20,
+  },
+  logoutText: {
+    color: '#666',
     fontSize: 14,
-    color: "#666",
   },
-  registerLink: {
-    color: "#00c450",
-    fontWeight: "bold",
+  skipButton: {
+    alignSelf: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    marginTop: 20,
   },
-  disabledText: {
-    opacity: 0.5,
-  }
+  skipButtonText: {
+    color: '#666',
+    fontSize: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 8,
+    color: '#333',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 10,
+    marginBottom: 20,
+  },
 });

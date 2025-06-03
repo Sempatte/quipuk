@@ -16,18 +16,18 @@ export default function TabLayout() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        console.log("🔍 [TabLayout] Verificando autenticación...");
+        
         
         const token = await AsyncStorage.getItem("token");
         const userId = await AsyncStorage.getItem("userId");
         
         if (!token || !userId) {
-          console.log("❌ [TabLayout] No hay token o userId, redirigiendo a login");
+          
           router.replace("/LoginScreen");
           return;
         }
         
-        console.log("✅ [TabLayout] Usuario autenticado correctamente");
+        
       } catch (error) {
         console.error("❌ [TabLayout] Error verificando auth:", error);
         router.replace("/LoginScreen");
@@ -46,7 +46,7 @@ export default function TabLayout() {
         try {
           const token = await AsyncStorage.getItem("token");
           if (!token) {
-            console.log("⚠️ [TabLayout] Token perdido durante navegación, redirigiendo...");
+            
             router.replace("/LoginScreen");
           }
         } catch (error) {

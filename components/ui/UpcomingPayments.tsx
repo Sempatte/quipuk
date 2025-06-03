@@ -77,7 +77,6 @@ const UpcomingPayments: React.FC<UpcomingPaymentsProps> = ({ refreshTrigger }) =
       
       refetch().finally(() => {
         setIsRefreshing(false);
-        if (__DEV__) console.log('UpcomingPayments refrescado por trigger:', refreshTrigger);
       });
     }
   }, [refreshTrigger, refetch]);
@@ -182,7 +181,7 @@ const UpcomingPayments: React.FC<UpcomingPaymentsProps> = ({ refreshTrigger }) =
   const handleConfirmPayment = () => {
     if (selectedPayment) {
       // Aquí iría la lógica para marcar el pago como completado en el backend
-      console.log("Pago confirmado:", selectedPayment.id);
+      
 
       // Cerrar el modal y refrescar datos
       setConfirmModalVisible(false);
@@ -256,7 +255,7 @@ const UpcomingPayments: React.FC<UpcomingPaymentsProps> = ({ refreshTrigger }) =
             style={styles.buttonPending}
             onPress={() => {
               // Aquí iría la lógica para mantener como pendiente
-              console.log("Mantener como pendiente:", item.id);
+              
             }}
           >
             <Text style={styles.buttonPendingText}>Pendiente</Text>

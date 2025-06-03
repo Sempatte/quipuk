@@ -61,13 +61,5 @@ const env: EnvConfig = {
   OCR_ENABLED: getBooleanEnvVar('OCR_ENABLED', false),
 };
 
-// Log en desarrollo para facilitar debugging
-if (__DEV__) {
-  console.log('🔧 Environment Config:', {
-    ...env,
-    // No mostrar API keys en logs por seguridad
-    GOOGLE_VISION_API_KEY: env.GOOGLE_VISION_API_KEY ? '***CONFIGURED***' : 'NOT_SET'
-  });
-}
 
 export default env;

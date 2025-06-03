@@ -45,7 +45,7 @@ export const useSpendingHistory = (
     
     // Si no hay transacciones, devolver datos vacíos
     if (!transactions || transactions.length === 0) {
-      if (__DEV__) console.log('[useSpendingHistory] No hay transacciones para procesar');
+      
       return {
         chartData: [],
         totalSpending: 0,
@@ -111,10 +111,7 @@ export const useSpendingHistory = (
     }
 
     // Log de fechas para debug
-    if (__DEV__) {
-      console.log(`[useSpendingHistory] Período: ${normalizedFilter}`);
-      console.log(`[useSpendingHistory] Rango: ${startDate.toLocaleDateString()} - ${endDate.toLocaleDateString()}`);
-    }
+    
     
     // ========== PASO 3: FILTRAR TRANSACCIONES VÁLIDAS ==========
     
@@ -152,11 +149,7 @@ export const useSpendingHistory = (
       }
     });
     
-    if (__DEV__) {
-      console.log(`[useSpendingHistory] Total transacciones: ${transactions.length}`);
-      console.log(`[useSpendingHistory] Transacciones filtradas: ${validTransactions.length}`);
-      console.log(`[useSpendingHistory] Gastos válidos: ${expenseTransactions.length}`);
-    }
+    
     
     // ========== PASO 4: GENERAR INTERVALOS DE FECHAS ==========
     
@@ -167,7 +160,7 @@ export const useSpendingHistory = (
       if (intervalType === "day") {
         // CLAVE: Asegurar que endDate es posterior a startDate
         if (startDate >= endDate) {
-          console.warn('[useSpendingHistory] Ajustando fechas porque startDate >= endDate');
+          
           endDate = new Date(startDate);
           endDate.setDate(endDate.getDate() + 1);
         }
@@ -188,7 +181,7 @@ export const useSpendingHistory = (
     
     // Si no hay intervalos, crear al menos uno para hoy
     if (intervals.length === 0) {
-      console.warn('[useSpendingHistory] No se generaron intervalos, usando día actual');
+      
       intervals = [new Date()];
     }
     
@@ -219,7 +212,7 @@ export const useSpendingHistory = (
         
         // Verificar fecha válida
         if (isNaN(txDate.getTime())) {
-          if (__DEV__) console.warn(`[useSpendingHistory] Fecha inválida: ${tx.id}`);
+          
           skippedCount++;
           return; // Saltar esta transacción
         }
@@ -294,22 +287,12 @@ export const useSpendingHistory = (
           
           // Log especial para transacciones recientes (últimos 5 días)
           const isRecent = (now.getTime() - txDate.getTime()) < 5 * 24 * 60 * 60 * 1000;
-          if (__DEV__ && isRecent) {
-            console.log(`[useSpendingHistory] Procesada transacción reciente:`, {
-              id: tx.id,
-              fecha: txDate.toLocaleDateString(),
-              monto: amount,
-              día: intervals[index].getDate(),
-              índice: index
-            });
-          }
+          
         } else {
           // No se pudo asignar a ningún intervalo
           skippedCount++;
           
-          if (__DEV__) {
-            console.warn(`[useSpendingHistory] No se pudo asignar transacción ${tx.id} a ningún intervalo`);
-          }
+          
         }
       } catch (error) {
         console.error('[useSpendingHistory] Error procesando transacción:', error);
@@ -356,15 +339,7 @@ export const useSpendingHistory = (
               chartData[index] += amount;
               processedCount++;
               
-              if (__DEV__) {
-                console.log(`[useSpendingHistory] Procesada transacción reciente en segunda pasada:`, {
-                  id: tx.id,
-                  fecha: txDate.toLocaleDateString(),
-                  monto: amount,
-                  día: txDate.getDate(),
-                  índice: index
-                });
-              }
+              
             }
           }
         } catch (error) {
@@ -414,13 +389,7 @@ export const useSpendingHistory = (
         if (todayIndex !== -1) {
           // Si ya hay un valor, verificar que sea al menos el monto total de hoy
           if (chartData[todayIndex] < todayAmount) {
-            if (__DEV__) {
-              console.log(`[useSpendingHistory] Actualizando día de hoy:`, {
-                valorActual: chartData[todayIndex],
-                valorNuevo: todayAmount,
-                índice: todayIndex
-              });
-            }
+            
             chartData[todayIndex] = todayAmount;
           }
         }
@@ -449,10 +418,7 @@ export const useSpendingHistory = (
     }
     
     // Log para verificación en desarrollo
-    if (__DEV__) {
-      console.log(`[useSpendingHistory] Procesadas ${processedCount} de ${expenseTransactions.length} transacciones (${skippedCount} omitidas)`);
-      console.log(`[useSpendingHistory] Total: ${totalSpending}, Promedio: ${averageSpending}`);
-    }
+    
     
     return {
       chartData: chartData.length > 0 ? chartData : [0],

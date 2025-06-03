@@ -110,7 +110,7 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
     if (__DEV__) {
       // Si hay transacciones, mostrar algunas estadísticas
       if (transactions.length > 0) {
-        console.log(`[SpendingHistory] Recibidas ${transactions.length} transacciones, válidas: ${filteredTransactions.length}`);
+        
         
         // Ver las transacciones más recientes (ordenadas por fecha)
         const recentTransactions = [...filteredTransactions]
@@ -118,9 +118,9 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
           .slice(0, 3);
         
         if (recentTransactions.length > 0) {
-          console.log('[SpendingHistory] Transacciones más recientes:');
+          
           recentTransactions.forEach((tx, i) => {
-            console.log(`  ${i+1}. ID: ${tx.id}, Fecha: ${new Date(tx.createdAt).toLocaleDateString()}, Tipo: ${tx.type}, Monto: ${tx.amount}`);
+            
           });
         }
       }

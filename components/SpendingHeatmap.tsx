@@ -40,7 +40,7 @@ const SpendingHeatmap: React.FC<SpendingHeatmapProps> = ({ refreshTrigger }) => 
       
       refetch().finally(() => {
         setIsRefreshing(false);
-        if (__DEV__) console.log('SpendingHeatmap refrescado por trigger:', refreshTrigger);
+ 
       });
     }
   }, [refreshTrigger, refetch]);

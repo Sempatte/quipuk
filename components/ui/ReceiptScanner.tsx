@@ -40,7 +40,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   const cameraRef = useRef<CameraView>(null);
   const [selectedLens, setSelectedLens] = useState<string | undefined>("builtInWideAngleCamera");
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
-  
+
   const {
     permissions,
     hasAllPermissions,
@@ -51,7 +51,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   // Solicitar permisos cuando se abre el modal
   useEffect(() => {
     if (visible && !permissions.camera) {
-      console.log('📷 [Scanner] Solicitando permisos de cámara...');
       requestPermissions();
     }
   }, [visible, permissions.camera, requestPermissions]);
@@ -68,22 +67,11 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
    */
   const handleDataProcessingComplete = useCallback(
     (data: ExtractedReceiptData) => {
-      console.log('✅ [Scanner] ============ PROCESAMIENTO COMPLETADO ============');
-      console.log('✅ [Scanner] Datos extraídos:', data);
-      
       try {
-        // CRÍTICO: Llamar al callback INMEDIATAMENTE
-        console.log('📤 [Scanner] Enviando datos al componente padre...');
         onDataExtracted(data);
-        console.log('📤 [Scanner] Datos enviados exitosamente');
-        
-        // Cerrar el modal DESPUÉS de enviar los datos
-        console.log('🚪 [Scanner] Cerrando modal...');
         onClose();
-        
       } catch (error) {
         console.error('💥 [Scanner] Error enviando datos:', error);
-        // Aún así cerrar el modal
         onClose();
       }
     },
@@ -94,36 +82,20 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
    * Procesa una imagen usando OCR
    */
   const processImage = async (imageUri: string): Promise<void> => {
-    console.log('🔍 [Scanner] ============ INICIANDO PROCESAMIENTO OCR ============');
-    console.log('🔍 [Scanner] URI:', imageUri.substring(0, 80) + '...');
-    setCapturedImageUri(imageUri); // Mostrar imagen en vez de cámara
+    setCapturedImageUri(imageUri);
     try {
       setIsProcessing(true);
-      
-      // Procesar la imagen con OCR
       const result = await integratedOCRService.processReceiptImage(imageUri);
-      
-      console.log('🔍 [Scanner] Resultado OCR:', {
-        success: result.success,
-        hasData: !!result.data,
-        error: result.error,
-        processingTime: result.processingTime
-      });
-
       if (result.success && result.data) {
-        // Validar que los datos son útiles
         const hasUsefulData = !!(
-          result.data.amount || 
-          result.data.merchantName || 
+          result.data.amount ||
+          result.data.merchantName ||
           (result.data.category && result.data.category !== 'Otros') ||
           (result.data.description && result.data.description !== 'Gasto escaneado desde comprobante')
         );
-
         if (hasUsefulData) {
-          console.log('✅ [Scanner] Datos útiles encontrados');
           showExtractedDataConfirmation(result.data);
         } else {
-          console.log('⚠️ [Scanner] Datos extraídos no son útiles');
           Alert.alert(
             'Datos insuficientes',
             'Se detectó texto pero no se pudieron extraer datos útiles del comprobante.',
@@ -160,36 +132,22 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
    * Toma una foto y procesa el comprobante - SIMPLIFICADO
    */
   const takePicture = async (): Promise<void> => {
-    console.log('📷 [Scanner] ============ INICIANDO CAPTURA ============');
-    
     if (!cameraRef.current || isProcessing) {
-      console.log('⚠️ [Scanner] Cámara no disponible o procesando');
       return;
     }
 
     try {
-      console.log('📸 [Scanner] Capturando foto...');
-      
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: false,
         skipProcessing: false,
         exif: false,
       });
-
-      console.log('📸 [Scanner] Foto capturada:', {
-        hasPhoto: !!photo,
-        hasUri: !!photo?.uri,
-      });
-
       if (!photo || !photo.uri) {
         throw new Error('No se pudo tomar la foto');
       }
-
-      setCapturedImageUri(photo.uri); // Mostrar imagen en vez de cámara
-      // Procesar la imagen
+      setCapturedImageUri(photo.uri);
       await processImage(photo.uri);
-      
     } catch (error) {
       console.error('💥 [Scanner] Error capturando foto:', error);
       Alert.alert(
@@ -204,8 +162,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
    * Selecciona imagen de galería - SIMPLIFICADO
    */
   const selectFromGallery = async (): Promise<void> => {
-    console.log('📷 [Scanner] ============ SELECCIONANDO DE GALERÍA ============');
-    
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -213,8 +169,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       });
 
       if (!result.canceled && result.assets[0]) {
-        console.log('🔍 [Scanner] Procesando imagen de galería...');
-        setCapturedImageUri(result.assets[0].uri); // Mostrar imagen en vez de cámara
+        setCapturedImageUri(result.assets[0].uri);
         await processImage(result.assets[0].uri);
       }
     } catch (error) {
@@ -227,8 +182,6 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
    * FUNCIÓN CORREGIDA - Muestra confirmación de datos extraídos
    */
   const showExtractedDataConfirmation = (data: ExtractedReceiptData): void => {
-    console.log('✅ [Scanner] Mostrando confirmación de datos');
-    
     const details = [
       data.amount && `Monto: S/ ${data.amount.toFixed(2)}`,
       data.merchantName && `Comercio: ${data.merchantName}`,
@@ -236,28 +189,10 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       data.date && `Fecha: ${new Date(data.date).toLocaleDateString('es-PE')}`,
     ].filter(Boolean).join('\n');
 
-    const message = details.length > 0 
+    const message = details.length > 0
       ? `Se extrajeron los siguientes datos:\n\n${details}\n\nConfianza: ${data.confidence}%\n\n¿Usar estos datos?`
       : `Se detectaron algunos datos.\nConfianza: ${data.confidence}%\n\n¿Usar estos datos?`;
     handleDataProcessingComplete(data);
-    /* Alert.alert(
-      'Datos extraídos',
-      message,
-      [
-        { 
-          text: 'Cancelar', 
-          style: 'cancel',
-          onPress: () => onClose()
-        },
-        { 
-          text: 'Usar datos', 
-          onPress: () => {
-            console.log('✅ [Scanner] Usuario confirmó datos');
-            handleDataProcessingComplete(data);
-          }
-        }
-      ]
-    ); */
   };
 
   /**
@@ -269,15 +204,15 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   };
 
   const handleAvailableLenses = (event: { lenses: string[] }) => {
-    // Buscar la lente principal (1x) evitando la ultra gran angular (0.5x)
     if (event.lenses.includes("builtInWideAngleCamera")) {
       setSelectedLens("builtInWideAngleCamera");
     } else {
-      // Fallback: usar la primera que no sea ultra gran angular
       const normalLens = event.lenses.find(lens => lens !== "builtInUltraWideCamera");
       setSelectedLens(normalLens || event.lenses[0]);
     }
   };
+
+  if (!visible) return null;
 
   // Renderizar estados de carga y permisos
   if (permissionsLoading) {
@@ -317,8 +252,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.headerButton} 
+          <TouchableOpacity
+            style={styles.headerButton}
             onPress={onClose}
             disabled={isProcessing}
           >
@@ -326,10 +261,10 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Escanear Comprobante</Text>
           <TouchableOpacity style={styles.headerButton} onPress={toggleFlash}>
-            <Ionicons 
-              name={flashMode === 'on' ? "flash" : "flash-off"} 
-              size={24} 
-              color="#FFF" 
+            <Ionicons
+              name={flashMode === 'on' ? "flash" : "flash-off"}
+              size={24}
+              color="#FFF"
             />
           </TouchableOpacity>
         </View>
@@ -373,8 +308,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
         </View>
         {/* Controles */}
         <View style={styles.controls}>
-          <TouchableOpacity 
-            style={styles.galleryButton} 
+          <TouchableOpacity
+            style={styles.galleryButton}
             onPress={selectFromGallery}
             disabled={isProcessing}
           >
@@ -395,8 +330,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
           </TouchableOpacity>
 
           {debugMode ? (
-            <TouchableOpacity 
-              style={styles.debugButton} 
+            <TouchableOpacity
+              style={styles.debugButton}
               onPress={() => {
                 const mockData: ExtractedReceiptData = {
                   amount: 25.50,
@@ -406,7 +341,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
                   confidence: 85,
                   date: new Date().toISOString(),
                 };
-                console.log('🧪 [Scanner] TEST: Simulando datos');
+
                 showExtractedDataConfirmation(mockData);
               }}
               disabled={isProcessing}

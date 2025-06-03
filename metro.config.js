@@ -18,10 +18,10 @@ defaultConfig.resolver.platforms = ['ios', 'android', 'native', 'web'];
 // Log de resolución de archivos
 const originalResolveAsset = defaultConfig.resolver.resolveAsset;
 defaultConfig.resolver.resolveAsset = (dirPath, assetName, extension) => {
-  console.log(`🔍 [Metro] Resolviendo asset: ${dirPath}/${assetName}.${extension}`);
+  
   try {
     const result = originalResolveAsset(dirPath, assetName, extension);
-    console.log(`✅ [Metro] Asset encontrado: ${result}`);
+    
     return result;
   } catch (error) {
     console.error(`❌ [Metro] Asset NO encontrado: ${dirPath}/${assetName}.${extension}`);
