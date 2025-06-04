@@ -23,7 +23,7 @@ export default function TabLayout() {
         
         if (!token || !userId) {
           
-          router.replace("/LoginScreen");
+          router.replace("LoginScreen");
           return;
         }
         

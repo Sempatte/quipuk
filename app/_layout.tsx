@@ -1,11 +1,11 @@
-// app/_layout.tsx - VERSION CORREGIDA COMPLETA
+// app/_layout.tsx - EXPO ROUTER VERSION CORREGIDA
 import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
   DefaultTheme,
   ThemeProvider,
 } from "@react-navigation/native";
-import { Stack } from "expo-router";
+import { Slot, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar, Platform } from "react-native";
 import { ApolloProvider } from "@apollo/client";
@@ -37,7 +37,11 @@ function MainLayout() {
     retryInterval: 60000,
   });
 
-  // 🔥 NUEVO ESTADO PARA MANEJAR AUTENTICACIÓN INICIAL
+  // 🔥 EXPO ROUTER: useSegments y useRouter para manejar navegación
+  const segments = useSegments();
+  const router = useRouter();
+  
+  // 🔥 Estados para autenticación
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
@@ -87,6 +91,50 @@ function MainLayout() {
     checkInitialAuth();
   }, []);
 
+  // 🔥 EXPO ROUTER: Lógica de navegación automática
+  useEffect(() => {
+    if (isCheckingAuth || isLoading) return;
+
+    // Determinar si estamos en una ruta protegida o pública
+    const inAuthGroup = segments[0] === "(tabs)";
+    const inPublicRoute = segments[0] === "LoginScreen" || 
+                         segments[0] === "RegisterScreen" || 
+                         segments[0] === "EmailVerificationScreen";
+
+    console.log("🔍 [RootLayout] Navegación:", {
+      segments,
+      inAuthGroup,
+      inPublicRoute,
+      isAuthenticated
+    });
+
+    // Si no está autenticado y está en ruta protegida, redirigir a login
+    if (!isAuthenticated && inAuthGroup) {
+      console.log("🔄 [RootLayout] Redirigiendo a LoginScreen (no autenticado)");
+      router.replace("LoginScreen" as any);
+      return;
+    }
+
+    // Si está autenticado y está en ruta pública, redirigir a tabs
+    if (isAuthenticated && inPublicRoute) {
+      console.log("🔄 [RootLayout] Redirigiendo a (tabs) (autenticado)");
+      router.replace("/(tabs)" as any);
+      return;
+    }
+
+    // Si es la primera carga y no hay segmentos, navegar según autenticación
+    if (segments.length < 1) {
+      if (isAuthenticated) {
+        console.log("🔄 [RootLayout] Navegación inicial a (tabs)");
+        router.replace("/(tabs)" as any);
+      } else {
+        console.log("🔄 [RootLayout] Navegación inicial a LoginScreen");
+        router.replace("/LoginScreen" as any);
+      }
+    }
+  }, [isAuthenticated, segments, isCheckingAuth, isLoading, router]);
+
+  // 🔥 Ocultar splash cuando todo esté listo
   useEffect(() => {
     if (fontsLoaded && !isLoading && !isCheckingAuth) {
       SplashScreen.hideAsync();
@@ -111,57 +159,8 @@ function MainLayout() {
         translucent={Platform.OS === 'ios'}
       />
       
-      <Stack 
-        // 🔥 SOLUCIÓN: Configuración inicial basada en autenticación usando nombres exactos de archivo
-        initialRouteName={isAuthenticated ? "(tabs)" : "LoginScreen"}
-        screenOptions={{
-          headerShown: false,
-          // 🔥 PREVENIR ANIMACIONES CONFLICTIVAS
-          animation: 'slide_from_right',
-          gestureEnabled: false, // Deshabilitar gestos para evitar navegación accidental
-        }}
-      >
-        <Stack.Screen 
-          name="LoginScreen" // Usar nombre exacto del archivo
-          options={{ 
-            headerShown: false,
-            // 🔥 IMPORTANTE: No permitir ir atrás desde login
-            gestureEnabled: false,
-            // 🔥 ADICIONAL: Reset del stack al llegar aquí
-            animationTypeForReplace: 'pop',
-          }} 
-        />
-        <Stack.Screen 
-          name="RegisterScreen" // Usar nombre exacto del archivo
-          options={{ 
-            headerShown: false,
-            gestureEnabled: true, // Permitir volver atrás desde registro
-          }} 
-        />
-        <Stack.Screen 
-          name="EmailVerificationScreen" // Usar nombre exacto del archivo
-          options={{ 
-            headerShown: false,
-            gestureEnabled: false, // No permitir ir atrás desde verificación
-          }} 
-        />
-        <Stack.Screen 
-          name="(tabs)" 
-          options={{ 
-            headerShown: false,
-            // 🔥 IMPORTANTE: No permitir ir atrás desde tabs (evita volver a login)
-            gestureEnabled: false,
-            // 🔥 ADICIONAL: Reset del stack al llegar aquí
-            animationTypeForReplace: 'pop',
-          }} 
-        />
-        <Stack.Screen 
-          name="+not-found" 
-          options={{ 
-            headerShown: false 
-          }} 
-        />
-      </Stack>
+      {/* 🔥 EXPO ROUTER: Usar Slot en lugar de Stack */}
+      <Slot />
     </ThemeProvider>
   );
 }
