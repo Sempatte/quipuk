@@ -14,12 +14,10 @@ import {
   ActivityIndicator,
   Dimensions,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { RootStackParamList } from "./interfaces/navigation";
 import { emailVerificationService } from "./services/emailVerificationService";
 import { useToast } from "./providers/ToastProvider";
 import { useRegisterForm } from "@/hooks/useRegisterForm";
@@ -28,11 +26,6 @@ import QuipukLogo from "@/assets/images/Logo.svg";
 import { defaultCountry, getCountryByCode } from "./contants/countries";
 
 const { width, height } = Dimensions.get('window');
-
-type RegisterScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "RegisterScreen"
->;
 
 // Componente para mostrar requisitos de contraseña
 interface PasswordRequirementProps {
@@ -169,7 +162,7 @@ const CustomInput: React.FC<CustomInputProps> = ({
 };
 
 export default function RegisterScreen() {
-  const navigation = useNavigation<RegisterScreenNavigationProp>();
+  const router = useRouter();
   const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -210,10 +203,13 @@ export default function RegisterScreen() {
         resetForm();
         
         // Navegar a la pantalla de verificación
-        navigation.navigate("EmailVerificationScreen", {
-          email: formData.email,
-          userId: result.userId,
-          fromRegistration: true,
+        router.push({
+          pathname: "/EmailVerificationScreen",
+          params: {
+            email: formData.email,
+            userId: result.userId?.toString(),
+            fromRegistration: "true",
+          },
         });
       } else {
         showToast("error", "Error en registro", result.message);
@@ -245,7 +241,7 @@ export default function RegisterScreen() {
             style={styles.header}
           >
             <TouchableOpacity
-              onPress={() => navigation.goBack()}
+              onPress={() => router.back()}
               style={styles.backButton}
               disabled={loading}
             >
@@ -594,7 +590,7 @@ export default function RegisterScreen() {
 
             {/* Link para login */}
             <TouchableOpacity
-              onPress={() => navigation.navigate("LoginScreen")}
+              onPress={() => router.replace("/LoginScreen")}
               disabled={loading}
               style={styles.loginLinkContainer}
             >

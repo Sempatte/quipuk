@@ -33,7 +33,7 @@ interface UserProfile {
 }
 
 export default function Profile() {
-  const navigation = useNavigation<RootStackNavigationProp<"(tabs)">>();
+  const navigation = useNavigation<RootStackNavigationProp<"/(tabs)">>();
   const router = useRouter();
 
   // Query del perfil

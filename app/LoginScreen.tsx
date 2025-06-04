@@ -1,460 +1,709 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Alert,
-  SafeAreaView,
+// app/LoginScreen.tsx - VERSIÓN ACTUALIZADA CON PIN + BIOMETRÍA
+import React, { useState, useEffect } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
   KeyboardAvoidingView,
-  Platform
-} from 'react-native';
-import { useRouter } from 'expo-router';
+  Platform,
+  TouchableWithoutFeedback,
+  Keyboard,
+  ActivityIndicator,
+  Alert,
+} from "react-native";
+import { useMutation } from "@apollo/client";
+import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Ionicons } from "@expo/vector-icons";
 
-// ✅ Importar tipos
-import { useBiometricAuth } from '@/hooks/useBiometricAuth';
-import { usePinAuth } from '@/hooks/usePinAuth';
-import { PinInput } from '@/components/ui/PinInput';
-import { BiometricSetupModal } from '@/components/BiometricSetupModal';
-import { PinSetup } from '@/components/ui/PinSetup';
-import { RootStackParamList } from './interfaces/navigation';
+// Imports del sistema de autenticación
+import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
+import { useBiometricAuth } from "@/hooks/useBiometricAuth";
+import { usePinAuth } from "@/hooks/usePinAuth";
+import { PinInput } from "@/components/ui/PinInput";
+import { BiometricSetupModal } from "@/components/BiometricSetupModal";
+import { PinSetup } from "@/components/ui/PinSetup";
 
-// ✅ Definir tipos específicos para el componente
-type AuthMethod = 'biometric' | 'pin' | 'password' | 'setup';
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { RootStackParamList } from "./interfaces/navigation";
+import { useToast } from "./providers/ToastProvider";
+import QuipukLogo from "@/assets/images/Logo.svg";
 
-interface User {
+type LoginScreenNavigationProp = NativeStackNavigationProp<
+  RootStackParamList,
+  "/LoginScreen"
+>;
+
+interface UserProfile {
   id: number;
   email: string;
-  name?: string;
+  username: string;
+  deviceId?: string;
 }
 
-interface BiometricAuthResult {
-  success: boolean;
-  requiresManualLogin?: boolean;
-  error?: string;
-}
+type AuthMethod = "biometric" | "pin" | "password" | "setup";
 
-interface PinVerifyResult {
-  success: boolean;
-  error?: string;
-  isLocked?: boolean;
-  lockDuration?: number;
-}
-
-interface PinConfig {
-  hasPin: boolean;
-  attempts?: number;
-  isLocked?: boolean;
-}
-
-export default function LoginScreen(): JSX.Element {
+export default function LoginScreen() {
+  const navigation = useNavigation<LoginScreenNavigationProp>();
   const router = useRouter();
-  
-  // ✅ Estados tipados
-  const [authMethod, setAuthMethod] = useState<AuthMethod>('password'); // Cambio inicial
-  const [showManualLogin, setShowManualLogin] = useState<boolean>(false);
-  const [pinError, setPinError] = useState<string>('');
-  const [showBiometricSetup, setShowBiometricSetup] = useState<boolean>(false);
-  const [showPinSetup, setShowPinSetup] = useState<boolean>(false);
+  const { showToast } = useToast();
 
-  // ✅ Usuario tipado - por ahora null, reemplaza con tu lógica real
-  const user: User | null = null;
+  // Estados tradicionales del login
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
 
-  // ✅ Hooks tipados (comentados temporalmente para evitar errores)
-  // const { 
-  //   isAvailable: biometricAvailable, 
-  //   isEnabled: biometricEnabled, 
-  //   authenticate: authenticateBiometric 
-  // } = useBiometricAuth();
+  // Estados del sistema de autenticación avanzada
+  const [authMethod, setAuthMethod] = useState<AuthMethod>("password");
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const [showPinSetup, setShowPinSetup] = useState(false);
+  const [pinError, setPinError] = useState<string>("");
+  const [isNewUser, setIsNewUser] = useState(false);
 
-  // const { 
-  //   pinConfig, 
-  //   verifyPin, 
-  //   isLoading: pinLoading 
-  // } = usePinAuth(user?.id);
+  // Hooks de autenticación
+  const {
+    isAvailable: biometricAvailable,
+    isEnabled: biometricEnabled,
+    authenticate: authenticateBiometric,
+  } = useBiometricAuth();
 
-  // ✅ Valores por defecto mientras no tienes los hooks
-  const biometricAvailable: boolean = false;
-  const biometricEnabled: boolean = false;
-  const pinConfig: PinConfig = { hasPin: false };
-  const pinLoading: boolean = false;
+  const {
+    pinConfig,
+    verifyPin,
+    isLoading: pinLoading,
+  } = usePinAuth(userProfile?.id);
 
-  // ✅ Función para manejar el éxito del login (tipada correctamente)
-  const handleLoginSuccess = (): void => {
-    console.log("✅ Login exitoso, navegando a (tabs)");
-    router.replace("/(tabs)"); // ✅ Eliminar el tipado explícito
-  };
+  // Mutation del login tradicional
+  const [login, { loading: loginLoading }] = useMutation(LOGIN_MUTATION, {
+    onCompleted: async (data) => {
+      const token = data?.login?.accessToken;
+      const user = data?.login?.user;
 
-  // ✅ Función para manejar el logout
-  const handleLogout = (): void => {
-    console.log("🚪 Logout realizado");
-    // Aquí iría tu lógica de logout
-  };
+      if (token && user) {
+        await AsyncStorage.setItem("token", token);
+        await AsyncStorage.setItem("userId", user.id.toString());
 
-  useEffect((): void => {
-    // Solo ejecutar si hay usuario
-    if (user) {
-      determineAuthMethod();
-    } else {
-      // Si no hay usuario, mostrar login con contraseña
-      setAuthMethod('password');
-    }
-  }, [user, biometricEnabled, pinConfig]);
+        // Configurar perfil del usuario
+        const profile: UserProfile = {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          deviceId: await generateDeviceId(), // Función para generar ID único del dispositivo
+        };
 
-  const determineAuthMethod = (): void => {
-    // Si usuario recién registrado, mostrar setup
-    if (user && !pinConfig.hasPin && !biometricEnabled) {
-      setAuthMethod('setup');
-      return;
-    }
+        setUserProfile(profile);
+        setIsNewUser(false); // Usuario existente
 
-    // Si tiene biometría habilitada, usarla primero
-    if (biometricEnabled && biometricAvailable) {
-      setAuthMethod('biometric');
-      handleBiometricAuth();
-      return;
-    }
+        // Determinar método de autenticación según configuración
+        await determineAuthMethod(profile);
 
-    // Si tiene PIN, usarlo
-    if (pinConfig.hasPin) {
-      setAuthMethod('pin');
-      return;
-    }
-
-    // Fallback a contraseña
-    setAuthMethod('password');
-  };
-
-  const handleBiometricAuth = async (): Promise<void> => {
-    try {
-      // ✅ Simular resultado mientras no tienes el hook real
-      const result: BiometricAuthResult = { success: false, requiresManualLogin: true };
-      
-      // const result = await authenticateBiometric();
-      
-      if (result.success) {
-        handleLoginSuccess();
-      } else if (result.requiresManualLogin) {
-        setShowManualLogin(true);
-        setAuthMethod(pinConfig.hasPin ? 'pin' : 'password');
-      } else {
-        Alert.alert('Face ID', result.error || 'Autenticación fallida');
+        showToast(
+          "success",
+          "¡Bienvenido!",
+          "Has iniciado sesión correctamente"
+        );
       }
-    } catch (error: unknown) {
-      console.error('Biometric auth error:', error);
-      setAuthMethod(pinConfig.hasPin ? 'pin' : 'password');
+    },
+    onError: (error) => {
+      console.log("Error al iniciar sesión:", error);
+
+      if (error.message.includes("EMAIL_NOT_VERIFIED")) {
+        try {
+          const errorData = JSON.parse(error.message);
+          showToast(
+            "info",
+            "Email no verificado",
+            "Necesitas verificar tu email antes de iniciar sesión"
+          );
+
+          router.push({
+            pathname: "/EmailVerificationScreen",
+            params: {
+              email: email,
+              userId: errorData.userId?.toString(),
+              fromRegistration: "false",
+            },
+          });
+        } catch (parseError) {
+          showToast(
+            "info",
+            "Email no verificado",
+            "Por favor verifica tu email antes de iniciar sesión"
+          );
+        }
+      } else if (error.message.includes("Usuario no encontrado")) {
+        showToast(
+          "error",
+          "Usuario no encontrado",
+          "Verifica tu email o regístrate"
+        );
+      } else if (error.message.includes("Contraseña incorrecta")) {
+        showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
+      } else {
+        showToast("error", "Error en inicio de sesión", error.message);
+      }
+    },
+  });
+
+  // Función para generar ID único del dispositivo
+  const generateDeviceId = async (): Promise<string> => {
+    let deviceId = await AsyncStorage.getItem("device_id");
+    if (!deviceId) {
+      deviceId = `quipuk_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      await AsyncStorage.setItem("device_id", deviceId);
+    }
+    return deviceId;
+  };
+
+  // Determinar método de autenticación según configuración del usuario
+  const determineAuthMethod = async (profile: UserProfile) => {
+    // Verificar si es un dispositivo nuevo o usuario sin configuración
+    const hasPin = pinConfig.hasPin;
+    const hasBiometric = biometricEnabled;
+
+    console.log("🔍 Determinando método de auth:", {
+      hasPin,
+      hasBiometric,
+      biometricAvailable,
+      isNewUser,
+    });
+
+    // Si no tiene PIN ni biometría configurados, mostrar setup
+    if (!hasPin && !hasBiometric) {
+      setAuthMethod("setup");
+      setShowPinSetup(true);
+      return;
+    }
+
+    // Prioridad: Biometría > PIN > Contraseña
+    if (hasBiometric && biometricAvailable) {
+      setAuthMethod("biometric");
+      setTimeout(() => handleBiometricAuth(), 500); // Delay para UX
+      return;
+    }
+
+    if (hasPin) {
+      setAuthMethod("pin");
+      return;
+    }
+
+    // Fallback: ir directamente a la app si solo tiene login tradicional
+    navigateToApp();
+  };
+
+  // Manejar login tradicional con email/contraseña
+  const handleTraditionalLogin = () => {
+    if (!email || !password) {
+      showToast("error", "Error", "Todos los campos son obligatorios.");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast("error", "Error", "Por favor ingresa un email válido.");
+      return;
+    }
+
+    login({ variables: { email, password } });
+  };
+
+  // Manejar autenticación con Face ID
+  const handleBiometricAuth = async () => {
+    try {
+      const result = await authenticateBiometric();
+
+      if (result.success) {
+        navigateToApp();
+      } else if (result.requiresManualLogin) {
+        // Fallback a PIN o contraseña
+        if (pinConfig.hasPin) {
+          setAuthMethod("pin");
+        } else {
+          setAuthMethod("password");
+          showToast("info", "Face ID falló", "Por favor ingresa tu contraseña");
+        }
+      } else {
+        Alert.alert("Face ID", result.error || "Autenticación fallida");
+      }
+    } catch (error) {
+      console.error("Biometric auth error:", error);
+      setAuthMethod(pinConfig.hasPin ? "pin" : "password");
     }
   };
 
-  const handlePinAuth = async (pin: string): Promise<void> => {
-    if (!user) return;
+  // Manejar autenticación con PIN
+  const handlePinAuth = async (pin: string) => {
+    if (!userProfile) return;
 
     try {
-      // ✅ Simular resultado mientras no tienes el hook real
-      const result: PinVerifyResult = { success: true };
-      
-      // const result = await verifyPin(pin);
-      
+      const result = await verifyPin(pin);
+
       if (result.success) {
-        handleLoginSuccess();
+        navigateToApp();
       } else {
-        setPinError(result.error || 'PIN incorrecto');
-        
-        if (result.isLocked && result.lockDuration) {
+        setPinError(result.error || "PIN incorrecto");
+
+        if (result.isLocked) {
           Alert.alert(
-            'Cuenta bloqueada',
+            "Cuenta bloqueada",
             `Tu cuenta está bloqueada por ${result.lockDuration} minutos debido a múltiples intentos fallidos.`,
             [
-              { text: 'Usar contraseña', onPress: () => setAuthMethod('password') },
-              { text: 'OK' }
+              {
+                text: "Usar contraseña",
+                onPress: () => setAuthMethod("password"),
+              },
+              { text: "OK" },
             ]
           );
         }
       }
-    } catch (error: unknown) {
-      setPinError('Error al verificar PIN');
+    } catch (error) {
+      setPinError("Error al verificar PIN");
     }
   };
 
-  const handleSetupComplete = (): void => {
+  // Manejar completar setup de PIN
+  const handlePinSetupComplete = (success: boolean) => {
     setShowPinSetup(false);
-    
-    // Después de configurar PIN, ofrecer biometría si está disponible
-    if (biometricAvailable) {
-      setShowBiometricSetup(true);
+
+    if (success) {
+      // Después de configurar PIN, ofrecer biometría si está disponible
+      if (biometricAvailable) {
+        setShowBiometricSetup(true);
+      } else {
+        navigateToApp();
+      }
     } else {
-      setAuthMethod(pinConfig.hasPin ? 'pin' : 'password');
+      // Si rechaza el setup, ir directamente a la app
+      navigateToApp();
     }
   };
 
-  const handleBiometricSetupComplete = (enabled: boolean): void => {
+  // Manejar completar setup de biometría
+  const handleBiometricSetupComplete = (enabled: boolean) => {
     setShowBiometricSetup(false);
-    setAuthMethod(enabled ? 'biometric' : (pinConfig.hasPin ? 'pin' : 'password'));
-    
+
     if (enabled) {
+      // Si habilitó biometría, usarla inmediatamente
+      setAuthMethod("biometric");
       handleBiometricAuth();
+    } else {
+      // Si rechaza biometría, usar PIN o ir a la app
+      if (pinConfig.hasPin) {
+        setAuthMethod("pin");
+      } else {
+        navigateToApp();
+      }
     }
   };
 
-  // ✅ Función de renderizado tipada
-  const renderAuthMethod = (): JSX.Element => {
-    switch (authMethod) {
-      case 'setup':
-        return (
-          <View style={styles.setupContainer}>
-            <Text style={styles.title}>Configurar autenticación</Text>
-            <Text style={styles.subtitle}>Configura tu PIN para mayor seguridad</Text>
-            <TouchableOpacity 
-              style={styles.setupButton}
-              onPress={() => console.log("Setup PIN")}
-            >
-              <Text style={styles.setupButtonText}>Configurar PIN</Text>
-            </TouchableOpacity>
-          </View>
-        );
+  // Navegar a la app principal
+  const navigateToApp = () => {
+    router.replace("/(tabs)");
+  };
 
-      case 'pin':
+  // Volver al login tradicional
+  const backToTraditionalLogin = () => {
+    setAuthMethod("password");
+    setUserProfile(null);
+    setPinError("");
+  };
+
+  // Renderizar método de autenticación actual
+  const renderAuthMethod = () => {
+    switch (authMethod) {
+      case "setup":
+        return null; // Los modales se manejan por separado
+
+      case "pin":
         return (
           <View style={styles.pinContainer}>
-            <Text style={styles.title}>Ingresa tu PIN</Text>
-            <Text style={styles.subtitle}>Usa tu PIN para acceder a Quipuk</Text>
-            {pinError ? <Text style={styles.errorText}>{pinError}</Text> : null}
+            <View style={styles.userInfo}>
+              <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
+              <Text style={styles.userEmail}>{userProfile?.email}</Text>
+            </View>
+
+            <PinInput
+              title="Ingresa tu PIN"
+              subtitle="Usa tu PIN para acceder a Quipuk"
+              maxLength={6}
+              onComplete={handlePinAuth}
+              disabled={pinLoading || pinConfig.isLocked}
+              hasError={!!pinError}
+              errorMessage={pinError}
+              showForgotPin={true}
+              onForgotPin={() => setAuthMethod("password")}
+            />
+
             <TouchableOpacity
-              style={styles.fallbackButton}
-              onPress={() => setAuthMethod('password')}
+              style={styles.changeAccountButton}
+              onPress={backToTraditionalLogin}
             >
-              <Text style={styles.fallbackText}>Usar contraseña</Text>
+              <Text style={styles.changeAccountText}>Cambiar de cuenta</Text>
             </TouchableOpacity>
           </View>
         );
 
-      case 'biometric':
+      case "biometric":
         return (
           <View style={styles.biometricContainer}>
+            <View style={styles.userInfo}>
+              <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
+              <Text style={styles.userEmail}>{userProfile?.email}</Text>
+            </View>
+
             <Text style={styles.biometricTitle}>Accede con Face ID</Text>
+
             <TouchableOpacity
               style={styles.biometricButton}
               onPress={handleBiometricAuth}
             >
-              <Text style={styles.biometricIcon}>👤</Text>
+              <Ionicons name="scan" size={40} color="white" />
             </TouchableOpacity>
+
             <TouchableOpacity
               style={styles.fallbackButton}
-              onPress={() => setAuthMethod(pinConfig.hasPin ? 'pin' : 'password')}
+              onPress={() =>
+                setAuthMethod(pinConfig.hasPin ? "pin" : "password")
+              }
             >
               <Text style={styles.fallbackText}>
-                {pinConfig.hasPin ? 'Usar PIN' : 'Usar contraseña'}
+                {pinConfig.hasPin ? "Usar PIN" : "Usar contraseña"}
               </Text>
             </TouchableOpacity>
-          </View>
-        );
 
-      case 'password':
-        return (
-          <View style={styles.passwordContainer}>
-            <Text style={styles.passwordTitle}>Iniciar sesión</Text>
-            <Text style={styles.passwordSubtitle}>
-              Ingresa tu email y contraseña para acceder a Quipuk
-            </Text>
             <TouchableOpacity
-              style={styles.loginButton}
-              onPress={handleLoginSuccess}
+              style={styles.changeAccountButton}
+              onPress={backToTraditionalLogin}
             >
-              <Text style={styles.loginButtonText}>Iniciar Sesión</Text>
+              <Text style={styles.changeAccountText}>Cambiar de cuenta</Text>
             </TouchableOpacity>
-            {(biometricAvailable || pinConfig.hasPin) && (
-              <TouchableOpacity
-                style={styles.backButton}
-                onPress={() => setAuthMethod(pinConfig.hasPin ? 'pin' : 'biometric')}
-              >
-                <Text style={styles.backButtonText}>
-                  ← Volver a {pinConfig.hasPin ? 'PIN' : 'Face ID'}
-                </Text>
-              </TouchableOpacity>
-            )}
           </View>
         );
 
+      case "password":
       default:
         return (
-          <View style={styles.loadingContainer}>
-            <Text>Cargando...</Text>
+          <View style={styles.formContainer}>
+            <Text style={styles.label}>Correo</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ingrese su correo"
+              placeholderTextColor="#888"
+              keyboardType="email-address"
+              autoCapitalize="none"
+              value={email}
+              onChangeText={setEmail}
+              editable={!loginLoading}
+            />
+
+            <Text style={styles.label}>Contraseña</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Ingrese su contraseña"
+              placeholderTextColor="#888"
+              secureTextEntry
+              value={password}
+              onChangeText={setPassword}
+              editable={!loginLoading}
+            />
+
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity
+                onPress={() => !loginLoading && setRememberMe(!rememberMe)}
+                disabled={loginLoading}
+                style={styles.checkboxContainer}
+              >
+                <View style={styles.checkbox}>
+                  {rememberMe && <View style={styles.checked} />}
+                </View>
+                <Text style={styles.optionText}>Recordarme</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity disabled={loginLoading}>
+                <Text
+                  style={[
+                    styles.optionText,
+                    styles.forgotPassword,
+                    loginLoading && styles.disabledText,
+                  ]}
+                >
+                  ¿Olvidaste tu contraseña?
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.loginButton,
+                loginLoading && styles.loginButtonDisabled,
+              ]}
+              onPress={handleTraditionalLogin}
+              disabled={loginLoading}
+            >
+              {loginLoading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#FFF" />
+                  <Text style={styles.loadingText}>Ingresando...</Text>
+                </View>
+              ) : (
+                <Text style={styles.loginButtonText}>Ingresar</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => router.push("/RegisterScreen")}
+              disabled={loginLoading}
+              style={styles.registerContainer}
+            >
+              <Text
+                style={[
+                  styles.registerText,
+                  loginLoading && styles.disabledText,
+                ]}
+              >
+                ¿Aún no tienes una cuenta?{" "}
+                <Text style={styles.registerLink}>Regístrate</Text>
+              </Text>
+            </TouchableOpacity>
           </View>
         );
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={styles.content}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View style={styles.header}>
-          <Text style={styles.logo}>Quipuk</Text>
-          <Text style={styles.tagline}>Tus finanzas e impuestos en una app</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={styles.inner}>
+          {/* Logo */}
+          <View style={styles.logoContainer}>
+            <QuipukLogo width={90} style={styles.logo} />
+          </View>
+
+          {/* Método de autenticación actual */}
+          {renderAuthMethod()}
         </View>
+      </TouchableWithoutFeedback>
 
-        {renderAuthMethod()}
+      {/* Modales */}
+      {userProfile && (
+        <>
+          <PinSetup
+            userId={userProfile.id}
+            onComplete={handlePinSetupComplete}
+            onSkip={() => handlePinSetupComplete(false)}
+            visible={showPinSetup}
+          />
 
-        {user && (
-          <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-            <Text style={styles.logoutText}>Cambiar de cuenta</Text>
-          </TouchableOpacity>
-        )}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <BiometricSetupModal
+            visible={showBiometricSetup}
+            user={userProfile}
+            onComplete={handleBiometricSetupComplete}
+          />
+        </>
+      )}
+    </KeyboardAvoidingView>
   );
 }
 
-// ✅ Estilos tipados
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: "#F5F5F5",
+    justifyContent: "flex-start",
+    width: "100%",
+    maxWidth: "100%",
   },
-  content: {
+  inner: {
     flex: 1,
-    justifyContent: 'center',
-    padding: 20,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 0,
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 40,
+  logoContainer: {
+    alignSelf: "stretch",
+    height: 200,
+    backgroundColor: "#000",
+    alignItems: "center",
+    justifyContent: "center",
+    borderBottomLeftRadius: 80,
+    overflow: "hidden",
   },
   logo: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-    marginBottom: 8,
+    marginTop: 30,
+    resizeMode: "contain",
   },
-  tagline: {
+
+  // Estilos para formulario tradicional
+  formContainer: {
+    alignSelf: "stretch",
+    paddingHorizontal: 40,
+    marginTop: 30,
+  },
+  label: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 5,
+  },
+  input: {
+    height: 50,
+    borderColor: "#ccc",
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 15,
     fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
+    backgroundColor: "#FFF",
+    marginBottom: 15,
   },
-  setupContainer: {
-    alignItems: 'center',
-    marginVertical: 40,
+  optionsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+    justifyContent: "space-between",
   },
-  setupButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
-    marginTop: 20,
+  checkboxContainer: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  setupButtonText: {
-    color: 'white',
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#00c450",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 10,
+  },
+  checked: {
+    width: 12,
+    height: 12,
+    backgroundColor: "#00c450",
+    borderRadius: 3,
+  },
+  optionText: {
+    fontSize: 14,
+    color: "#666",
+  },
+  forgotPassword: {
+    color: "#00c450",
+  },
+  loginButton: {
+    backgroundColor: "#00c450",
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 15,
+  },
+  loginButtonDisabled: {
+    backgroundColor: "#CCC",
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  loadingText: {
+    color: "#FFF",
     fontSize: 16,
-    fontWeight: '600',
+    marginLeft: 10,
+    fontWeight: "bold",
   },
-  pinContainer: {
-    alignItems: 'center',
-    marginVertical: 40,
+  loginButtonText: {
+    fontSize: 18,
+    color: "#FFF",
+    fontWeight: "bold",
   },
+  registerContainer: {
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  registerText: {
+    textAlign: "center",
+    fontSize: 14,
+    color: "#666",
+  },
+  registerLink: {
+    color: "#00c450",
+    fontWeight: "bold",
+  },
+  disabledText: {
+    opacity: 0.5,
+  },
+
+  // Estilos para autenticación biométrica
   biometricContainer: {
-    alignItems: 'center',
-    marginVertical: 40,
+    alignSelf: "stretch",
+    paddingHorizontal: 40,
+    marginTop: 30,
+    alignItems: "center",
+  },
+  userInfo: {
+    alignItems: "center",
+    marginBottom: 30,
+  },
+  welcomeText: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 5,
+  },
+  userEmail: {
+    fontSize: 16,
+    color: "#666",
   },
   biometricTitle: {
-    fontSize: 24,
-    fontWeight: '600',
+    fontSize: 20,
+    fontWeight: "600",
     marginBottom: 30,
-    color: '#333',
+    color: "#333",
   },
   biometricButton: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: '#007AFF',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
     marginBottom: 20,
-  },
-  biometricIcon: {
-    fontSize: 40,
-    color: 'white',
   },
   fallbackButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
+    marginBottom: 20,
   },
   fallbackText: {
-    color: '#007AFF',
+    color: "#007AFF",
     fontSize: 16,
   },
-  passwordContainer: {
-    marginVertical: 40,
+
+  // Estilos para autenticación con PIN
+  pinContainer: {
+    alignSelf: "stretch",
+    paddingHorizontal: 20,
+    marginTop: 30,
   },
-  passwordTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#333',
-  },
-  passwordSubtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  loginButton: {
-    backgroundColor: '#007AFF',
-    paddingVertical: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  loginButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  backButton: {
-    alignSelf: 'center',
+
+  // Estilos compartidos
+  changeAccountButton: {
+    alignSelf: "center",
     paddingVertical: 12,
     paddingHorizontal: 24,
     marginTop: 20,
   },
-  backButtonText: {
-    color: '#007AFF',
-    fontSize: 16,
-  },
-  logoutButton: {
-    alignSelf: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    marginTop: 20,
-  },
-  logoutText: {
-    color: '#666',
+  changeAccountText: {
+    color: "#666",
     fontSize: 14,
   },
-  title: {
-    fontSize: 24,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginBottom: 8,
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  loadingContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginVertical: 40,
-  },
-} as const);
+});

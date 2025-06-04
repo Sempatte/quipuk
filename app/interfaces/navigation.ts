@@ -2,8 +2,8 @@ import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 // Define los nombres de las rutas con el formato correcto para Expo Router
 export type RootStackParamList = {
-  "/LoginScreen": undefined;        // ✅ Con barra inicial
-  "/RegisterScreen": undefined;     // ✅ Con barra inicial  
+  "/LoginScreen": undefined;
+  "/RegisterScreen": undefined;
   "/EmailVerificationScreen": {
     email: string;
     userId?: number;

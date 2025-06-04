@@ -10,9 +10,9 @@ import {
 import { useQuery } from "@apollo/client";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
 // Importaciones de componentes
 import BellIcon from "@/assets/images/icons/mdi_bell.svg";
@@ -25,24 +25,18 @@ import QuipuTip from "@/components/ui/QuipuTip";
 
 // Importaciones de GraphQL y tipos
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import { RootStackParamList } from "../interfaces/navigation";
-
-type LoginScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "LoginScreen" | "movements"
->;
 
 export default function Index() {
   const { data, loading, error } = useQuery(GET_USER_PROFILE);
-  const navigation = useNavigation<LoginScreenNavigationProp>();
+  const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
       if (error?.message === "Token expired or invalid") {
         AsyncStorage.removeItem("token");
-        navigation.navigate("LoginScreen");
+        router.replace("/LoginScreen");
       }
-    }, [error, navigation])
+    }, [error, router])
   );
 
   if (loading) {

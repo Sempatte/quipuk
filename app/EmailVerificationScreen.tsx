@@ -13,13 +13,12 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useRoute, RouteProp } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import QuipukLogo from '@/assets/images/Logo.svg';
 import { emailVerificationService } from './services/emailVerificationService';
 import { useToast } from './providers/ToastProvider';
-import { RootStackParamList } from './interfaces/navigation';
 
 // Definir los parámetros de la ruta
 type EmailVerificationRouteParams = {
@@ -28,18 +27,13 @@ type EmailVerificationRouteParams = {
   fromRegistration?: boolean;
 };
 
-type EmailVerificationScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  'LoginScreen'
->;
-
 type EmailVerificationScreenRouteProp = RouteProp<
   Record<string, EmailVerificationRouteParams>,
   string
 >;
 
 export default function EmailVerificationScreen() {
-  const navigation = useNavigation<EmailVerificationScreenNavigationProp>();
+  const router = useRouter();
   const route = useRoute<EmailVerificationScreenRouteProp>();
   const { showToast } = useToast();
 
@@ -80,7 +74,7 @@ export default function EmailVerificationScreen() {
         // Si ya está verificado, navegar automáticamente
         if (status.isVerified) {
           showToast('success', 'Email ya verificado', 'Tu email ya está verificado');
-          navigation.navigate('(tabs)');
+          router.replace('/(tabs)');
         }
       }
     } catch (error) {
@@ -131,14 +125,14 @@ export default function EmailVerificationScreen() {
           const loginResult = await emailVerificationService.loginAfterVerification(userId);
           
           if (loginResult.success) {
-            navigation.navigate('(tabs)');
+            router.replace('/(tabs)');
           } else {
             // Si falla el login automático, ir a login manual
-            navigation.navigate('LoginScreen');
+            router.replace('/LoginScreen');
           }
         } else {
           // Si no viene del registro, volver al login
-          navigation.navigate('LoginScreen');
+          router.replace('/LoginScreen');
         }
       } else {
         showToast('error', 'Error de verificación', result.message);
@@ -194,7 +188,7 @@ export default function EmailVerificationScreen() {
         { 
           text: 'Sí, volver', 
           style: 'destructive',
-          onPress: () => navigation.navigate('LoginScreen')
+          onPress: () => router.replace('/LoginScreen')
         },
       ]
     );

@@ -97,9 +97,12 @@ function MainLayout() {
 
     // Determinar si estamos en una ruta protegida o pública
     const inAuthGroup = segments[0] === "(tabs)";
-    const inPublicRoute = segments[0] === "LoginScreen" || 
-                         segments[0] === "RegisterScreen" || 
-                         segments[0] === "EmailVerificationScreen";
+    // Asegurarse de que se compara con la ruta absoluta si los segmentos pueden no tenerla
+    const currentRoute = segments.join('/') === '' ? '/' : `/${segments.join('/')}`;
+
+    const inPublicRoute = currentRoute === "/LoginScreen" || 
+                         currentRoute === "/RegisterScreen" || 
+                         currentRoute === "/EmailVerificationScreen";
 
     console.log("🔍 [RootLayout] Navegación:", {
       segments,
@@ -110,8 +113,8 @@ function MainLayout() {
 
     // Si no está autenticado y está en ruta protegida, redirigir a login
     if (!isAuthenticated && inAuthGroup) {
-      console.log("🔄 [RootLayout] Redirigiendo a LoginScreen (no autenticado)");
-      router.replace("LoginScreen" as any);
+      console.log("🔄 [RootLayout] Redirigiendo a /LoginScreen (no autenticado)");
+      router.replace("/LoginScreen");
       return;
     }
 
@@ -125,11 +128,9 @@ function MainLayout() {
     // Si es la primera carga y no hay segmentos, navegar según autenticación
     if (segments.length < 1) {
       if (isAuthenticated) {
-        console.log("🔄 [RootLayout] Navegación inicial a (tabs)");
-        router.replace("/(tabs)" as any);
+        router.replace("/(tabs)");
       } else {
-        console.log("🔄 [RootLayout] Navegación inicial a LoginScreen");
-        router.replace("/LoginScreen" as any);
+        router.replace("/LoginScreen");
       }
     }
   }, [isAuthenticated, segments, isCheckingAuth, isLoading, router]);

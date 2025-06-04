@@ -7,9 +7,13 @@ interface PinSetupProps {
   userId: number;
   onComplete: (success: boolean) => void;
   onSkip?: () => void;
+  visible?: boolean; // ✅ Nuevo prop
 }
 
-export const PinSetup: React.FC<PinSetupProps> = ({ userId, onComplete, onSkip }) => {
+export const PinSetup: React.FC<PinSetupProps> = ({ userId, onComplete, onSkip, visible = true }) => {
+  // ✅ Si no es visible, no renderizar nada
+  if (!visible) return null;
+
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [firstPin, setFirstPin] = useState('');
   const [isLoading, setIsLoading] = useState(false);
