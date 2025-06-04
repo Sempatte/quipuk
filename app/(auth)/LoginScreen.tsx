@@ -1,5 +1,5 @@
-// app/(auth)/EnhancedLoginScreen.tsx
-import React, { useState, useEffect } from "react";
+// app/(auth)/LoginScreen.tsx - PRODUCTION READY
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -14,10 +14,11 @@ import {
   Alert,
   ScrollView,
   Dimensions,
+  Image,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useMutation } from "@apollo/client";
+import { useMutation, useQuery } from "@apollo/client";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,7 +31,8 @@ import { PinSetup } from "@/components/ui/PinSetup";
 import QuipukLogo from "@/assets/images/Logo.svg";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
-import { useAuth } from "../../hooks/useAuth";
+import { GET_USER_PROFILE } from "../graphql/users.graphql";
+import { useAuth } from "@/hooks/useAuth";
 
 const { width, height } = Dimensions.get("window");
 
@@ -38,11 +40,13 @@ interface UserProfile {
   id: number;
   email: string;
   username: string;
+  fullName: string;
+  profilePictureUrl?: string;
 }
 
 type AuthMethod = "biometric" | "pin" | "password" | "setup" | "blocked";
 
-export default function EnhancedLoginScreen() {
+export default function ProductionLoginScreen() {
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -67,13 +71,39 @@ export default function EnhancedLoginScreen() {
     hasPin,
     pinConfig,
     linkDevice,
-    setupBiometric,
     authenticateWithBiometric,
     verifyPin,
-    createPin,
     canUserAccessDevice,
-    authMethod: detectedAuthMethod
+    loadAuthState
   } = useAuth();
+
+  // Query para obtener datos del usuario (solo cuando tenemos token)
+  const { data: userProfileData, loading: profileLoading, refetch: refetchProfile } = useQuery(
+    GET_USER_PROFILE,
+    {
+      skip: !linkedUserId, // Solo ejecutar si hay usuario vinculado
+      fetchPolicy: 'cache-first',
+      errorPolicy: 'ignore', // Ignorar errores para evitar crashes
+      onCompleted: (data) => {
+        if (data?.getUserProfile) {
+          setUserProfile({
+            id: data.getUserProfile.id,
+            email: data.getUserProfile.email,
+            username: data.getUserProfile.username,
+            fullName: data.getUserProfile.fullName,
+            profilePictureUrl: data.getUserProfile.profilePictureUrl
+          });
+        }
+      },
+      onError: (error) => {
+        console.warn("Error loading user profile:", error);
+        // Si hay error de token, limpiar datos
+        if (error.message.includes("token") || error.message.includes("unauthorized")) {
+          handleTokenExpired();
+        }
+      }
+    }
+  );
 
   // Mutation del login tradicional
   const [login, { loading: loginLoading }] = useMutation(LOGIN_MUTATION, {
@@ -82,17 +112,24 @@ export default function EnhancedLoginScreen() {
       const user = data?.login?.user;
 
       if (token && user) {
-        await AsyncStorage.setItem("token", token);
-        await AsyncStorage.setItem("userId", user.id.toString());
+        try {
+          await AsyncStorage.setItem("token", token);
+          await AsyncStorage.setItem("userId", user.id.toString());
 
-        const profile: UserProfile = {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-        };
+          const profile: UserProfile = {
+            id: user.id,
+            email: user.email,
+            username: user.username,
+            fullName: user.fullName || user.username,
+            profilePictureUrl: user.profilePictureUrl
+          };
 
-        setUserProfile(profile);
-        await handleSuccessfulLogin(profile);
+          setUserProfile(profile);
+          await handleSuccessfulLogin(profile);
+        } catch (error) {
+          console.error("Error storing auth data:", error);
+          showToast("error", "Error", "No se pudieron guardar los datos de sesión");
+        }
       }
     },
     onError: (error) => {
@@ -101,16 +138,81 @@ export default function EnhancedLoginScreen() {
     },
   });
 
+  // 🔧 FUNCIÓN PARA CARGAR DATOS DEL USUARIO DESDE STORAGE/API
+  const loadUserFromStorage = useCallback(async (): Promise<UserProfile | null> => {
+    try {
+      const [storedUserId, token] = await Promise.all([
+        AsyncStorage.getItem("userId"),
+        AsyncStorage.getItem("token")
+      ]);
+
+      if (!storedUserId || !token) {
+        return null;
+      }
+
+      // Si tenemos datos en el query, usarlos
+      if (userProfileData?.getUserProfile) {
+        return {
+          id: userProfileData.getUserProfile.id,
+          email: userProfileData.getUserProfile.email,
+          username: userProfileData.getUserProfile.username,
+          fullName: userProfileData.getUserProfile.fullName,
+          profilePictureUrl: userProfileData.getUserProfile.profilePictureUrl
+        };
+      }
+
+      // Si no, intentar refetch
+      try {
+        const { data } = await refetchProfile();
+        if (data?.getUserProfile) {
+          return {
+            id: data.getUserProfile.id,
+            email: data.getUserProfile.email,
+            username: data.getUserProfile.username,
+            fullName: data.getUserProfile.fullName,
+            profilePictureUrl: data.getUserProfile.profilePictureUrl
+          };
+        }
+      } catch (refetchError) {
+        console.warn("Error refetching profile:", refetchError);
+      }
+
+      // Fallback: crear perfil mínimo desde storage
+      return {
+        id: parseInt(storedUserId, 10),
+        email: "usuario@ejemplo.com", // Se actualizará cuando cargue la API
+        username: "Usuario",
+        fullName: "Usuario"
+      };
+
+    } catch (error) {
+      console.error("Error loading user from storage:", error);
+      return null;
+    }
+  }, [userProfileData, refetchProfile]);
+
+  // 🔧 FUNCIÓN PARA MANEJAR TOKEN EXPIRADO
+  const handleTokenExpired = useCallback(async () => {
+    try {
+      await AsyncStorage.multiRemove(["token", "userId"]);
+      setUserProfile(null);
+      setAuthMethod("password");
+      await loadAuthState(); // Recargar estado de auth
+    } catch (error) {
+      console.error("Error handling token expiration:", error);
+    }
+  }, [loadAuthState]);
+
   // Efecto para determinar método de autenticación al cargar
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading || profileLoading) return;
 
     determineInitialAuthMethod();
-  }, [authLoading, isLinkedDevice, linkedUserId, canUseBiometric, hasPin, pinConfig]);
+  }, [authLoading, profileLoading, isLinkedDevice, linkedUserId, canUseBiometric, hasPin, pinConfig]);
 
   const determineInitialAuthMethod = async () => {
     try {
-      if (!isLinkedDevice) {
+      if (!isLinkedDevice || !linkedUserId) {
         // Dispositivo no vinculado - mostrar login tradicional
         setAuthMethod("password");
         return;
@@ -122,26 +224,27 @@ export default function EnhancedLoginScreen() {
         return;
       }
 
-      // Dispositivo vinculado - usar método preferido
-      if (canUseBiometric) {
-        setAuthMethod("biometric");
-        // Auto-intentar biometría después de un breve delay
-        setTimeout(() => handleBiometricAuth(), 800);
-      } else if (hasPin) {
-        setAuthMethod("pin");
-      } else {
-        // Dispositivo vinculado pero sin métodos de auth configurados
-        setAuthMethod("setup");
-        setShowPinSetup(true);
-      }
+      // 🔧 CARGAR DATOS REALES DEL USUARIO
+      const loadedProfile = await loadUserFromStorage();
+      if (loadedProfile) {
+        setUserProfile(loadedProfile);
 
-      // Simular perfil del usuario vinculado
-      if (linkedUserId) {
-        setUserProfile({
-          id: linkedUserId,
-          email: "usuario@ejemplo.com", // En producción obtener del storage o API
-          username: "Usuario"
-        });
+        // Dispositivo vinculado - usar método preferido
+        if (canUseBiometric) {
+          setAuthMethod("biometric");
+          // Auto-intentar biometría después de un breve delay
+          setTimeout(() => handleBiometricAuth(), 800);
+        } else if (hasPin) {
+          setAuthMethod("pin");
+        } else {
+          // Dispositivo vinculado pero sin métodos de auth configurados
+          setAuthMethod("setup");
+          setShowPinSetup(true);
+        }
+      } else {
+        // No se pudieron cargar datos del usuario
+        console.warn("Could not load user data, falling back to password login");
+        setAuthMethod("password");
       }
 
     } catch (error) {
@@ -186,6 +289,9 @@ export default function EnhancedLoginScreen() {
   };
 
   const handleLoginError = (errorMessage: string) => {
+    // Limpiar campos en caso de error
+    setPassword("");
+    
     if (errorMessage.includes("EMAIL_NOT_VERIFIED")) {
       try {
         const errorData = JSON.parse(errorMessage);
@@ -204,10 +310,12 @@ export default function EnhancedLoginScreen() {
       }
     } else if (errorMessage.includes("DEVICE_ALREADY_LINKED")) {
       showToast("error", "Dispositivo no autorizado", "Este dispositivo ya está vinculado a otra cuenta");
-    } else if (errorMessage.includes("Usuario no encontrado")) {
+    } else if (errorMessage.includes("Usuario no encontrado") || errorMessage.includes("User not found")) {
       showToast("error", "Usuario no encontrado", "Verifica tu email o regístrate");
-    } else if (errorMessage.includes("Contraseña incorrecta")) {
+    } else if (errorMessage.includes("Contraseña incorrecta") || errorMessage.includes("Invalid password")) {
       showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
+    } else if (errorMessage.includes("token") || errorMessage.includes("unauthorized")) {
+      handleTokenExpired();
     } else {
       showToast("error", "Error de login", errorMessage);
     }
@@ -225,7 +333,7 @@ export default function EnhancedLoginScreen() {
       return;
     }
 
-    login({ variables: { email, password } });
+    login({ variables: { email: email.toLowerCase().trim(), password } });
   };
 
   const handleBiometricAuth = async () => {
@@ -259,6 +367,7 @@ export default function EnhancedLoginScreen() {
 
   const handlePinAuth = async (pin: string) => {
     try {
+      setPinError(""); // Limpiar error previo
       const result = await verifyPin(pin);
 
       if (result.success) {
@@ -285,6 +394,7 @@ export default function EnhancedLoginScreen() {
         }
       }
     } catch (error) {
+      console.error("PIN verification error:", error);
       setPinError("Error al verificar PIN");
     }
   };
@@ -326,6 +436,14 @@ export default function EnhancedLoginScreen() {
     setPinError("");
     setEmail("");
     setPassword("");
+  };
+
+  // 🔧 FUNCIÓN PARA OBTENER AVATAR DEL USUARIO
+  const getUserAvatar = () => {
+    if (userProfile?.profilePictureUrl) {
+      return { uri: userProfile.profilePictureUrl };
+    }
+    return null;
   };
 
   const renderAuthMethod = () => {
@@ -370,11 +488,23 @@ export default function EnhancedLoginScreen() {
         return (
           <View style={styles.authContainer}>
             <View style={styles.userInfo}>
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={32} color="#FFF" />
+              <View style={styles.avatarContainer}>
+                {userProfile?.profilePictureUrl ? (
+                  <Image 
+                    source={{ uri: userProfile.profilePictureUrl }} 
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="person" size={32} color="#FFF" />
+                  </View>
+                )}
               </View>
               <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-              <Text style={styles.userEmail}>{userProfile?.email || "Usuario"}</Text>
+              <Text style={styles.userDisplayName}>
+                {userProfile?.fullName || userProfile?.username || "Usuario"}
+              </Text>
+              <Text style={styles.userEmail}>{userProfile?.email}</Text>
             </View>
 
             <PinInput
@@ -402,11 +532,23 @@ export default function EnhancedLoginScreen() {
         return (
           <View style={styles.authContainer}>
             <View style={styles.userInfo}>
-              <View style={styles.avatarPlaceholder}>
-                <Ionicons name="person" size={32} color="#FFF" />
+              <View style={styles.avatarContainer}>
+                {userProfile?.profilePictureUrl ? (
+                  <Image 
+                    source={{ uri: userProfile.profilePictureUrl }} 
+                    style={styles.avatarImage}
+                  />
+                ) : (
+                  <View style={styles.avatarPlaceholder}>
+                    <Ionicons name="person" size={32} color="#FFF" />
+                  </View>
+                )}
               </View>
               <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-              <Text style={styles.userEmail}>{userProfile?.email || "Usuario"}</Text>
+              <Text style={styles.userDisplayName}>
+                {userProfile?.fullName || userProfile?.username || "Usuario"}
+              </Text>
+              <Text style={styles.userEmail}>{userProfile?.email}</Text>
             </View>
 
             <View style={styles.biometricSection}>
@@ -486,6 +628,8 @@ export default function EnhancedLoginScreen() {
                   value={email}
                   onChangeText={setEmail}
                   editable={!loginLoading}
+                  autoComplete="email"
+                  textContentType="emailAddress"
                 />
               </View>
             </View>
@@ -507,6 +651,8 @@ export default function EnhancedLoginScreen() {
                   value={password}
                   onChangeText={setPassword}
                   editable={!loginLoading}
+                  autoComplete="password"
+                  textContentType="password"
                 />
                 <TouchableOpacity
                   style={styles.passwordToggle}
@@ -568,14 +714,16 @@ export default function EnhancedLoginScreen() {
     }
   };
 
-  if (authLoading) {
+  if (authLoading || profileLoading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <StatusBar style="light" />
         <View style={styles.loadingScreen}>
           <QuipukLogo width={120} height={60} />
           <ActivityIndicator size="large" color="#00c450" style={{ marginTop: 30 }} />
-          <Text style={styles.loadingText}>Verificando dispositivo...</Text>
+          <Text style={styles.loadingText}>
+            {authLoading ? "Verificando dispositivo..." : "Cargando perfil..."}
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -856,6 +1004,23 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 40,
   },
+  avatarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 40,
+  },
   avatarPlaceholder: {
     width: 80,
     height: 80,
@@ -863,17 +1028,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#00c450",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 16,
   },
   welcomeText: {
     fontSize: 24,
     fontWeight: "700",
     color: "#1a1a1a",
-    marginBottom: 8,
+    marginBottom: 4,
     fontFamily: "Outfit_700Bold",
   },
+  userDisplayName: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 4,
+    fontFamily: "Outfit_600SemiBold",
+  },
   userEmail: {
-    fontSize: 16,
+    fontSize: 14,
     color: "#666",
     fontFamily: "Outfit_400Regular",
   },
