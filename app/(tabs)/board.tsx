@@ -1,12 +1,12 @@
-// app/(tabs)/board.tsx
+// app/(tabs)/board.tsx - IMPORTS CORREGIDOS CON RUTAS ABSOLUTAS
 import React, { useCallback, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@apollo/client';
 import { ThemedView } from "@/components/ThemedView";
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
-import { globalStyles } from '../styles/globalStyles';
-import { GET_TRANSACTIONS } from '../graphql/transaction.graphql';
+import { globalStyles } from '@/app/styles/globalStyles'; // 🔧 CAMBIADO A RUTA ABSOLUTA
+import { GET_TRANSACTIONS } from '@/app/graphql/transaction.graphql'; // 🔧 CAMBIADO A RUTA ABSOLUTA
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Import all chart components

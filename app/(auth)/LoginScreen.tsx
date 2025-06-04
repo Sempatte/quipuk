@@ -1,3 +1,4 @@
+// app/(auth)/LoginScreen.tsx - SOLO CAMBIAR IMPORTS PROBLEMÁTICOS
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -30,11 +31,13 @@ import { BiometricSetupModal } from "@/components/BiometricSetupModal";
 import { PinSetup } from "@/components/ui/PinSetup";
 
 import QuipukLogo from "@/assets/images/Logo.svg";
+
+import { useBlackStatusBar } from "@/hooks/useStatusBar";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
-import { useBlackStatusBar } from "@/hooks/useStatusBar";
 
 const { width, height } = Dimensions.get("window");
+
 
 interface UserProfile {
   id: number;

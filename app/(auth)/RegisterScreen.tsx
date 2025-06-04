@@ -1,4 +1,4 @@
-// app/RegisterScreen.tsx - Mejorado con Zod y mejor diseño
+// app/(auth)/RegisterScreen.tsx - IMPORTS CORREGIDOS CON RUTAS ABSOLUTAS
 import React, { useState } from "react";
 import {
   View,
@@ -18,12 +18,12 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { emailVerificationService } from "../services/emailVerificationService";
-import { useToast } from "../providers/ToastProvider";
+import { emailVerificationService } from "@/app/services/emailVerificationService"; // 🔧 RUTA ABSOLUTA
+import { useToast } from "@/app/providers/ToastProvider"; // 🔧 RUTA ABSOLUTA
 import { useRegisterForm } from "@/hooks/useRegisterForm";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import QuipukLogo from "@/assets/images/Logo.svg";
-import { defaultCountry, getCountryByCode } from "../contants/countries";
+import { defaultCountry, getCountryByCode } from "@/app/contants/countries"; // 🔧 RUTA ABSOLUTA
 
 const { width, height } = Dimensions.get("window");
 

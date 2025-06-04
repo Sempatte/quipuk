@@ -449,3 +449,4 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
 });
+
