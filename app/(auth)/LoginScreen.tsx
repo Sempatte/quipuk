@@ -1,4 +1,4 @@
-// app/(auth)/LoginScreen.tsx - PRODUCTION READY
+// app/(auth)/AuthenticationScreen.tsx - FLUJO MEJORADO
 import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
@@ -23,6 +23,7 @@ import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from 'expo-haptics';
 
 import { PinInput } from "@/components/ui/PinInput";
 import { BiometricSetupModal } from "@/components/BiometricSetupModal";
@@ -44,9 +45,23 @@ interface UserProfile {
   profilePictureUrl?: string;
 }
 
-type AuthMethod = "biometric" | "pin" | "password" | "setup" | "blocked";
+type AuthStep = 
+  | "loading"           // Verificando estado inicial
+  | "biometric"         // Face ID disponible
+  | "pin"              // PIN requerido
+  | "setup"            // Configuración inicial
+  | "blocked"          // Dispositivo bloqueado
+  | "traditional"      // Login con email/password
+  | "registration";    // Permitir registro
 
-export default function ProductionLoginScreen() {
+interface AuthState {
+  step: AuthStep;
+  userProfile: UserProfile | null;
+  error: string | null;
+  attempts: number;
+}
+
+export default function LoginScren() {
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -55,12 +70,17 @@ export default function ProductionLoginScreen() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Estados del sistema de autenticación avanzada
-  const [authMethod, setAuthMethod] = useState<AuthMethod>("password");
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  // Estado principal de autenticación
+  const [authState, setAuthState] = useState<AuthState>({
+    step: "loading",
+    userProfile: null,
+    error: null,
+    attempts: 0,
+  });
+
+  // Estados para modales
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
-  const [pinError, setPinError] = useState<string>("");
 
   // Hook de autenticación mejorada
   const {
@@ -77,27 +97,29 @@ export default function ProductionLoginScreen() {
     loadAuthState
   } = useAuth();
 
-  // Query para obtener datos del usuario (solo cuando tenemos token)
+  // Query para datos del usuario (solo cuando hay usuario vinculado)
   const { data: userProfileData, loading: profileLoading, refetch: refetchProfile } = useQuery(
     GET_USER_PROFILE,
     {
-      skip: !linkedUserId, // Solo ejecutar si hay usuario vinculado
+      skip: !linkedUserId,
       fetchPolicy: 'cache-first',
-      errorPolicy: 'ignore', // Ignorar errores para evitar crashes
+      errorPolicy: 'ignore',
       onCompleted: (data) => {
         if (data?.getUserProfile) {
-          setUserProfile({
-            id: data.getUserProfile.id,
-            email: data.getUserProfile.email,
-            username: data.getUserProfile.username,
-            fullName: data.getUserProfile.fullName,
-            profilePictureUrl: data.getUserProfile.profilePictureUrl
-          });
+          setAuthState(prev => ({
+            ...prev,
+            userProfile: {
+              id: data.getUserProfile.id,
+              email: data.getUserProfile.email,
+              username: data.getUserProfile.username,
+              fullName: data.getUserProfile.fullName,
+              profilePictureUrl: data.getUserProfile.profilePictureUrl
+            }
+          }));
         }
       },
       onError: (error) => {
         console.warn("Error loading user profile:", error);
-        // Si hay error de token, limpiar datos
         if (error.message.includes("token") || error.message.includes("unauthorized")) {
           handleTokenExpired();
         }
@@ -124,7 +146,7 @@ export default function ProductionLoginScreen() {
             profilePictureUrl: user.profilePictureUrl
           };
 
-          setUserProfile(profile);
+          setAuthState(prev => ({ ...prev, userProfile: profile }));
           await handleSuccessfulLogin(profile);
         } catch (error) {
           console.error("Error storing auth data:", error);
@@ -133,26 +155,39 @@ export default function ProductionLoginScreen() {
       }
     },
     onError: (error) => {
-      console.log("Login error:", error);
       handleLoginError(error.message);
     },
   });
 
-  // 🔧 FUNCIÓN PARA CARGAR DATOS DEL USUARIO DESDE STORAGE/API
-  const loadUserFromStorage = useCallback(async (): Promise<UserProfile | null> => {
+  // 🎯 FLUJO PRINCIPAL: Determinar paso de autenticación
+  const determineAuthStep = useCallback(async () => {
     try {
-      const [storedUserId, token] = await Promise.all([
-        AsyncStorage.getItem("userId"),
-        AsyncStorage.getItem("token")
-      ]);
-
-      if (!storedUserId || !token) {
-        return null;
+      console.log("🔍 Determinando paso de autenticación...");
+      
+      if (authLoading || profileLoading) {
+        setAuthState(prev => ({ ...prev, step: "loading" }));
+        return;
       }
 
-      // Si tenemos datos en el query, usarlos
-      if (userProfileData?.getUserProfile) {
-        return {
+      // 1. Si no hay dispositivo vinculado -> Permitir login tradicional
+      if (!isLinkedDevice || !linkedUserId) {
+        console.log("📱 Dispositivo no vinculado -> Login tradicional");
+        setAuthState(prev => ({ 
+          ...prev, 
+          step: "traditional",
+          userProfile: null 
+        }));
+        return;
+      }
+
+      // 2. Dispositivo vinculado -> Cargar perfil del usuario
+      console.log("📱 Dispositivo vinculado al usuario:", linkedUserId);
+      
+      // Intentar cargar perfil desde varios métodos
+      let userProfile = authState.userProfile;
+      
+      if (!userProfile && userProfileData?.getUserProfile) {
+        userProfile = {
           id: userProfileData.getUserProfile.id,
           email: userProfileData.getUserProfile.email,
           username: userProfileData.getUserProfile.username,
@@ -161,102 +196,201 @@ export default function ProductionLoginScreen() {
         };
       }
 
-      // Si no, intentar refetch
-      try {
-        const { data } = await refetchProfile();
-        if (data?.getUserProfile) {
-          return {
-            id: data.getUserProfile.id,
-            email: data.getUserProfile.email,
-            username: data.getUserProfile.username,
-            fullName: data.getUserProfile.fullName,
-            profilePictureUrl: data.getUserProfile.profilePictureUrl
-          };
-        }
-      } catch (refetchError) {
-        console.warn("Error refetching profile:", refetchError);
+      if (!userProfile) {
+        // Fallback: crear perfil mínimo
+        userProfile = {
+          id: linkedUserId,
+          email: "usuario@ejemplo.com",
+          username: "Usuario",
+          fullName: "Usuario"
+        };
       }
 
-      // Fallback: crear perfil mínimo desde storage
-      return {
-        id: parseInt(storedUserId, 10),
-        email: "usuario@ejemplo.com", // Se actualizará cuando cargue la API
-        username: "Usuario",
-        fullName: "Usuario"
-      };
+      setAuthState(prev => ({ ...prev, userProfile }));
+
+      // 3. Verificar si el dispositivo está bloqueado
+      if (pinConfig.isLocked) {
+        console.log("🔒 Dispositivo bloqueado");
+        setAuthState(prev => ({ ...prev, step: "blocked" }));
+        return;
+      }
+
+      // 4. Verificar configuración de autenticación
+      if (canUseBiometric) {
+        console.log("📱 Face ID disponible -> Mostrar biométrico");
+        setAuthState(prev => ({ ...prev, step: "biometric" }));
+        
+        // Auto-intentar biometría después de un delay
+        setTimeout(() => handleBiometricAuth(), 1000);
+        return;
+      }
+
+      if (hasPin) {
+        console.log("🔢 PIN configurado -> Mostrar PIN");
+        setAuthState(prev => ({ ...prev, step: "pin" }));
+        return;
+      }
+
+      // 5. Dispositivo vinculado pero sin configuración -> Setup
+      console.log("⚙️ Dispositivo sin configuración -> Setup");
+      setAuthState(prev => ({ ...prev, step: "setup" }));
+      setShowPinSetup(true);
 
     } catch (error) {
-      console.error("Error loading user from storage:", error);
-      return null;
+      console.error("❌ Error determinando auth step:", error);
+      setAuthState(prev => ({ 
+        ...prev, 
+        step: "traditional",
+        error: "Error de configuración"
+      }));
     }
-  }, [userProfileData, refetchProfile]);
+  }, [
+    authLoading, 
+    profileLoading, 
+    isLinkedDevice, 
+    linkedUserId, 
+    canUseBiometric, 
+    hasPin, 
+    pinConfig,
+    userProfileData,
+    authState.userProfile
+  ]);
 
-  // 🔧 FUNCIÓN PARA MANEJAR TOKEN EXPIRADO
+  // Efecto principal para determinar el paso
+  useEffect(() => {
+    determineAuthStep();
+  }, [determineAuthStep]);
+
+  // 🎯 HANDLERS DE AUTENTICACIÓN
+
   const handleTokenExpired = useCallback(async () => {
     try {
       await AsyncStorage.multiRemove(["token", "userId"]);
-      setUserProfile(null);
-      setAuthMethod("password");
-      await loadAuthState(); // Recargar estado de auth
+      setAuthState(prev => ({ 
+        ...prev, 
+        step: "traditional",
+        userProfile: null,
+        error: null 
+      }));
+      await loadAuthState();
     } catch (error) {
       console.error("Error handling token expiration:", error);
     }
   }, [loadAuthState]);
 
-  // Efecto para determinar método de autenticación al cargar
-  useEffect(() => {
-    if (authLoading || profileLoading) return;
-
-    determineInitialAuthMethod();
-  }, [authLoading, profileLoading, isLinkedDevice, linkedUserId, canUseBiometric, hasPin, pinConfig]);
-
-  const determineInitialAuthMethod = async () => {
+  const handleBiometricAuth = async () => {
     try {
-      if (!isLinkedDevice || !linkedUserId) {
-        // Dispositivo no vinculado - mostrar login tradicional
-        setAuthMethod("password");
-        return;
+      if (Platform.OS === 'ios') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
 
-      if (pinConfig.isLocked) {
-        // Dispositivo bloqueado
-        setAuthMethod("blocked");
-        return;
-      }
+      const result = await authenticateWithBiometric();
 
-      // 🔧 CARGAR DATOS REALES DEL USUARIO
-      const loadedProfile = await loadUserFromStorage();
-      if (loadedProfile) {
-        setUserProfile(loadedProfile);
-
-        // Dispositivo vinculado - usar método preferido
-        if (canUseBiometric) {
-          setAuthMethod("biometric");
-          // Auto-intentar biometría después de un breve delay
-          setTimeout(() => handleBiometricAuth(), 800);
-        } else if (hasPin) {
-          setAuthMethod("pin");
+      if (result.success) {
+        navigateToApp();
+      } else if (result.requiresManualLogin) {
+        if (hasPin) {
+          setAuthState(prev => ({ ...prev, step: "pin" }));
+          showToast("info", "Face ID falló", "Usa tu PIN para acceder");
         } else {
-          // Dispositivo vinculado pero sin métodos de auth configurados
-          setAuthMethod("setup");
-          setShowPinSetup(true);
+          setAuthState(prev => ({ ...prev, step: "traditional", userProfile: null }));
+          showToast("info", "Face ID falló", "Inicia sesión con tu contraseña");
         }
       } else {
-        // No se pudieron cargar datos del usuario
-        console.warn("Could not load user data, falling back to password login");
-        setAuthMethod("password");
+        Alert.alert(
+          "Face ID",
+          result.error || "Autenticación fallida",
+          [
+            { text: "Reintentar", onPress: handleBiometricAuth },
+            { 
+              text: hasPin ? "Usar PIN" : "Usar contraseña", 
+              onPress: () => {
+                if (hasPin) {
+                  setAuthState(prev => ({ ...prev, step: "pin" }));
+                } else {
+                  setAuthState(prev => ({ ...prev, step: "traditional", userProfile: null }));
+                }
+              }
+            }
+          ]
+        );
       }
-
     } catch (error) {
-      console.error("Error determining auth method:", error);
-      setAuthMethod("password");
+      console.error("Biometric auth error:", error);
+      if (hasPin) {
+        setAuthState(prev => ({ ...prev, step: "pin" }));
+      } else {
+        setAuthState(prev => ({ ...prev, step: "traditional", userProfile: null }));
+      }
     }
+  };
+
+  const handlePinAuth = async (pin: string) => {
+    try {
+      const result = await verifyPin(pin);
+
+      if (result.success) {
+        navigateToApp();
+      } else {
+        setAuthState(prev => ({ 
+          ...prev, 
+          error: result.error || "PIN incorrecto",
+          attempts: prev.attempts + 1 
+        }));
+
+        if (Platform.OS === 'ios') {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        }
+
+        if (result.isLocked) {
+          setAuthState(prev => ({ ...prev, step: "blocked" }));
+          Alert.alert(
+            "Dispositivo bloqueado",
+            `Tu dispositivo está bloqueado por ${result.lockDuration} minutos debido a múltiples intentos fallidos.`,
+            [
+              {
+                text: "Usar contraseña",
+                onPress: () => {
+                  setAuthState(prev => ({ 
+                    ...prev, 
+                    step: "traditional",
+                    userProfile: null 
+                  }));
+                },
+              },
+              { text: "OK" },
+            ]
+          );
+        }
+      }
+    } catch (error) {
+      console.error("PIN verification error:", error);
+      setAuthState(prev => ({ 
+        ...prev, 
+        error: "Error al verificar PIN" 
+      }));
+    }
+  };
+
+  const handleTraditionalLogin = () => {
+    if (!email || !password) {
+      showToast("error", "Error", "Todos los campos son obligatorios");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      showToast("error", "Error", "Ingresa un email válido");
+      return;
+    }
+
+    login({ variables: { email: email.toLowerCase().trim(), password } });
   };
 
   const handleSuccessfulLogin = async (profile: UserProfile) => {
     try {
       if (!isLinkedDevice) {
-        // Primer login - vincular dispositivo
+        // Primer login -> Vincular dispositivo
         const linkSuccess = await linkDevice(profile.id);
         
         if (!linkSuccess) {
@@ -264,8 +398,8 @@ export default function ProductionLoginScreen() {
           return;
         }
 
-        // Después de vincular, configurar PIN
-        setAuthMethod("setup");
+        // Después de vincular -> Configurar PIN
+        setAuthState(prev => ({ ...prev, step: "setup" }));
         setShowPinSetup(true);
         return;
       }
@@ -275,11 +409,11 @@ export default function ProductionLoginScreen() {
       if (!canAccess) {
         showToast("error", "Acceso denegado", "Este dispositivo está vinculado a otra cuenta");
         await AsyncStorage.multiRemove(["token", "userId"]);
-        setAuthMethod("password");
+        setAuthState(prev => ({ ...prev, step: "traditional" }));
         return;
       }
 
-      // Login exitoso - ir a la app
+      // Login exitoso -> Ir a la app
       navigateToApp();
       
     } catch (error) {
@@ -289,7 +423,6 @@ export default function ProductionLoginScreen() {
   };
 
   const handleLoginError = (errorMessage: string) => {
-    // Limpiar campos en caso de error
     setPassword("");
     
     if (errorMessage.includes("EMAIL_NOT_VERIFIED")) {
@@ -310,92 +443,8 @@ export default function ProductionLoginScreen() {
       }
     } else if (errorMessage.includes("DEVICE_ALREADY_LINKED")) {
       showToast("error", "Dispositivo no autorizado", "Este dispositivo ya está vinculado a otra cuenta");
-    } else if (errorMessage.includes("Usuario no encontrado") || errorMessage.includes("User not found")) {
-      showToast("error", "Usuario no encontrado", "Verifica tu email o regístrate");
-    } else if (errorMessage.includes("Contraseña incorrecta") || errorMessage.includes("Invalid password")) {
-      showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
-    } else if (errorMessage.includes("token") || errorMessage.includes("unauthorized")) {
-      handleTokenExpired();
     } else {
       showToast("error", "Error de login", errorMessage);
-    }
-  };
-
-  const handleTraditionalLogin = () => {
-    if (!email || !password) {
-      showToast("error", "Error", "Todos los campos son obligatorios");
-      return;
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      showToast("error", "Error", "Ingresa un email válido");
-      return;
-    }
-
-    login({ variables: { email: email.toLowerCase().trim(), password } });
-  };
-
-  const handleBiometricAuth = async () => {
-    try {
-      const result = await authenticateWithBiometric();
-
-      if (result.success) {
-        navigateToApp();
-      } else if (result.requiresManualLogin) {
-        if (hasPin) {
-          setAuthMethod("pin");
-          showToast("info", "Face ID falló", "Usa tu PIN para acceder");
-        } else {
-          setAuthMethod("password");
-          setUserProfile(null);
-          showToast("info", "Face ID falló", "Inicia sesión con tu contraseña");
-        }
-      } else {
-        Alert.alert("Face ID", result.error || "Autenticación fallida");
-      }
-    } catch (error) {
-      console.error("Biometric auth error:", error);
-      if (hasPin) {
-        setAuthMethod("pin");
-      } else {
-        setAuthMethod("password");
-        setUserProfile(null);
-      }
-    }
-  };
-
-  const handlePinAuth = async (pin: string) => {
-    try {
-      setPinError(""); // Limpiar error previo
-      const result = await verifyPin(pin);
-
-      if (result.success) {
-        navigateToApp();
-      } else {
-        setPinError(result.error || "PIN incorrecto");
-
-        if (result.isLocked) {
-          setAuthMethod("blocked");
-          Alert.alert(
-            "Dispositivo bloqueado",
-            `Tu dispositivo está bloqueado por ${result.lockDuration} minutos debido a múltiples intentos fallidos.`,
-            [
-              {
-                text: "Usar contraseña",
-                onPress: () => {
-                  setAuthMethod("password");
-                  setUserProfile(null);
-                },
-              },
-              { text: "OK" },
-            ]
-          );
-        }
-      }
-    } catch (error) {
-      console.error("PIN verification error:", error);
-      setPinError("Error al verificar PIN");
     }
   };
 
@@ -403,14 +452,12 @@ export default function ProductionLoginScreen() {
     setShowPinSetup(false);
 
     if (success) {
-      // PIN creado exitosamente
       if (canUseBiometric) {
         setShowBiometricSetup(true);
       } else {
         navigateToApp();
       }
     } else {
-      // Usuario saltó la configuración del PIN
       navigateToApp();
     }
   };
@@ -419,7 +466,7 @@ export default function ProductionLoginScreen() {
     setShowBiometricSetup(false);
 
     if (enabled) {
-      setAuthMethod("biometric");
+      setAuthState(prev => ({ ...prev, step: "biometric" }));
       setTimeout(() => handleBiometricAuth(), 500);
     } else {
       navigateToApp();
@@ -430,98 +477,84 @@ export default function ProductionLoginScreen() {
     router.replace("/(tabs)");
   };
 
-  const backToTraditionalLogin = () => {
-    setAuthMethod("password");
-    setUserProfile(null);
-    setPinError("");
+  const forceTraditionalLogin = () => {
+    setAuthState(prev => ({ 
+      ...prev, 
+      step: "traditional",
+      userProfile: null,
+      error: null,
+      attempts: 0 
+    }));
     setEmail("");
     setPassword("");
   };
 
-  // 🔧 FUNCIÓN PARA OBTENER AVATAR DEL USUARIO
-  const getUserAvatar = () => {
-    if (userProfile?.profilePictureUrl) {
-      return { uri: userProfile.profilePictureUrl };
-    }
-    return null;
-  };
+  // 🎯 RENDER BASED ON AUTH STEP
 
-  const renderAuthMethod = () => {
-    switch (authMethod) {
+  const renderContent = () => {
+    switch (authState.step) {
+      case "loading":
+        return (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#00c450" />
+            <Text style={styles.loadingText}>
+              {authLoading ? "Verificando dispositivo..." : "Cargando perfil..."}
+            </Text>
+          </View>
+        );
+
       case "blocked":
         return (
-          <View style={styles.authContainer}>
-            <View style={styles.blockedContainer}>
-              <Ionicons name="lock-closed" size={64} color="#E74C3C" />
-              <Text style={styles.blockedTitle}>Dispositivo Bloqueado</Text>
-              <Text style={styles.blockedMessage}>
-                Tu dispositivo está bloqueado por demasiados intentos fallidos.
-                {pinConfig.lockedUntil && (
-                  ` Intenta nuevamente después de las ${pinConfig.lockedUntil.toLocaleTimeString()}.`
-                )}
-              </Text>
-              
-              <TouchableOpacity
-                style={styles.fallbackButton}
-                onPress={backToTraditionalLogin}
-              >
-                <Text style={styles.fallbackText}>Iniciar sesión con contraseña</Text>
-              </TouchableOpacity>
-            </View>
+          <View style={styles.centeredContainer}>
+            <Ionicons name="lock-closed" size={64} color="#E74C3C" />
+            <Text style={styles.blockedTitle}>Dispositivo Bloqueado</Text>
+            <Text style={styles.blockedMessage}>
+              Tu dispositivo está bloqueado por demasiados intentos fallidos.
+              {pinConfig.lockedUntil && (
+                ` Intenta nuevamente después de las ${pinConfig.lockedUntil.toLocaleTimeString()}.`
+              )}
+            </Text>
+            
+            <TouchableOpacity
+              style={styles.fallbackButton}
+              onPress={forceTraditionalLogin}
+            >
+              <Text style={styles.fallbackText}>Iniciar sesión con contraseña</Text>
+            </TouchableOpacity>
           </View>
         );
 
       case "setup":
         return (
-          <View style={styles.authContainer}>
-            <View style={styles.setupContainer}>
-              <Ionicons name="settings-outline" size={64} color="#00c450" />
-              <Text style={styles.setupTitle}>Configuración Inicial</Text>
-              <Text style={styles.setupMessage}>
-                Configura un PIN para acceder rápidamente a tu cuenta en este dispositivo.
-              </Text>
-            </View>
+          <View style={styles.centeredContainer}>
+            <Ionicons name="settings-outline" size={64} color="#00c450" />
+            <Text style={styles.setupTitle}>Configuración Inicial</Text>
+            <Text style={styles.setupMessage}>
+              Configura un PIN para acceder rápidamente a tu cuenta en este dispositivo.
+            </Text>
           </View>
         );
 
       case "pin":
         return (
           <View style={styles.authContainer}>
-            <View style={styles.userInfo}>
-              <View style={styles.avatarContainer}>
-                {userProfile?.profilePictureUrl ? (
-                  <Image 
-                    source={{ uri: userProfile.profilePictureUrl }} 
-                    style={styles.avatarImage}
-                  />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Ionicons name="person" size={32} color="#FFF" />
-                  </View>
-                )}
-              </View>
-              <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-              <Text style={styles.userDisplayName}>
-                {userProfile?.fullName || userProfile?.username || "Usuario"}
-              </Text>
-              <Text style={styles.userEmail}>{userProfile?.email}</Text>
-            </View>
+            <UserProfileHeader userProfile={authState.userProfile} />
 
             <PinInput
               title="Ingresa tu PIN"
               subtitle="Usa tu PIN para acceder a Quipuk"
               maxLength={6}
               onComplete={handlePinAuth}
-              disabled={authLoading}
-              hasError={!!pinError}
-              errorMessage={pinError}
+              disabled={loginLoading}
+              hasError={!!authState.error}
+              errorMessage={authState.error || undefined}
               showForgotPin={true}
-              onForgotPin={backToTraditionalLogin}
+              onForgotPin={forceTraditionalLogin}
             />
 
             <TouchableOpacity
               style={styles.changeAccountButton}
-              onPress={backToTraditionalLogin}
+              onPress={forceTraditionalLogin}
             >
               <Text style={styles.changeAccountText}>Cambiar de cuenta</Text>
             </TouchableOpacity>
@@ -531,25 +564,7 @@ export default function ProductionLoginScreen() {
       case "biometric":
         return (
           <View style={styles.authContainer}>
-            <View style={styles.userInfo}>
-              <View style={styles.avatarContainer}>
-                {userProfile?.profilePictureUrl ? (
-                  <Image 
-                    source={{ uri: userProfile.profilePictureUrl }} 
-                    style={styles.avatarImage}
-                  />
-                ) : (
-                  <View style={styles.avatarPlaceholder}>
-                    <Ionicons name="person" size={32} color="#FFF" />
-                  </View>
-                )}
-              </View>
-              <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-              <Text style={styles.userDisplayName}>
-                {userProfile?.fullName || userProfile?.username || "Usuario"}
-              </Text>
-              <Text style={styles.userEmail}>{userProfile?.email}</Text>
-            </View>
+            <UserProfileHeader userProfile={authState.userProfile} />
 
             <View style={styles.biometricSection}>
               <Text style={styles.biometricTitle}>Accede con Face ID</Text>
@@ -572,7 +587,10 @@ export default function ProductionLoginScreen() {
 
               <TouchableOpacity
                 style={styles.fallbackButton}
-                onPress={() => setAuthMethod(hasPin ? "pin" : "password")}
+                onPress={() => setAuthState(prev => ({ 
+                  ...prev, 
+                  step: hasPin ? "pin" : "traditional" 
+                }))}
               >
                 <Text style={styles.fallbackText}>
                   {hasPin ? "Usar PIN" : "Usar contraseña"}
@@ -582,152 +600,161 @@ export default function ProductionLoginScreen() {
 
             <TouchableOpacity
               style={styles.changeAccountButton}
-              onPress={backToTraditionalLogin}
+              onPress={forceTraditionalLogin}
             >
               <Text style={styles.changeAccountText}>Cambiar de cuenta</Text>
             </TouchableOpacity>
           </View>
         );
 
-      case "password":
+      case "traditional":
+        return <TraditionalLoginForm />;
+
       default:
-        return (
-          <View style={styles.formContainer}>
-            <Text style={styles.welcomeTitle}>
-              Bienvenido a <Text style={styles.brandName}>Quipuk</Text>
-            </Text>
-            <Text style={styles.welcomeSubtitle}>
-              {isLinkedDevice ? "Inicia sesión para continuar" : "Inicia sesión o regístrate"}
-            </Text>
-
-            {isLinkedDevice && (
-              <View style={styles.deviceLinkedNotice}>
-                <Ionicons name="phone-portrait" size={20} color="#00c450" />
-                <Text style={styles.deviceLinkedText}>
-                  Este dispositivo está registrado
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Correo electrónico</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons 
-                  name="mail-outline" 
-                  size={20} 
-                  color="#666" 
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={styles.input}
-                  placeholder="tu@email.com"
-                  placeholderTextColor="#999"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={email}
-                  onChangeText={setEmail}
-                  editable={!loginLoading}
-                  autoComplete="email"
-                  textContentType="emailAddress"
-                />
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Contraseña</Text>
-              <View style={styles.inputWrapper}>
-                <Ionicons 
-                  name="lock-closed-outline" 
-                  size={20} 
-                  color="#666" 
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={[styles.input, styles.passwordInput]}
-                  placeholder="Tu contraseña"
-                  placeholderTextColor="#999"
-                  secureTextEntry={!showPassword}
-                  value={password}
-                  onChangeText={setPassword}
-                  editable={!loginLoading}
-                  autoComplete="password"
-                  textContentType="password"
-                />
-                <TouchableOpacity
-                  style={styles.passwordToggle}
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loginLoading}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color="#666"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity disabled={loginLoading}>
-                <Text style={[styles.forgotPassword, loginLoading && styles.disabledText]}>
-                  ¿Olvidaste tu contraseña?
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
-              onPress={handleTraditionalLogin}
-              disabled={loginLoading}
-              activeOpacity={0.8}
-            >
-              <LinearGradient
-                colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
-                style={styles.loginGradient}
-              >
-                {loginLoading ? (
-                  <View style={styles.loadingContainer}>
-                    <ActivityIndicator color="#FFF" size="small" />
-                    <Text style={styles.loginButtonText}>Ingresando...</Text>
-                  </View>
-                ) : (
-                  <Text style={styles.loginButtonText}>Ingresar</Text>
-                )}
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {!isLinkedDevice && (
-              <TouchableOpacity
-                onPress={() => router.push("/RegisterScreen")}
-                disabled={loginLoading}
-                style={styles.registerContainer}
-              >
-                <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
-                  ¿Aún no tienes una cuenta?{" "}
-                  <Text style={styles.registerLink}>Regístrate</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        );
+        return <TraditionalLoginForm />;
     }
   };
 
-  if (authLoading || profileLoading) {
+  // Componente para mostrar perfil del usuario
+  const UserProfileHeader = ({ userProfile }: { userProfile: UserProfile | null }) => {
+    if (!userProfile) return null;
+
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
-        <StatusBar style="light" />
-        <View style={styles.loadingScreen}>
-          <QuipukLogo width={120} height={60} />
-          <ActivityIndicator size="large" color="#00c450" style={{ marginTop: 30 }} />
-          <Text style={styles.loadingText}>
-            {authLoading ? "Verificando dispositivo..." : "Cargando perfil..."}
+      <View style={styles.userInfo}>
+        <View style={styles.avatarContainer}>
+          {userProfile.profilePictureUrl ? (
+            <Image 
+              source={{ uri: userProfile.profilePictureUrl }} 
+              style={styles.avatarImage}
+            />
+          ) : (
+            <View style={styles.avatarPlaceholder}>
+              <Ionicons name="person" size={32} color="#FFF" />
+            </View>
+          )}
+        </View>
+        <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
+        <Text style={styles.userDisplayName}>
+          {userProfile.fullName || userProfile.username}
+        </Text>
+        <Text style={styles.userEmail}>{userProfile.email}</Text>
+      </View>
+    );
+  };
+
+  // Componente para login tradicional
+  const TraditionalLoginForm = () => (
+    <View style={styles.formContainer}>
+      <Text style={styles.welcomeTitle}>
+        Bienvenido a <Text style={styles.brandName}>Quipuk</Text>
+      </Text>
+      <Text style={styles.welcomeSubtitle}>
+        {isLinkedDevice ? "Inicia sesión para continuar" : "Inicia sesión o regístrate"}
+      </Text>
+
+      {isLinkedDevice && (
+        <View style={styles.deviceLinkedNotice}>
+          <Ionicons name="phone-portrait" size={20} color="#00c450" />
+          <Text style={styles.deviceLinkedText}>
+            Este dispositivo está registrado
           </Text>
         </View>
-      </SafeAreaView>
-    );
-  }
+      )}
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Correo electrónico</Text>
+        <View style={styles.inputWrapper}>
+          <Ionicons 
+            name="mail-outline" 
+            size={20} 
+            color="#666" 
+            style={styles.inputIcon}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="tu@email.com"
+            placeholderTextColor="#999"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={setEmail}
+            editable={!loginLoading}
+            autoComplete="email"
+            textContentType="emailAddress"
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Contraseña</Text>
+        <View style={styles.inputWrapper}>
+          <Ionicons 
+            name="lock-closed-outline" 
+            size={20} 
+            color="#666" 
+            style={styles.inputIcon}
+          />
+          <TextInput
+            style={[styles.input, styles.passwordInput]}
+            placeholder="Tu contraseña"
+            placeholderTextColor="#999"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={setPassword}
+            editable={!loginLoading}
+            autoComplete="password"
+            textContentType="password"
+          />
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={() => setShowPassword(!showPassword)}
+            disabled={loginLoading}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
+        onPress={handleTraditionalLogin}
+        disabled={loginLoading}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
+          style={styles.loginGradient}
+        >
+          {loginLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#FFF" size="small" />
+              <Text style={styles.loginButtonText}>Ingresando...</Text>
+            </View>
+          ) : (
+            <Text style={styles.loginButtonText}>Ingresar</Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {!isLinkedDevice && (
+        <TouchableOpacity
+          onPress={() => router.push("/RegisterScreen")}
+          disabled={loginLoading}
+          style={styles.registerContainer}
+        >
+          <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
+            ¿Aún no tienes una cuenta?{" "}
+            <Text style={styles.registerLink}>Regístrate</Text>
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -743,6 +770,7 @@ export default function ProductionLoginScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
+            {/* Header con logo */}
             <LinearGradient
               colors={["#000000", "#1a1a1a"]}
               style={styles.logoContainer}
@@ -750,17 +778,19 @@ export default function ProductionLoginScreen() {
               <QuipukLogo width={120} height={60} />
             </LinearGradient>
 
+            {/* Contenido principal */}
             <View style={styles.contentContainer}>
-              {renderAuthMethod()}
+              {renderContent()}
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {userProfile && (
+      {/* Modales */}
+      {authState.userProfile && (
         <>
           <PinSetup
-            userId={userProfile.id}
+            userId={authState.userProfile.id}
             onComplete={handlePinSetupComplete}
             onSkip={() => handlePinSetupComplete(false)}
             visible={showPinSetup}
@@ -768,7 +798,7 @@ export default function ProductionLoginScreen() {
 
           <BiometricSetupModal
             visible={showBiometricSetup}
-            user={userProfile}
+            user={authState.userProfile}
             onComplete={handleBiometricSetupComplete}
           />
         </>
@@ -777,6 +807,7 @@ export default function ProductionLoginScreen() {
   );
 }
 
+// 🎨 ESTILOS OPTIMIZADOS
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -802,7 +833,9 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 24,
   },
-  loadingScreen: {
+
+  // Loading State
+  loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
@@ -815,8 +848,10 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
 
-  // Estados especiales
-  blockedContainer: {
+  // Centered States (blocked, setup)
+  centeredContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
@@ -837,10 +872,6 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     fontFamily: "Outfit_400Regular",
   },
-  setupContainer: {
-    alignItems: "center",
-    padding: 20,
-  },
   setupTitle: {
     fontSize: 24,
     fontWeight: "700",
@@ -858,144 +889,7 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
 
-  // Formulario tradicional
-  formContainer: {
-    flex: 1,
-  },
-  welcomeTitle: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#1a1a1a",
-    textAlign: "center",
-    marginBottom: 8,
-    fontFamily: "Outfit_700Bold",
-  },
-  brandName: {
-    color: "#00c450",
-  },
-  welcomeSubtitle: {
-    fontSize: 16,
-    color: "#666",
-    textAlign: "center",
-    marginBottom: 24,
-    fontFamily: "Outfit_400Regular",
-  },
-  deviceLinkedNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#E8F5E8",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 24,
-  },
-  deviceLinkedText: {
-    marginLeft: 8,
-    fontSize: 14,
-    color: "#2D5016",
-    fontFamily: "Outfit_500Medium",
-  },
-
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#333",
-    marginBottom: 8,
-    fontFamily: "Outfit_600SemiBold",
-  },
-  inputWrapper: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF",
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: "#E5E8EB",
-    paddingHorizontal: 16,
-    minHeight: 52,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  inputIcon: {
-    marginRight: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: "#1a1a1a",
-    fontFamily: "Outfit_400Regular",
-  },
-  passwordInput: {
-    paddingRight: 0,
-  },
-  passwordToggle: {
-    padding: 8,
-    marginLeft: 8,
-  },
-
-  optionsContainer: {
-    alignItems: "flex-end",
-    marginBottom: 24,
-  },
-  forgotPassword: {
-    fontSize: 14,
-    color: "#00c450",
-    fontFamily: "Outfit_500Medium",
-  },
-
-  loginButton: {
-    borderRadius: 25,
-    overflow: "hidden",
-    marginBottom: 24,
-    shadowColor: "#00c450",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  loginButtonDisabled: {
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  loginGradient: {
-    paddingVertical: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 52,
-  },
-  loadingContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  loginButtonText: {
-    fontSize: 18,
-    color: "#FFF",
-    fontWeight: "600",
-    marginLeft: 8,
-    fontFamily: "Outfit_600SemiBold",
-  },
-
-  registerContainer: {
-    alignItems: "center",
-    paddingVertical: 16,
-  },
-  registerText: {
-    fontSize: 14,
-    color: "#666",
-    fontFamily: "Outfit_400Regular",
-  },
-  registerLink: {
-    color: "#00c450",
-    fontWeight: "600",
-    fontFamily: "Outfit_600SemiBold",
-  },
-
-  // Estados de autenticación avanzada
+  // Auth Container (PIN, Biometric)
   authContainer: {
     flex: 1,
     alignItems: "center",
@@ -1049,6 +943,7 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
 
+  // Biometric Section
   biometricSection: {
     alignItems: "center",
     marginBottom: 40,
@@ -1091,7 +986,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Outfit_500Medium",
   },
-
   changeAccountButton: {
     alignSelf: "center",
     paddingVertical: 12,
@@ -1101,6 +995,133 @@ const styles = StyleSheet.create({
     color: "#666",
     fontSize: 14,
     fontFamily: "Outfit_400Regular",
+  },
+
+  // Traditional Form
+  formContainer: {
+    flex: 1,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    textAlign: "center",
+    marginBottom: 8,
+    fontFamily: "Outfit_700Bold",
+  },
+  brandName: {
+    color: "#00c450",
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 24,
+    fontFamily: "Outfit_400Regular",
+  },
+  deviceLinkedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F5E8",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  deviceLinkedText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#2D5016",
+    fontFamily: "Outfit_500Medium",
+  },
+
+  // Form Inputs
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E5E8EB",
+    paddingHorizontal: 16,
+    minHeight: 52,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: "#1a1a1a",
+    fontFamily: "Outfit_400Regular",
+  },
+  passwordInput: {
+    paddingRight: 0,
+  },
+  passwordToggle: {
+    padding: 8,
+    marginLeft: 8,
+  },
+
+  // Login Button
+  loginButton: {
+    borderRadius: 25,
+    overflow: "hidden",
+    marginBottom: 24,
+    marginTop: 16,
+    shadowColor: "#00c450",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  loginButtonDisabled: {
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  loginGradient: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 52,
+  },
+  loginButtonText: {
+    fontSize: 18,
+    color: "#FFF",
+    fontWeight: "600",
+    marginLeft: 8,
+    fontFamily: "Outfit_600SemiBold",
+  },
+
+  // Register Link
+  registerContainer: {
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  registerText: {
+    fontSize: 14,
+    color: "#666",
+    fontFamily: "Outfit_400Regular",
+  },
+  registerLink: {
+    color: "#00c450",
+    fontWeight: "600",
+    fontFamily: "Outfit_600SemiBold",
   },
   disabledText: {
     opacity: 0.5,

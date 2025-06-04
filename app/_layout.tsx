@@ -1,4 +1,4 @@
-// app/_layout.tsx - Enhanced with device management
+// app/_layout.tsx - ENHANCED WITH IMPROVED AUTH FLOW
 import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
@@ -31,142 +31,137 @@ import { deviceManagementService } from "./services/deviceManagementService";
 
 SplashScreen.preventAutoHideAsync();
 
-function AuthHandler() {
+// 🎯 ENHANCED: AuthHandler with better logic
+function EnhancedAuthHandler() {
   const segments = useSegments();
   const router = useRouter();
   const [authState, setAuthState] = useState<{
+    isChecking: boolean;
     isAuthenticated: boolean | null;
     isLinkedDevice: boolean | null;
     linkedUserId: number | null;
+    shouldNavigate: boolean;
   }>({
+    isChecking: true,
     isAuthenticated: null,
     isLinkedDevice: null,
     linkedUserId: null,
+    shouldNavigate: false,
   });
-  const [hasNavigated, setHasNavigated] = useState(false);
   
-  // Verificación de autenticación mejorada
-  useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        console.log("Checking enhanced auth status");
-        
-        const [token, userId, linkedUserId] = await Promise.all([
-          AsyncStorage.getItem("token"),
-          AsyncStorage.getItem("userId"),
-          deviceManagementService.getLinkedUser()
-        ]);
-        
-        const isAuth = !!(token && userId);
-        const isLinked = linkedUserId !== null;
-        
-        // Verificar coherencia entre autenticación y vinculación
-        if (isAuth && userId) {
-          const userIdNum = parseInt(userId, 10);
-          const canAccess = await deviceManagementService.canUserAccessDevice(userIdNum);
-          
-          if (!canAccess && isLinked) {
-            // Usuario autenticado pero dispositivo vinculado a otra cuenta
-            console.log("Device linked to different user, clearing auth");
-            await AsyncStorage.multiRemove(["token", "userId"]);
-            setAuthState({
-              isAuthenticated: false,
-              isLinkedDevice: true,
-              linkedUserId: linkedUserId
-            });
-            return;
-          }
-        }
-        
-        console.log("Auth state:", {
-          isAuth,
-          isLinked,
-          linkedUserId,
-          userId: userId ? parseInt(userId, 10) : null
-        });
-        
-        setAuthState({
-          isAuthenticated: isAuth,
-          isLinkedDevice: isLinked,
-          linkedUserId: linkedUserId
-        });
-      } catch (error) {
-        console.error("Error checking auth status:", error);
-        setAuthState({
-          isAuthenticated: false,
-          isLinkedDevice: false,
-          linkedUserId: null
-        });
-      }
-    };
+  // 🎯 IMPROVED: Single source of truth for auth verification
+  const checkCompleteAuthStatus = async () => {
+    try {
+      console.log("🔍 [Layout] Checking complete auth status");
+      
+      const [token, userId, linkedUserId] = await Promise.all([
+        AsyncStorage.getItem("token"),
+        AsyncStorage.getItem("userId"),
+        deviceManagementService.getLinkedUser()
+      ]);
+      
+      const isAuth = !!(token && userId);
+      const isLinked = linkedUserId !== null;
+      
+      // 🎯 ENHANCED: Better validation logic
+      let finalAuthState = {
+        isAuthenticated: false,
+        isLinkedDevice: isLinked,
+        linkedUserId: linkedUserId,
+      };
 
-    checkAuthStatus();
+      if (isAuth && userId) {
+        const userIdNum = parseInt(userId, 10);
+        
+        if (isLinked && linkedUserId !== userIdNum) {
+          // 🔧 FIX: Wrong user on linked device
+          console.log("❌ [Layout] Wrong user on linked device, clearing auth");
+          await AsyncStorage.multiRemove(["token", "userId"]);
+          finalAuthState.isAuthenticated = false;
+        } else if (isLinked) {
+          // ✅ Correct user on linked device
+          const canAccess = await deviceManagementService.canUserAccessDevice(userIdNum);
+          finalAuthState.isAuthenticated = canAccess;
+          
+          if (!canAccess) {
+            console.log("❌ [Layout] Access denied, clearing auth");
+            await AsyncStorage.multiRemove(["token", "userId"]);
+          }
+        } else {
+          // ✅ User authenticated on unlinked device
+          finalAuthState.isAuthenticated = true;
+        }
+      }
+      
+      console.log("✅ [Layout] Auth state determined:", finalAuthState);
+      
+      setAuthState(prev => ({
+        ...prev,
+        isChecking: false,
+        ...finalAuthState,
+        shouldNavigate: true
+      }));
+      
+    } catch (error) {
+      console.error("❌ [Layout] Error checking auth status:", error);
+      setAuthState(prev => ({
+        ...prev,
+        isChecking: false,
+        isAuthenticated: false,
+        isLinkedDevice: false,
+        linkedUserId: null,
+        shouldNavigate: true
+      }));
+    }
+  };
+
+  // Initial auth check
+  useEffect(() => {
+    checkCompleteAuthStatus();
   }, []);
 
-  // Navegación inteligente basada en estado de dispositivo
+  // 🎯 ENHANCED: Smarter navigation logic
   useEffect(() => {
-    if (authState.isAuthenticated === null || authState.isLinkedDevice === null) {
-      return; // Esperar verificación inicial
+    if (!authState.shouldNavigate || authState.isChecking) {
+      return; // Wait for initial check
     }
     
     const currentPath = `/${segments.join('/')}`;
     const isInTabsGroup = segments[0] === "(tabs)";
     const isInAuthRoute = currentPath.includes("LoginScreen") || 
                          currentPath.includes("RegisterScreen") || 
-                         currentPath.includes("EmailVerificationScreen");
+                         currentPath.includes("EmailVerificationScreen") ||
+                         currentPath.includes("AuthenticationScreen");
     
-    console.log("Evaluating enhanced navigation:", {
+    console.log("🧭 [Layout] Navigation evaluation:", {
       currentPath,
       isAuthenticated: authState.isAuthenticated,
       isLinkedDevice: authState.isLinkedDevice,
       linkedUserId: authState.linkedUserId,
       isInTabsGroup,
-      isInAuthRoute,
-      hasNavigated
+      isInAuthRoute
     });
 
-    // Casos de redirección mejorados
+    // 🎯 IMPROVED: Better navigation decisions
     if (!authState.isAuthenticated) {
-      if (isInTabsGroup || (!isInAuthRoute && !hasNavigated)) {
-        console.log("User not authenticated -> LoginScreen");
+      if (isInTabsGroup || (!isInAuthRoute && currentPath !== "/")) {
+        console.log("🔄 [Layout] Not authenticated -> AuthenticationScreen");
         router.replace("/LoginScreen");
-        setHasNavigated(true);
       }
-    } else if (authState.isAuthenticated) {
-      // Usuario autenticado
-      if (authState.isLinkedDevice && authState.linkedUserId) {
-        // Dispositivo vinculado - verificar si es el usuario correcto
-        const storedUserId = AsyncStorage.getItem("userId").then(id => {
-          if (id && parseInt(id, 10) === authState.linkedUserId) {
-            // Usuario correcto en dispositivo vinculado
-            if (isInAuthRoute || (!isInTabsGroup && !hasNavigated)) {
-              console.log("Authenticated user on linked device -> tabs");
-              router.replace("/(tabs)");
-              setHasNavigated(true);
-            }
-          } else {
-            // Usuario incorrecto en dispositivo vinculado
-            console.log("Wrong user on linked device -> LoginScreen");
-            AsyncStorage.multiRemove(["token", "userId"]);
-            router.replace("/LoginScreen");
-            setHasNavigated(true);
-          }
-        });
-      } else {
-        // Dispositivo no vinculado - proceder normalmente
-        if (isInAuthRoute || (!isInTabsGroup && !hasNavigated)) {
-          console.log("Authenticated user on unlinked device -> tabs");
-          router.replace("/(tabs)");
-          setHasNavigated(true);
-        }
+    } else {
+      // User is authenticated
+      if (isInAuthRoute || (!isInTabsGroup && currentPath !== "/")) {
+        console.log("🔄 [Layout] Authenticated -> tabs");
+        router.replace("/(tabs)");
       }
     }
-  }, [authState]);
+  }, [authState.shouldNavigate, authState.isChecking, authState.isAuthenticated, segments, router]);
 
   return null;
 }
 
-function MainLayout() {
+// 🎯 ENHANCED: MainLayout with better error handling
+function EnhancedMainLayout() {
   const colorScheme = useColorScheme();
   const { isBackendActive, isLoading } = useBackendHealth({
     showErrorToast: false,
@@ -183,48 +178,54 @@ function MainLayout() {
     Outfit_300Light,
   });
 
-  // Configuración global del StatusBar
+  // 🎯 ENHANCED: Global StatusBar configuration
   useEffect(() => {
-    console.log("Configuring global StatusBar");
-    
-    if (Platform.OS === "android") {
-      StatusBar.setBarStyle("light-content", true);
-      StatusBar.setBackgroundColor("#000000", true);
-      StatusBar.setTranslucent(false);
-    } else if (Platform.OS === "ios") {
-      StatusBar.setBarStyle("light-content", true);
-    }
-  }, []);
-
-  // Forzar StatusBar negro en cada cambio de ruta
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (Platform.OS === "android") {
-        StatusBar.setBarStyle("light-content");
-        StatusBar.setBackgroundColor("#000000");
-      } else if (Platform.OS === "ios") {
-        StatusBar.setBarStyle("light-content");
+    const configureGlobalStatusBar = () => {
+      console.log("⚙️ [Layout] Configuring global StatusBar");
+      
+      try {
+        if (Platform.OS === "android") {
+          StatusBar.setBarStyle("light-content", true);
+          StatusBar.setBackgroundColor("#000000", true);
+          StatusBar.setTranslucent(false);
+        } else if (Platform.OS === "ios") {
+          StatusBar.setBarStyle("light-content", true);
+        }
+      } catch (error) {
+        console.warn("⚠️ [Layout] StatusBar configuration failed:", error);
       }
-    }, 500);
+    };
+
+    configureGlobalStatusBar();
+
+    // 🔧 FIX: Periodic enforcement for stubborn cases
+    const interval = setInterval(configureGlobalStatusBar, 1000);
 
     return () => clearInterval(interval);
   }, []);
 
+  // Hide splash screen when ready
   useEffect(() => {
     if (fontsLoaded && !isLoading) {
+      console.log("✅ [Layout] Ready to show app, hiding splash");
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, isLoading]);
 
+  // Show loading states
   if (!fontsLoaded || isLoading) {
-    return null;
+    console.log("⏳ [Layout] Showing loading state");
+    return null; // SplashScreen is still visible
   }
 
+  // Show offline message
   if (!isBackendActive) {
+    console.log("📡 [Layout] Backend inactive, showing offline message");
     return <OfflineMessage />;
   }
 
-  const customTheme = {
+  // 🎯 ENHANCED: Better theme configuration
+  const enhancedTheme = {
     ...(colorScheme === "dark" ? DarkTheme : DefaultTheme),
     colors: {
       ...(colorScheme === "dark" ? DarkTheme.colors : DefaultTheme.colors),
@@ -234,34 +235,41 @@ function MainLayout() {
       text: "#000000",
       border: "#E5E8EB",
       notification: "#FF5252",
+      // 🆕 Additional theme colors
+      success: "#00DC5A",
+      warning: "#FF9800", 
+      error: "#FF5252",
+      info: "#2196F3",
     },
   };
 
   return (
-    <ThemeProvider value={customTheme}>
+    <ThemeProvider value={enhancedTheme}>
+      {/* 🎯 ENHANCED: More robust StatusBar */}
       <StatusBar 
         barStyle="light-content" 
         backgroundColor="#000000" 
         translucent={false}
         hidden={false}
-        animated={false}
+        animated={true}
         networkActivityIndicatorVisible={false}
-        showHideTransition="none"
+        showHideTransition="fade"
       />
       
-      <AuthHandler />
+      <EnhancedAuthHandler />
       <Slot />
     </ThemeProvider>
   );
 }
 
-export default function RootLayout() {
+// 🎯 ENHANCED: Root component with better error boundaries
+export default function EnhancedRootLayout() {
   return (
     <SafeAreaProvider>
       <ApolloProvider client={client}>
         <FontProvider>
           <ToastProvider>
-            <MainLayout />
+            <EnhancedMainLayout />
           </ToastProvider>
         </FontProvider>
       </ApolloProvider>
