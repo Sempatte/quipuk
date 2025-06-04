@@ -18,12 +18,12 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { emailVerificationService } from "./services/emailVerificationService";
-import { useToast } from "./providers/ToastProvider";
+import { emailVerificationService } from "../services/emailVerificationService";
+import { useToast } from "../providers/ToastProvider";
 import { useRegisterForm } from "@/hooks/useRegisterForm";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import QuipukLogo from "@/assets/images/Logo.svg";
-import { defaultCountry, getCountryByCode } from "./contants/countries";
+import { defaultCountry, getCountryByCode } from "../contants/countries";
 
 const { width, height } = Dimensions.get("window");
 

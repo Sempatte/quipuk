@@ -1,4 +1,4 @@
-// app/(auth)/LoginScreen.tsx - NAVEGACIÓN CORREGIDA
+// app/(auth)/LoginScreen.tsx - DISEÑO MEJORADO CON SAFEAREAVIEW
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -12,11 +12,16 @@ import {
   Keyboard,
   ActivityIndicator,
   Alert,
+  ScrollView,
+  Dimensions,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import { useMutation } from "@apollo/client";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 // Imports del sistema de autenticación
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
@@ -26,8 +31,10 @@ import { BiometricSetupModal } from "@/components/BiometricSetupModal";
 import { PinSetup } from "@/components/ui/PinSetup";
 
 import QuipukLogo from "@/assets/images/Logo.svg";
-import { useToast } from "./providers/ToastProvider";
-import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
+import { useToast } from "../providers/ToastProvider";
+import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
+
+const { width, height } = Dimensions.get("window");
 
 interface UserProfile {
   id: number;
@@ -46,6 +53,7 @@ export default function LoginScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Estados del sistema de autenticación avanzada
   const [authMethod, setAuthMethod] = useState<AuthMethod>("password");
@@ -78,7 +86,6 @@ export default function LoginScreen() {
         await AsyncStorage.setItem("token", token);
         await AsyncStorage.setItem("userId", user.id.toString());
 
-        // Configurar perfil del usuario
         const profile: UserProfile = {
           id: user.id,
           email: user.email,
@@ -88,8 +95,6 @@ export default function LoginScreen() {
 
         setUserProfile(profile);
         setIsNewUser(false);
-
-        // Determinar método de autenticación según configuración
         await determineAuthMethod(profile);
 
         showToast(
@@ -111,7 +116,6 @@ export default function LoginScreen() {
             "Necesitas verificar tu email antes de iniciar sesión"
           );
 
-          // 🔥 NAVEGACIÓN CORREGIDA
           router.push({
             pathname: "/EmailVerificationScreen",
             params: {
@@ -141,7 +145,7 @@ export default function LoginScreen() {
     },
   });
 
-  // Función para generar ID único del dispositivo
+  // Funciones auxiliares
   const generateDeviceId = async (): Promise<string> => {
     let deviceId = await AsyncStorage.getItem("device_id");
     if (!deviceId) {
@@ -153,17 +157,9 @@ export default function LoginScreen() {
     return deviceId;
   };
 
-  // Determinar método de autenticación según configuración del usuario
   const determineAuthMethod = async (profile: UserProfile) => {
     const hasPin = pinConfig.hasPin;
     const hasBiometric = biometricEnabled;
-
-    console.log("🔍 Determinando método de auth:", {
-      hasPin,
-      hasBiometric,
-      biometricAvailable,
-      isNewUser,
-    });
 
     if (!hasPin && !hasBiometric) {
       setAuthMethod("setup");
@@ -185,7 +181,6 @@ export default function LoginScreen() {
     navigateToApp();
   };
 
-  // Manejar login tradicional con email/contraseña
   const handleTraditionalLogin = () => {
     if (!email || !password) {
       showToast("error", "Error", "Todos los campos son obligatorios.");
@@ -201,7 +196,6 @@ export default function LoginScreen() {
     login({ variables: { email, password } });
   };
 
-  // Manejar autenticación con Face ID
   const handleBiometricAuth = async () => {
     try {
       const result = await authenticateBiometric();
@@ -224,7 +218,6 @@ export default function LoginScreen() {
     }
   };
 
-  // Manejar autenticación con PIN
   const handlePinAuth = async (pin: string) => {
     if (!userProfile) return;
 
@@ -255,7 +248,6 @@ export default function LoginScreen() {
     }
   };
 
-  // Manejar completar setup de PIN
   const handlePinSetupComplete = (success: boolean) => {
     setShowPinSetup(false);
 
@@ -270,7 +262,6 @@ export default function LoginScreen() {
     }
   };
 
-  // Manejar completar setup de biometría
   const handleBiometricSetupComplete = (enabled: boolean) => {
     setShowBiometricSetup(false);
 
@@ -286,12 +277,10 @@ export default function LoginScreen() {
     }
   };
 
-  // 🔥 NAVEGACIÓN CORREGIDA
   const navigateToApp = () => {
     router.replace("/(tabs)");
   };
 
-  // Volver al login tradicional
   const backToTraditionalLogin = () => {
     setAuthMethod("password");
     setUserProfile(null);
@@ -306,8 +295,11 @@ export default function LoginScreen() {
 
       case "pin":
         return (
-          <View style={styles.pinContainer}>
+          <View style={styles.authContainer}>
             <View style={styles.userInfo}>
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={32} color="#FFF" />
+              </View>
               <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
               <Text style={styles.userEmail}>{userProfile?.email}</Text>
             </View>
@@ -335,31 +327,45 @@ export default function LoginScreen() {
 
       case "biometric":
         return (
-          <View style={styles.biometricContainer}>
+          <View style={styles.authContainer}>
             <View style={styles.userInfo}>
+              <View style={styles.avatarPlaceholder}>
+                <Ionicons name="person" size={32} color="#FFF" />
+              </View>
               <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
               <Text style={styles.userEmail}>{userProfile?.email}</Text>
             </View>
 
-            <Text style={styles.biometricTitle}>Accede con Face ID</Text>
-
-            <TouchableOpacity
-              style={styles.biometricButton}
-              onPress={handleBiometricAuth}
-            >
-              <Ionicons name="scan" size={40} color="white" />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.fallbackButton}
-              onPress={() =>
-                setAuthMethod(pinConfig.hasPin ? "pin" : "password")
-              }
-            >
-              <Text style={styles.fallbackText}>
-                {pinConfig.hasPin ? "Usar PIN" : "Usar contraseña"}
+            <View style={styles.biometricSection}>
+              <Text style={styles.biometricTitle}>Accede con Face ID</Text>
+              <Text style={styles.biometricSubtitle}>
+                Toca el botón para autenticarte
               </Text>
-            </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.biometricButton}
+                onPress={handleBiometricAuth}
+                activeOpacity={0.8}
+              >
+                <LinearGradient
+                  colors={["#007AFF", "#0056CC"]}
+                  style={styles.biometricGradient}
+                >
+                  <Ionicons name="scan" size={40} color="white" />
+                </LinearGradient>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.fallbackButton}
+                onPress={() =>
+                  setAuthMethod(pinConfig.hasPin ? "pin" : "password")
+                }
+              >
+                <Text style={styles.fallbackText}>
+                  {pinConfig.hasPin ? "Usar PIN" : "Usar contraseña"}
+                </Text>
+              </TouchableOpacity>
+            </View>
 
             <TouchableOpacity
               style={styles.changeAccountButton}
@@ -374,84 +380,119 @@ export default function LoginScreen() {
       default:
         return (
           <View style={styles.formContainer}>
-            <Text style={styles.label}>Correo</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ingrese su correo"
-              placeholderTextColor="#888"
-              keyboardType="email-address"
-              autoCapitalize="none"
-              value={email}
-              onChangeText={setEmail}
-              editable={!loginLoading}
-            />
+            <Text style={styles.welcomeTitle}>
+              Bienvenido a <Text style={styles.brandName}>Quipuk</Text>
+            </Text>
+            <Text style={styles.welcomeSubtitle}>
+              Inicia sesión para continuar
+            </Text>
 
-            <Text style={styles.label}>Contraseña</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Ingrese su contraseña"
-              placeholderTextColor="#888"
-              secureTextEntry
-              value={password}
-              onChangeText={setPassword}
-              editable={!loginLoading}
-            />
+            {/* Email Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Correo electrónico</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons 
+                  name="mail-outline" 
+                  size={20} 
+                  color="#666" 
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={styles.input}
+                  placeholder="tu@email.com"
+                  placeholderTextColor="#999"
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  value={email}
+                  onChangeText={setEmail}
+                  editable={!loginLoading}
+                />
+              </View>
+            </View>
 
+            {/* Password Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Contraseña</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons 
+                  name="lock-closed-outline" 
+                  size={20} 
+                  color="#666" 
+                  style={styles.inputIcon}
+                />
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  placeholder="Tu contraseña"
+                  placeholderTextColor="#999"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                  editable={!loginLoading}
+                />
+                <TouchableOpacity
+                  style={styles.passwordToggle}
+                  onPress={() => setShowPassword(!showPassword)}
+                  disabled={loginLoading}
+                >
+                  <Ionicons
+                    name={showPassword ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#666"
+                  />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Options */}
             <View style={styles.optionsContainer}>
               <TouchableOpacity
                 onPress={() => !loginLoading && setRememberMe(!rememberMe)}
                 disabled={loginLoading}
                 style={styles.checkboxContainer}
               >
-                <View style={styles.checkbox}>
-                  {rememberMe && <View style={styles.checked} />}
+                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
+                  {rememberMe && <Ionicons name="checkmark" size={14} color="#FFF" />}
                 </View>
-                <Text style={styles.optionText}>Recordarme</Text>
+                <Text style={styles.checkboxText}>Recordarme</Text>
               </TouchableOpacity>
 
               <TouchableOpacity disabled={loginLoading}>
-                <Text
-                  style={[
-                    styles.optionText,
-                    styles.forgotPassword,
-                    loginLoading && styles.disabledText,
-                  ]}
-                >
+                <Text style={[styles.forgotPassword, loginLoading && styles.disabledText]}>
                   ¿Olvidaste tu contraseña?
                 </Text>
               </TouchableOpacity>
             </View>
 
+            {/* Login Button */}
             <TouchableOpacity
-              style={[
-                styles.loginButton,
-                loginLoading && styles.loginButtonDisabled,
-              ]}
+              style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
               onPress={handleTraditionalLogin}
               disabled={loginLoading}
+              activeOpacity={0.8}
             >
-              {loginLoading ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator color="#FFF" />
-                  <Text style={styles.loadingText}>Ingresando...</Text>
-                </View>
-              ) : (
-                <Text style={styles.loginButtonText}>Ingresar</Text>
-              )}
+              <LinearGradient
+                colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
+                style={styles.loginGradient}
+              >
+                {loginLoading ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator color="#FFF" size="small" />
+                    <Text style={styles.loginButtonText}>Ingresando...</Text>
+                  </View>
+                ) : (
+                  <Text style={styles.loginButtonText}>Ingresar</Text>
+                )}
+              </LinearGradient>
             </TouchableOpacity>
 
+            {/* Register Link */}
             <TouchableOpacity
-              // 🔥 NAVEGACIÓN CORREGIDA
               onPress={() => router.push("/RegisterScreen")}
               disabled={loginLoading}
               style={styles.registerContainer}
             >
-              <Text
-                style={[
-                  styles.registerText,
-                  loginLoading && styles.disabledText,
-                ]}
-              >
+              <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
                 ¿Aún no tienes una cuenta?{" "}
                 <Text style={styles.registerLink}>Regístrate</Text>
               </Text>
@@ -462,21 +503,34 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.container}
-    >
-      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <View style={styles.inner}>
-          {/* Logo */}
-          <View style={styles.logoContainer}>
-            <QuipukLogo width={90} style={styles.logo} />
-          </View>
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar style="dark" backgroundColor="#000000" />
+      
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        style={styles.keyboardContainer}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <ScrollView 
+            contentContainerStyle={styles.scrollContainer}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Header with Logo */}
+            <LinearGradient
+              colors={["#000000", "#1a1a1a"]}
+              style={styles.logoContainer}
+            >
+              <QuipukLogo width={120} height={60} />
+            </LinearGradient>
 
-          {/* Método de autenticación actual */}
-          {renderAuthMethod()}
-        </View>
-      </TouchableWithoutFeedback>
+            {/* Auth Content */}
+            <View style={styles.contentContainer}>
+              {renderAuthMethod()}
+            </View>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
 
       {/* Modales */}
       {userProfile && (
@@ -495,66 +549,108 @@ export default function LoginScreen() {
           />
         </>
       )}
-    </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#F5F5F5",
-    justifyContent: "flex-start",
-    width: "100%",
-    maxWidth: "100%",
+    backgroundColor: "#F8F9FA",
   },
-  inner: {
+  keyboardContainer: {
     flex: 1,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 0,
+  },
+  scrollContainer: {
+    flexGrow: 1,
   },
   logoContainer: {
-    alignSelf: "stretch",
-    height: 200,
-    backgroundColor: "#000",
     alignItems: "center",
     justifyContent: "center",
-    borderBottomLeftRadius: 80,
-    overflow: "hidden",
+    paddingVertical: 40,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    minHeight: height * 0.25,
   },
-  logo: {
-    marginTop: 30,
-    resizeMode: "contain",
+  contentContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 24,
   },
 
-  // Estilos para formulario tradicional
+  // Form container styles
   formContainer: {
-    alignSelf: "stretch",
-    paddingHorizontal: 40,
-    marginTop: 30,
+    flex: 1,
   },
-  label: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    textAlign: "center",
+    marginBottom: 8,
+    fontFamily: "Outfit_700Bold",
   },
-  input: {
-    height: 50,
-    borderColor: "#ccc",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 15,
+  brandName: {
+    color: "#00c450",
+  },
+  welcomeSubtitle: {
     fontSize: 16,
-    backgroundColor: "#FFF",
-    marginBottom: 15,
+    color: "#666",
+    textAlign: "center",
+    marginBottom: 32,
+    fontFamily: "Outfit_400Regular",
   },
-  optionsContainer: {
+
+  // Input styles
+  inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#333",
+    marginBottom: 8,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  inputWrapper: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 15,
+    backgroundColor: "#FFF",
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: "#E5E8EB",
+    paddingHorizontal: 16,
+    minHeight: 52,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: "#1a1a1a",
+    fontFamily: "Outfit_400Regular",
+  },
+  passwordInput: {
+    paddingRight: 0,
+  },
+  passwordToggle: {
+    padding: 8,
+    marginLeft: 8,
+  },
+
+  // Options styles
+  optionsContainer: {
+    flexDirection: "row",
     justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -563,131 +659,165 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 20,
     height: 20,
-    borderRadius: 5,
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: "#00c450",
+    borderColor: "#E5E8EB",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 10,
+    marginRight: 8,
+    backgroundColor: "#FFF",
   },
-  checked: {
-    width: 12,
-    height: 12,
+  checkboxChecked: {
     backgroundColor: "#00c450",
-    borderRadius: 3,
+    borderColor: "#00c450",
   },
-  optionText: {
+  checkboxText: {
     fontSize: 14,
     color: "#666",
+    fontFamily: "Outfit_400Regular",
   },
   forgotPassword: {
+    fontSize: 14,
     color: "#00c450",
+    fontFamily: "Outfit_500Medium",
   },
+
+  // Button styles
   loginButton: {
-    backgroundColor: "#00c450",
-    height: 50,
     borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 15,
+    overflow: "hidden",
+    marginBottom: 24,
+    shadowColor: "#00c450",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
   loginButtonDisabled: {
-    backgroundColor: "#CCC",
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  loginGradient: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 52,
   },
   loadingContainer: {
     flexDirection: "row",
     alignItems: "center",
   },
-  loadingText: {
-    color: "#FFF",
-    fontSize: 16,
-    marginLeft: 10,
-    fontWeight: "bold",
-  },
   loginButtonText: {
     fontSize: 18,
     color: "#FFF",
-    fontWeight: "bold",
+    fontWeight: "600",
+    marginLeft: 8,
+    fontFamily: "Outfit_600SemiBold",
   },
+
+  // Register link styles
   registerContainer: {
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 16,
   },
   registerText: {
-    textAlign: "center",
     fontSize: 14,
     color: "#666",
+    fontFamily: "Outfit_400Regular",
   },
   registerLink: {
     color: "#00c450",
-    fontWeight: "bold",
-  },
-  disabledText: {
-    opacity: 0.5,
+    fontWeight: "600",
+    fontFamily: "Outfit_600SemiBold",
   },
 
-  // Estilos para autenticación biométrica
-  biometricContainer: {
-    alignSelf: "stretch",
-    paddingHorizontal: 40,
-    marginTop: 30,
+  // Auth container styles (PIN & Biometric)
+  authContainer: {
+    flex: 1,
     alignItems: "center",
   },
   userInfo: {
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 40,
+  },
+  avatarPlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#00c450",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
   },
   welcomeText: {
     fontSize: 24,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginBottom: 8,
+    fontFamily: "Outfit_700Bold",
   },
   userEmail: {
     fontSize: 16,
     color: "#666",
+    fontFamily: "Outfit_400Regular",
+  },
+
+  // Biometric styles
+  biometricSection: {
+    alignItems: "center",
+    marginBottom: 40,
   },
   biometricTitle: {
     fontSize: 20,
     fontWeight: "600",
-    marginBottom: 30,
-    color: "#333",
+    color: "#1a1a1a",
+    marginBottom: 8,
+    fontFamily: "Outfit_600SemiBold",
+  },
+  biometricSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginBottom: 32,
+    fontFamily: "Outfit_400Regular",
   },
   biometricButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: "#007AFF",
+    borderRadius: 60,
+    overflow: "hidden",
+    marginBottom: 24,
+    shadowColor: "#007AFF",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  biometricGradient: {
+    width: 120,
+    height: 120,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
   },
   fallbackButton: {
     paddingVertical: 12,
     paddingHorizontal: 24,
-    marginBottom: 20,
   },
   fallbackText: {
     color: "#007AFF",
     fontSize: 16,
+    fontFamily: "Outfit_500Medium",
   },
 
-  // Estilos para autenticación con PIN
-  pinContainer: {
-    alignSelf: "stretch",
-    paddingHorizontal: 20,
-    marginTop: 30,
-  },
-
-  // Estilos compartidos
+  // Shared styles
   changeAccountButton: {
     alignSelf: "center",
     paddingVertical: 12,
     paddingHorizontal: 24,
-    marginTop: 20,
   },
   changeAccountText: {
     color: "#666",
     fontSize: 14,
+    fontFamily: "Outfit_400Regular",
+  },
+  disabledText: {
+    opacity: 0.5,
   },
 });

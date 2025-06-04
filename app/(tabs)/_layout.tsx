@@ -1,49 +1,33 @@
-import { Tabs, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+// app/(tabs)/_layout.tsx - STATUSBAR NEGRO FORZADO EN TABS
+import { Tabs } from "expo-router";
+import React, { useEffect } from "react";
 import { StatusBar, Platform } from "react-native";
-import { useColorScheme } from "@/hooks/useColorScheme";
 import { TabBar } from "@/components/TabBar";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-  const router = useRouter();
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-
+  
+  // 🖤 FORZAR STATUSBAR NEGRO EN TABS
   useEffect(() => {
-    const quickAuthCheck = async () => {
-      try {
-        const token = await AsyncStorage.getItem("token");
-        const userId = await AsyncStorage.getItem("userId");
-        
-        if (!token || !userId) {
-          console.log("❌ [TabLayout] No hay credenciales, redirigiendo...");
-          router.replace("/LoginScreen"); // Ruta simple
-          return;
-        }
-        
-        console.log("✅ [TabLayout] Usuario autenticado en tabs");
-      } catch (error) {
-        console.error("❌ [TabLayout] Error en auth check:", error);
-        router.replace("/LoginScreen");
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    };
-
-    quickAuthCheck();
-  }, [router]);
-
-  if (isCheckingAuth) {
-    return null;
-  }
+    console.log("🖤 [TabLayout] Forzando StatusBar negro en tabs");
+    
+    if (Platform.OS === "android") {
+      StatusBar.setBarStyle("light-content", true);
+      StatusBar.setBackgroundColor("#000000", true);
+      StatusBar.setTranslucent(false);
+    } else if (Platform.OS === "ios") {
+      StatusBar.setBarStyle("light-content", true);
+    }
+  }, []);
 
   return (
     <>
-      <StatusBar
-        barStyle="light-content"
-        backgroundColor="#000000"
-        translucent={Platform.OS === 'ios'}
+      {/* 🖤 STATUSBAR NEGRO EXPLÍCITO EN TABS */}
+      <StatusBar 
+        barStyle="light-content" 
+        backgroundColor="#000000" 
+        translucent={false}
+        hidden={false}
+        animated={false}
       />
       
       <Tabs 
