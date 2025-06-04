@@ -30,7 +30,7 @@ import { PinSetup } from "@/components/ui/PinSetup";
 import QuipukLogo from "@/assets/images/Logo.svg";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
-import { useAuth } from "../services/useAuth";
+import { useAuth } from "../../hooks/useAuth";
 
 const { width, height } = Dimensions.get("window");
 

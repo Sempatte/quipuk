@@ -1,4 +1,4 @@
-// app/(auth)/RegisterScreen.tsx - IMPORTS CORREGIDOS CON RUTAS ABSOLUTAS
+// app/(auth)/RegisterScreen.tsx - FIXED CustomInput Interface
 import React, { useState } from "react";
 import {
   View,
@@ -18,12 +18,12 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
-import { emailVerificationService } from "@/app/services/emailVerificationService"; // 🔧 RUTA ABSOLUTA
-import { useToast } from "@/app/providers/ToastProvider"; // 🔧 RUTA ABSOLUTA
+import { emailVerificationService } from "@/app/services/emailVerificationService";
+import { useToast } from "@/app/providers/ToastProvider";
 import { useRegisterForm } from "@/hooks/useRegisterForm";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import QuipukLogo from "@/assets/images/Logo.svg";
-import { defaultCountry, getCountryByCode } from "@/app/contants/countries"; // 🔧 RUTA ABSOLUTA
+import { defaultCountry, getCountryByCode } from "@/app/contants/countries";
 
 const { width, height } = Dimensions.get("window");
 
@@ -107,7 +107,7 @@ const FormProgressIndicator: React.FC<FormProgressProps> = ({
   );
 };
 
-// Componente de Input reutilizable
+// 🔧 FIXED: Componente de Input reutilizable con props extendidas
 interface CustomInputProps {
   placeholder: string;
   value: string;
@@ -120,6 +120,12 @@ interface CustomInputProps {
   iconName?: keyof typeof Ionicons.glyphMap;
   editable?: boolean;
   maxLength?: number;
+  // 🆕 NUEVAS PROPS para contraseñas
+  showPasswordToggle?: boolean;
+  onTogglePassword?: () => void;
+  // 🆕 NUEVAS PROPS para validación de coincidencia
+  matchValue?: string; // Para confirmar contraseña
+  showMatchIndicator?: boolean;
 }
 
 const CustomInput: React.FC<CustomInputProps> = ({
@@ -134,8 +140,18 @@ const CustomInput: React.FC<CustomInputProps> = ({
   iconName,
   editable = true,
   maxLength,
+  // 🆕 Props para contraseña
+  showPasswordToggle = false,
+  onTogglePassword,
+  // 🆕 Props para validación
+  matchValue,
+  showMatchIndicator = false,
 }) => {
   const [isFocused, setIsFocused] = useState(false);
+
+  // 🎯 Calcular estado de coincidencia
+  const isMatching = matchValue !== undefined && value === matchValue && value.length > 0;
+  const isNotMatching = matchValue !== undefined && value !== matchValue && value.length > 0;
 
   return (
     <View style={styles.inputContainer}>
@@ -146,18 +162,32 @@ const CustomInput: React.FC<CustomInputProps> = ({
           isFocused && styles.inputWrapperFocused,
           error && styles.inputWrapperError,
           !editable && styles.inputWrapperDisabled,
+          // 🆕 Estilo para match de contraseñas
+          isMatching && styles.inputWrapperSuccess,
         ]}
       >
         {iconName && (
           <Ionicons
             name={iconName}
             size={20}
-            color={error ? "#E74C3C" : isFocused ? "#00c450" : "#999"}
+            color={
+              error
+                ? "#E74C3C"
+                : isMatching
+                  ? "#00c450"
+                  : isFocused
+                    ? "#00c450"
+                    : "#999"
+            }
             style={styles.inputIcon}
           />
         )}
         <TextInput
-          style={[styles.input, iconName && styles.inputWithIcon]}
+          style={[
+            styles.input,
+            iconName && styles.inputWithIcon,
+            showPasswordToggle && styles.inputWithToggle,
+          ]}
           placeholder={placeholder}
           placeholderTextColor="#999"
           value={value}
@@ -173,7 +203,60 @@ const CustomInput: React.FC<CustomInputProps> = ({
           editable={editable}
           maxLength={maxLength}
         />
+
+        {/* 🆕 Toggle de contraseña */}
+        {showPasswordToggle && onTogglePassword && (
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={onTogglePassword}
+            disabled={!editable}
+          >
+            <Ionicons
+              name={secureTextEntry ? "eye-outline" : "eye-off-outline"}
+              size={20}
+              color="#999"
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* 🆕 Indicador de coincidencia para confirmar contraseña */}
+        {showMatchIndicator && matchValue !== undefined && value.length > 0 && (
+          <View style={styles.matchIndicator}>
+            <Ionicons
+              name={isMatching ? "checkmark-circle" : "close-circle"}
+              size={20}
+              color={isMatching ? "#00c450" : "#E74C3C"}
+            />
+          </View>
+        )}
       </View>
+
+      {/* 🆕 Mensaje de estado de coincidencia */}
+      {showMatchIndicator && matchValue !== undefined && value.length > 0 && (
+        <View
+          style={[
+            styles.matchStatus,
+            isMatching ? styles.matchSuccess : styles.matchError,
+          ]}
+        >
+          <Ionicons
+            name={isMatching ? "checkmark-circle" : "close-circle"}
+            size={14}
+            color={isMatching ? "#00c450" : "#E74C3C"}
+          />
+          <Text
+            style={[
+              styles.matchText,
+              isMatching ? styles.matchTextSuccess : styles.matchTextError,
+            ]}
+          >
+            {isMatching
+              ? "Las contraseñas coinciden"
+              : "Las contraseñas no coinciden"}
+          </Text>
+        </View>
+      )}
+
       {error && (
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={16} color="#E74C3C" />
@@ -219,9 +302,8 @@ export default function RegisterScreen() {
         await emailVerificationService.registerWithEmailVerification({
           fullName: formData.fullName,
           email: formData.email,
-          phoneNumber: `${
-            getCountryByCode(formData.countryCode)?.dialCode || "+51"
-          }${formData.phoneNumber}`,
+          phoneNumber: `${getCountryByCode(formData.countryCode)?.dialCode || "+51"
+            }${formData.phoneNumber}`,
           username: formData.username,
           password: formData.password,
         });
@@ -382,215 +464,73 @@ export default function RegisterScreen() {
               maxLength={20}
             />
 
-            {/* Password con toggle y validación visual */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Contraseña</Text>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  errors.password && styles.inputWrapperError,
-                  loading && styles.inputWrapperDisabled,
-                ]}
-              >
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={errors.password ? "#E74C3C" : "#999"}
-                  style={styles.inputIcon}
+            {/* 🔧 FIXED: Password con toggle usando CustomInput mejorado */}
+            <CustomInput
+              placeholder="Contraseña"
+              value={formData.password}
+              onChangeText={(text) => {
+                updateField("password", text);
+                // Validar en tiempo real después de 1 carácter
+                if (text.length > 0) {
+                  setTimeout(() => validateField("password"), 300);
+                }
+              }}
+              onBlur={() => validateField("password")}
+              error={errors.password}
+              secureTextEntry={!showPassword}
+              autoCapitalize="none"
+              iconName="lock-closed-outline"
+              editable={!loading}
+              maxLength={100}
+              showPasswordToggle={true}
+              onTogglePassword={() => setShowPassword(!showPassword)}
+            />
+
+            {/* Indicadores de requisitos de contraseña */}
+            {formData.password.length > 0 && (
+              <View style={styles.passwordRequirements}>
+                <PasswordRequirement
+                  met={formData.password.length >= 8}
+                  text="Mínimo 8 caracteres"
                 />
-                <TextInput
-                  style={[
-                    styles.input,
-                    styles.inputWithIcon,
-                    styles.inputWithToggle,
-                  ]}
-                  placeholder="Contraseña"
-                  placeholderTextColor="#999"
-                  value={formData.password}
-                  onChangeText={(text) => {
-                    updateField("password", text);
-                    // Validar en tiempo real después de 1 carácter
-                    if (text.length > 0) {
-                      setTimeout(() => validateField("password"), 300);
-                    }
-                  }}
-                  onBlur={() => validateField("password")}
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  editable={!loading}
-                  maxLength={100}
+                <PasswordRequirement
+                  met={/[a-z]/.test(formData.password)}
+                  text="Una letra minúscula"
                 />
-                <TouchableOpacity
-                  style={styles.passwordToggle}
-                  onPress={() => setShowPassword(!showPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons
-                    name={showPassword ? "eye-off-outline" : "eye-outline"}
-                    size={20}
-                    color="#999"
-                  />
-                </TouchableOpacity>
+                <PasswordRequirement
+                  met={/[A-Z]/.test(formData.password)}
+                  text="Una letra mayúscula"
+                />
+                <PasswordRequirement
+                  met={/\d/.test(formData.password)}
+                  text="Un número"
+                />
               </View>
+            )}
 
-              {/* Indicadores de requisitos de contraseña */}
-              {formData.password.length > 0 && (
-                <View style={styles.passwordRequirements}>
-                  <PasswordRequirement
-                    met={formData.password.length >= 8}
-                    text="Mínimo 8 caracteres"
-                  />
-                  <PasswordRequirement
-                    met={/[a-z]/.test(formData.password)}
-                    text="Una letra minúscula"
-                  />
-                  <PasswordRequirement
-                    met={/[A-Z]/.test(formData.password)}
-                    text="Una letra mayúscula"
-                  />
-                  <PasswordRequirement
-                    met={/\d/.test(formData.password)}
-                    text="Un número"
-                  />
-                </View>
-              )}
-
-              {errors.password && (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={16} color="#E74C3C" />
-                  <Text style={styles.errorText}>{errors.password}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Confirm Password con toggle y comparación visual */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Confirmar contraseña</Text>
-              <View
-                style={[
-                  styles.inputWrapper,
-                  errors.confirmPassword && styles.inputWrapperError,
-                  loading && styles.inputWrapperDisabled,
-                  // Mostrar verde si las contraseñas coinciden
-                  formData.confirmPassword.length > 0 &&
-                    formData.password === formData.confirmPassword &&
-                    styles.inputWrapperSuccess,
-                ]}
-              >
-                <Ionicons
-                  name="lock-closed-outline"
-                  size={20}
-                  color={
-                    errors.confirmPassword
-                      ? "#E74C3C"
-                      : formData.confirmPassword.length > 0 &&
-                        formData.password === formData.confirmPassword
-                      ? "#00c450"
-                      : "#999"
-                  }
-                  style={styles.inputIcon}
-                />
-                <TextInput
-                  style={[
-                    styles.input,
-                    styles.inputWithIcon,
-                    styles.inputWithToggle,
-                  ]}
-                  placeholder="Confirmar contraseña"
-                  placeholderTextColor="#999"
-                  value={formData.confirmPassword}
-                  onChangeText={(text) => {
-                    updateField("confirmPassword", text);
-                    // Validar en tiempo real después de 1 carácter
-                    if (text.length > 0) {
-                      setTimeout(() => validateField("confirmPassword"), 300);
-                    }
-                  }}
-                  onBlur={() => validateField("confirmPassword")}
-                  secureTextEntry={!showConfirmPassword}
-                  autoCapitalize="none"
-                  editable={!loading}
-                  maxLength={100}
-                />
-                <TouchableOpacity
-                  style={styles.passwordToggle}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons
-                    name={
-                      showConfirmPassword ? "eye-off-outline" : "eye-outline"
-                    }
-                    size={20}
-                    color="#999"
-                  />
-                </TouchableOpacity>
-
-                {/* Icono de estado de coincidencia */}
-                {formData.confirmPassword.length > 0 && (
-                  <View style={styles.matchIndicator}>
-                    <Ionicons
-                      name={
-                        formData.password === formData.confirmPassword
-                          ? "checkmark-circle"
-                          : "close-circle"
-                      }
-                      size={20}
-                      color={
-                        formData.password === formData.confirmPassword
-                          ? "#00c450"
-                          : "#E74C3C"
-                      }
-                    />
-                  </View>
-                )}
-              </View>
-
-              {/* Mensaje de estado de coincidencia */}
-              {formData.confirmPassword.length > 0 && (
-                <View
-                  style={[
-                    styles.matchStatus,
-                    formData.password === formData.confirmPassword
-                      ? styles.matchSuccess
-                      : styles.matchError,
-                  ]}
-                >
-                  <Ionicons
-                    name={
-                      formData.password === formData.confirmPassword
-                        ? "checkmark-circle"
-                        : "close-circle"
-                    }
-                    size={14}
-                    color={
-                      formData.password === formData.confirmPassword
-                        ? "#00c450"
-                        : "#E74C3C"
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.matchText,
-                      formData.password === formData.confirmPassword
-                        ? styles.matchTextSuccess
-                        : styles.matchTextError,
-                    ]}
-                  >
-                    {formData.password === formData.confirmPassword
-                      ? "Las contraseñas coinciden"
-                      : "Las contraseñas no coinciden"}
-                  </Text>
-                </View>
-              )}
-
-              {errors.confirmPassword && (
-                <View style={styles.errorContainer}>
-                  <Ionicons name="alert-circle" size={16} color="#E74C3C" />
-                  <Text style={styles.errorText}>{errors.confirmPassword}</Text>
-                </View>
-              )}
-            </View>
+            {/* 🔧 FIXED: Confirm Password con toggle y validación usando CustomInput mejorado */}
+            <CustomInput
+              placeholder="Confirmar contraseña"
+              value={formData.confirmPassword}
+              onChangeText={(text) => {
+                updateField("confirmPassword", text);
+                // Validar en tiempo real después de 1 carácter
+                if (text.length > 0) {
+                  setTimeout(() => validateField("confirmPassword"), 300);
+                }
+              }}
+              onBlur={() => validateField("confirmPassword")}
+              error={errors.confirmPassword}
+              secureTextEntry={!showConfirmPassword}
+              autoCapitalize="none"
+              iconName="lock-closed-outline"
+              editable={!loading}
+              maxLength={100}
+              showPasswordToggle={true}
+              onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
+              matchValue={formData.password}
+              showMatchIndicator={true}
+            />
 
             {/* Checkbox mejorado */}
             <TouchableOpacity
@@ -792,6 +732,8 @@ const styles = StyleSheet.create({
   progressBarComplete: {
     backgroundColor: "#00c450",
   },
+
+  // 🔧 FIXED: Estilos mejorados para CustomInput
   inputContainer: {
     marginBottom: 20,
   },
@@ -868,6 +810,7 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     fontFamily: "Outfit_400Regular",
   },
+
   // Estilos para requisitos de contraseña
   passwordRequirements: {
     marginTop: 8,
@@ -892,7 +835,8 @@ const styles = StyleSheet.create({
     color: "#00c450",
     fontFamily: "Outfit_500Medium",
   },
-  // Estilos para estado de coincidencia de contraseñas
+
+  // 🆕 Estilos para estado de coincidencia de contraseñas
   matchStatus: {
     flexDirection: "row",
     alignItems: "center",
@@ -918,6 +862,7 @@ const styles = StyleSheet.create({
   matchTextError: {
     color: "#E74C3C",
   },
+
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "center",
