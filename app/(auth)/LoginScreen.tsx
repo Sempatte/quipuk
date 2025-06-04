@@ -1,4 +1,4 @@
-// app/(auth)/LoginScreen.tsx - SOLO CAMBIAR IMPORTS PROBLEMÁTICOS
+// app/(auth)/EnhancedLoginScreen.tsx
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -23,42 +23,32 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
-// Imports del sistema de autenticación
-import { useBiometricAuth } from "@/hooks/useBiometricAuth";
-import { usePinAuth } from "@/hooks/usePinAuth";
 import { PinInput } from "@/components/ui/PinInput";
 import { BiometricSetupModal } from "@/components/BiometricSetupModal";
 import { PinSetup } from "@/components/ui/PinSetup";
 
 import QuipukLogo from "@/assets/images/Logo.svg";
-
-import { useBlackStatusBar } from "@/hooks/useStatusBar";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
+import { useAuth } from "../services/useAuth";
 
 const { width, height } = Dimensions.get("window");
-
 
 interface UserProfile {
   id: number;
   email: string;
   username: string;
-  deviceId?: string;
 }
 
-type AuthMethod = "biometric" | "pin" | "password" | "setup";
+type AuthMethod = "biometric" | "pin" | "password" | "setup" | "blocked";
 
-export default function LoginScreen() {
-  // 🖤 HOOK CENTRALIZADO PARA STATUSBAR
-  useBlackStatusBar();
-
+export default function EnhancedLoginScreen() {
   const router = useRouter();
   const { showToast } = useToast();
 
-  // Estados tradicionales del login
+  // Estados del formulario tradicional
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   // Estados del sistema de autenticación avanzada
@@ -67,20 +57,23 @@ export default function LoginScreen() {
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [pinError, setPinError] = useState<string>("");
-  const [isNewUser, setIsNewUser] = useState(false);
 
-  // Hooks de autenticación
+  // Hook de autenticación mejorada
   const {
-    isAvailable: biometricAvailable,
-    isEnabled: biometricEnabled,
-    authenticate: authenticateBiometric,
-  } = useBiometricAuth();
-
-  const {
+    isLoading: authLoading,
+    isLinkedDevice,
+    linkedUserId,
+    canUseBiometric,
+    hasPin,
     pinConfig,
+    linkDevice,
+    setupBiometric,
+    authenticateWithBiometric,
     verifyPin,
-    isLoading: pinLoading,
-  } = usePinAuth(userProfile?.id);
+    createPin,
+    canUserAccessDevice,
+    authMethod: detectedAuthMethod
+  } = useAuth();
 
   // Mutation del login tradicional
   const [login, { loading: loginLoading }] = useMutation(LOGIN_MUTATION, {
@@ -96,106 +89,139 @@ export default function LoginScreen() {
           id: user.id,
           email: user.email,
           username: user.username,
-          deviceId: await generateDeviceId(),
         };
 
         setUserProfile(profile);
-        setIsNewUser(false);
-        await determineAuthMethod(profile);
-
-        showToast(
-          "success",
-          "¡Bienvenido!",
-          "Has iniciado sesión correctamente"
-        );
+        await handleSuccessfulLogin(profile);
       }
     },
     onError: (error) => {
-      console.log("Error al iniciar sesión:", error);
-
-      if (error.message.includes("EMAIL_NOT_VERIFIED")) {
-        try {
-          const errorData = JSON.parse(error.message);
-          showToast(
-            "info",
-            "Email no verificado",
-            "Necesitas verificar tu email antes de iniciar sesión"
-          );
-
-          router.push({
-            pathname: "/EmailVerificationScreen",
-            params: {
-              email: email,
-              userId: errorData.userId?.toString(),
-              fromRegistration: "false",
-            },
-          });
-        } catch (parseError) {
-          showToast(
-            "info",
-            "Email no verificado",
-            "Por favor verifica tu email antes de iniciar sesión"
-          );
-        }
-      } else if (error.message.includes("Usuario no encontrado")) {
-        showToast(
-          "error",
-          "Usuario no encontrado",
-          "Verifica tu email o regístrate"
-        );
-      } else if (error.message.includes("Contraseña incorrecta")) {
-        showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
-      } else {
-        showToast("error", "Error en inicio de sesión", error.message);
-      }
+      console.log("Login error:", error);
+      handleLoginError(error.message);
     },
   });
 
-  // Funciones auxiliares
-  const generateDeviceId = async (): Promise<string> => {
-    let deviceId = await AsyncStorage.getItem("device_id");
-    if (!deviceId) {
-      deviceId = `quipuk_${Date.now()}_${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
-      await AsyncStorage.setItem("device_id", deviceId);
+  // Efecto para determinar método de autenticación al cargar
+  useEffect(() => {
+    if (authLoading) return;
+
+    determineInitialAuthMethod();
+  }, [authLoading, isLinkedDevice, linkedUserId, canUseBiometric, hasPin, pinConfig]);
+
+  const determineInitialAuthMethod = async () => {
+    try {
+      if (!isLinkedDevice) {
+        // Dispositivo no vinculado - mostrar login tradicional
+        setAuthMethod("password");
+        return;
+      }
+
+      if (pinConfig.isLocked) {
+        // Dispositivo bloqueado
+        setAuthMethod("blocked");
+        return;
+      }
+
+      // Dispositivo vinculado - usar método preferido
+      if (canUseBiometric) {
+        setAuthMethod("biometric");
+        // Auto-intentar biometría después de un breve delay
+        setTimeout(() => handleBiometricAuth(), 800);
+      } else if (hasPin) {
+        setAuthMethod("pin");
+      } else {
+        // Dispositivo vinculado pero sin métodos de auth configurados
+        setAuthMethod("setup");
+        setShowPinSetup(true);
+      }
+
+      // Simular perfil del usuario vinculado
+      if (linkedUserId) {
+        setUserProfile({
+          id: linkedUserId,
+          email: "usuario@ejemplo.com", // En producción obtener del storage o API
+          username: "Usuario"
+        });
+      }
+
+    } catch (error) {
+      console.error("Error determining auth method:", error);
+      setAuthMethod("password");
     }
-    return deviceId;
   };
 
-  const determineAuthMethod = async (profile: UserProfile) => {
-    const hasPin = pinConfig.hasPin;
-    const hasBiometric = biometricEnabled;
+  const handleSuccessfulLogin = async (profile: UserProfile) => {
+    try {
+      if (!isLinkedDevice) {
+        // Primer login - vincular dispositivo
+        const linkSuccess = await linkDevice(profile.id);
+        
+        if (!linkSuccess) {
+          showToast("error", "Error", "No se pudo vincular el dispositivo");
+          return;
+        }
 
-    if (!hasPin && !hasBiometric) {
-      setAuthMethod("setup");
-      setShowPinSetup(true);
-      return;
+        // Después de vincular, configurar PIN
+        setAuthMethod("setup");
+        setShowPinSetup(true);
+        return;
+      }
+
+      // Verificar que el usuario puede acceder a este dispositivo
+      const canAccess = await canUserAccessDevice(profile.id);
+      if (!canAccess) {
+        showToast("error", "Acceso denegado", "Este dispositivo está vinculado a otra cuenta");
+        await AsyncStorage.multiRemove(["token", "userId"]);
+        setAuthMethod("password");
+        return;
+      }
+
+      // Login exitoso - ir a la app
+      navigateToApp();
+      
+    } catch (error) {
+      console.error("Error handling successful login:", error);
+      showToast("error", "Error", "Hubo un problema procesando el login");
     }
+  };
 
-    if (hasBiometric && biometricAvailable) {
-      setAuthMethod("biometric");
-      setTimeout(() => handleBiometricAuth(), 500);
-      return;
+  const handleLoginError = (errorMessage: string) => {
+    if (errorMessage.includes("EMAIL_NOT_VERIFIED")) {
+      try {
+        const errorData = JSON.parse(errorMessage);
+        showToast("info", "Email no verificado", "Necesitas verificar tu email");
+        
+        router.push({
+          pathname: "/EmailVerificationScreen",
+          params: {
+            email: email,
+            userId: errorData.userId?.toString(),
+            fromRegistration: "false",
+          },
+        });
+      } catch (parseError) {
+        showToast("info", "Email no verificado", "Verifica tu email antes de iniciar sesión");
+      }
+    } else if (errorMessage.includes("DEVICE_ALREADY_LINKED")) {
+      showToast("error", "Dispositivo no autorizado", "Este dispositivo ya está vinculado a otra cuenta");
+    } else if (errorMessage.includes("Usuario no encontrado")) {
+      showToast("error", "Usuario no encontrado", "Verifica tu email o regístrate");
+    } else if (errorMessage.includes("Contraseña incorrecta")) {
+      showToast("error", "Contraseña incorrecta", "Verifica tu contraseña");
+    } else {
+      showToast("error", "Error de login", errorMessage);
     }
-
-    if (hasPin) {
-      setAuthMethod("pin");
-      return;
-    }
-
-    navigateToApp();
   };
 
   const handleTraditionalLogin = () => {
     if (!email || !password) {
-      showToast("error", "Error", "Todos los campos son obligatorios.");
+      showToast("error", "Error", "Todos los campos son obligatorios");
       return;
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      showToast("error", "Error", "Por favor ingresa un email válido.");
+      showToast("error", "Error", "Ingresa un email válido");
       return;
     }
 
@@ -204,29 +230,34 @@ export default function LoginScreen() {
 
   const handleBiometricAuth = async () => {
     try {
-      const result = await authenticateBiometric();
+      const result = await authenticateWithBiometric();
 
       if (result.success) {
         navigateToApp();
       } else if (result.requiresManualLogin) {
-        if (pinConfig.hasPin) {
+        if (hasPin) {
           setAuthMethod("pin");
+          showToast("info", "Face ID falló", "Usa tu PIN para acceder");
         } else {
           setAuthMethod("password");
-          showToast("info", "Face ID falló", "Por favor ingresa tu contraseña");
+          setUserProfile(null);
+          showToast("info", "Face ID falló", "Inicia sesión con tu contraseña");
         }
       } else {
         Alert.alert("Face ID", result.error || "Autenticación fallida");
       }
     } catch (error) {
       console.error("Biometric auth error:", error);
-      setAuthMethod(pinConfig.hasPin ? "pin" : "password");
+      if (hasPin) {
+        setAuthMethod("pin");
+      } else {
+        setAuthMethod("password");
+        setUserProfile(null);
+      }
     }
   };
 
   const handlePinAuth = async (pin: string) => {
-    if (!userProfile) return;
-
     try {
       const result = await verifyPin(pin);
 
@@ -236,13 +267,17 @@ export default function LoginScreen() {
         setPinError(result.error || "PIN incorrecto");
 
         if (result.isLocked) {
+          setAuthMethod("blocked");
           Alert.alert(
-            "Cuenta bloqueada",
-            `Tu cuenta está bloqueada por ${result.lockDuration} minutos debido a múltiples intentos fallidos.`,
+            "Dispositivo bloqueado",
+            `Tu dispositivo está bloqueado por ${result.lockDuration} minutos debido a múltiples intentos fallidos.`,
             [
               {
                 text: "Usar contraseña",
-                onPress: () => setAuthMethod("password"),
+                onPress: () => {
+                  setAuthMethod("password");
+                  setUserProfile(null);
+                },
               },
               { text: "OK" },
             ]
@@ -254,16 +289,18 @@ export default function LoginScreen() {
     }
   };
 
-  const handlePinSetupComplete = (success: boolean) => {
+  const handlePinSetupComplete = async (success: boolean) => {
     setShowPinSetup(false);
 
     if (success) {
-      if (biometricAvailable) {
+      // PIN creado exitosamente
+      if (canUseBiometric) {
         setShowBiometricSetup(true);
       } else {
         navigateToApp();
       }
     } else {
+      // Usuario saltó la configuración del PIN
       navigateToApp();
     }
   };
@@ -273,13 +310,9 @@ export default function LoginScreen() {
 
     if (enabled) {
       setAuthMethod("biometric");
-      handleBiometricAuth();
+      setTimeout(() => handleBiometricAuth(), 500);
     } else {
-      if (pinConfig.hasPin) {
-        setAuthMethod("pin");
-      } else {
-        navigateToApp();
-      }
+      navigateToApp();
     }
   };
 
@@ -291,13 +324,47 @@ export default function LoginScreen() {
     setAuthMethod("password");
     setUserProfile(null);
     setPinError("");
+    setEmail("");
+    setPassword("");
   };
 
-  // Renderizar método de autenticación actual
   const renderAuthMethod = () => {
     switch (authMethod) {
+      case "blocked":
+        return (
+          <View style={styles.authContainer}>
+            <View style={styles.blockedContainer}>
+              <Ionicons name="lock-closed" size={64} color="#E74C3C" />
+              <Text style={styles.blockedTitle}>Dispositivo Bloqueado</Text>
+              <Text style={styles.blockedMessage}>
+                Tu dispositivo está bloqueado por demasiados intentos fallidos.
+                {pinConfig.lockedUntil && (
+                  ` Intenta nuevamente después de las ${pinConfig.lockedUntil.toLocaleTimeString()}.`
+                )}
+              </Text>
+              
+              <TouchableOpacity
+                style={styles.fallbackButton}
+                onPress={backToTraditionalLogin}
+              >
+                <Text style={styles.fallbackText}>Iniciar sesión con contraseña</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+
       case "setup":
-        return null;
+        return (
+          <View style={styles.authContainer}>
+            <View style={styles.setupContainer}>
+              <Ionicons name="settings-outline" size={64} color="#00c450" />
+              <Text style={styles.setupTitle}>Configuración Inicial</Text>
+              <Text style={styles.setupMessage}>
+                Configura un PIN para acceder rápidamente a tu cuenta en este dispositivo.
+              </Text>
+            </View>
+          </View>
+        );
 
       case "pin":
         return (
@@ -307,7 +374,7 @@ export default function LoginScreen() {
                 <Ionicons name="person" size={32} color="#FFF" />
               </View>
               <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-              <Text style={styles.userEmail}>{userProfile?.email}</Text>
+              <Text style={styles.userEmail}>{userProfile?.email || "Usuario"}</Text>
             </View>
 
             <PinInput
@@ -315,11 +382,11 @@ export default function LoginScreen() {
               subtitle="Usa tu PIN para acceder a Quipuk"
               maxLength={6}
               onComplete={handlePinAuth}
-              disabled={pinLoading || pinConfig.isLocked}
+              disabled={authLoading}
               hasError={!!pinError}
               errorMessage={pinError}
               showForgotPin={true}
-              onForgotPin={() => setAuthMethod("password")}
+              onForgotPin={backToTraditionalLogin}
             />
 
             <TouchableOpacity
@@ -339,7 +406,7 @@ export default function LoginScreen() {
                 <Ionicons name="person" size={32} color="#FFF" />
               </View>
               <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-              <Text style={styles.userEmail}>{userProfile?.email}</Text>
+              <Text style={styles.userEmail}>{userProfile?.email || "Usuario"}</Text>
             </View>
 
             <View style={styles.biometricSection}>
@@ -363,12 +430,10 @@ export default function LoginScreen() {
 
               <TouchableOpacity
                 style={styles.fallbackButton}
-                onPress={() =>
-                  setAuthMethod(pinConfig.hasPin ? "pin" : "password")
-                }
+                onPress={() => setAuthMethod(hasPin ? "pin" : "password")}
               >
                 <Text style={styles.fallbackText}>
-                  {pinConfig.hasPin ? "Usar PIN" : "Usar contraseña"}
+                  {hasPin ? "Usar PIN" : "Usar contraseña"}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -390,10 +455,18 @@ export default function LoginScreen() {
               Bienvenido a <Text style={styles.brandName}>Quipuk</Text>
             </Text>
             <Text style={styles.welcomeSubtitle}>
-              Inicia sesión para continuar
+              {isLinkedDevice ? "Inicia sesión para continuar" : "Inicia sesión o regístrate"}
             </Text>
 
-            {/* Email Input */}
+            {isLinkedDevice && (
+              <View style={styles.deviceLinkedNotice}>
+                <Ionicons name="phone-portrait" size={20} color="#00c450" />
+                <Text style={styles.deviceLinkedText}>
+                  Este dispositivo está registrado
+                </Text>
+              </View>
+            )}
+
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Correo electrónico</Text>
               <View style={styles.inputWrapper}>
@@ -417,7 +490,6 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* Password Input */}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Contraseña</Text>
               <View style={styles.inputWrapper}>
@@ -450,19 +522,7 @@ export default function LoginScreen() {
               </View>
             </View>
 
-            {/* Options */}
             <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                onPress={() => !loginLoading && setRememberMe(!rememberMe)}
-                disabled={loginLoading}
-                style={styles.checkboxContainer}
-              >
-                <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                  {rememberMe && <Ionicons name="checkmark" size={14} color="#FFF" />}
-                </View>
-                <Text style={styles.checkboxText}>Recordarme</Text>
-              </TouchableOpacity>
-
               <TouchableOpacity disabled={loginLoading}>
                 <Text style={[styles.forgotPassword, loginLoading && styles.disabledText]}>
                   ¿Olvidaste tu contraseña?
@@ -470,7 +530,6 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Login Button */}
             <TouchableOpacity
               style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
               onPress={handleTraditionalLogin}
@@ -492,21 +551,35 @@ export default function LoginScreen() {
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Register Link */}
-            <TouchableOpacity
-              onPress={() => router.push("/RegisterScreen")}
-              disabled={loginLoading}
-              style={styles.registerContainer}
-            >
-              <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
-                ¿Aún no tienes una cuenta?{" "}
-                <Text style={styles.registerLink}>Regístrate</Text>
-              </Text>
-            </TouchableOpacity>
+            {!isLinkedDevice && (
+              <TouchableOpacity
+                onPress={() => router.push("/RegisterScreen")}
+                disabled={loginLoading}
+                style={styles.registerContainer}
+              >
+                <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
+                  ¿Aún no tienes una cuenta?{" "}
+                  <Text style={styles.registerLink}>Regístrate</Text>
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
         );
     }
   };
+
+  if (authLoading) {
+    return (
+      <SafeAreaView style={styles.container} edges={["top"]}>
+        <StatusBar style="light" />
+        <View style={styles.loadingScreen}>
+          <QuipukLogo width={120} height={60} />
+          <ActivityIndicator size="large" color="#00c450" style={{ marginTop: 30 }} />
+          <Text style={styles.loadingText}>Verificando dispositivo...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -522,7 +595,6 @@ export default function LoginScreen() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Header with Logo */}
             <LinearGradient
               colors={["#000000", "#1a1a1a"]}
               style={styles.logoContainer}
@@ -530,7 +602,6 @@ export default function LoginScreen() {
               <QuipukLogo width={120} height={60} />
             </LinearGradient>
 
-            {/* Auth Content */}
             <View style={styles.contentContainer}>
               {renderAuthMethod()}
             </View>
@@ -538,7 +609,6 @@ export default function LoginScreen() {
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* Modales */}
       {userProfile && (
         <>
           <PinSetup
@@ -558,6 +628,7 @@ export default function LoginScreen() {
     </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -583,7 +654,63 @@ const styles = StyleSheet.create({
     paddingTop: 32,
     paddingBottom: 24,
   },
+  loadingScreen: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: "#666",
+    fontFamily: "Outfit_400Regular",
+  },
 
+  // Estados especiales
+  blockedContainer: {
+    alignItems: "center",
+    padding: 20,
+  },
+  blockedTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#E74C3C",
+    marginTop: 20,
+    marginBottom: 16,
+    textAlign: "center",
+    fontFamily: "Outfit_700Bold",
+  },
+  blockedMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+    marginBottom: 30,
+    fontFamily: "Outfit_400Regular",
+  },
+  setupContainer: {
+    alignItems: "center",
+    padding: 20,
+  },
+  setupTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#1a1a1a",
+    marginTop: 20,
+    marginBottom: 16,
+    textAlign: "center",
+    fontFamily: "Outfit_700Bold",
+  },
+  setupMessage: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 24,
+    fontFamily: "Outfit_400Regular",
+  },
+
+  // Formulario tradicional
   formContainer: {
     flex: 1,
   },
@@ -602,8 +729,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#666",
     textAlign: "center",
-    marginBottom: 32,
+    marginBottom: 24,
     fontFamily: "Outfit_400Regular",
+  },
+  deviceLinkedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#E8F5E8",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 24,
+  },
+  deviceLinkedText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: "#2D5016",
+    fontFamily: "Outfit_500Medium",
   },
 
   inputContainer: {
@@ -649,34 +791,8 @@ const styles = StyleSheet.create({
   },
 
   optionsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
     marginBottom: 24,
-  },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: "#E5E8EB",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 8,
-    backgroundColor: "#FFF",
-  },
-  checkboxChecked: {
-    backgroundColor: "#00c450",
-    borderColor: "#00c450",
-  },
-  checkboxText: {
-    fontSize: 14,
-    color: "#666",
-    fontFamily: "Outfit_400Regular",
   },
   forgotPassword: {
     fontSize: 14,
@@ -731,6 +847,7 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
   },
 
+  // Estados de autenticación avanzada
   authContainer: {
     flex: 1,
     alignItems: "center",

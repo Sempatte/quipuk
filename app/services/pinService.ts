@@ -1,18 +1,19 @@
-// app/services/pinService.ts - VERSIÓN CORREGIDA CON ALMACENAMIENTO LOCAL
+// app/services/pinService.ts
 import * as SecureStore from 'expo-secure-store';
 import { cryptoService } from './cryptoService';
+import { deviceManagementService } from './deviceManagementService';
 import { 
   PinConfig, 
   PinVerificationResult, 
   PinCreationResult, 
-  AuthLog,
-  SecurityQuestion 
+  AuthLog
 } from '../types/pin.types';
 
 interface StoredPinData {
   userId: number;
   pinHash: string;
   pinSalt: string;
+  deviceId: string;
   pinCreatedAt: string;
   pinLastChanged: string;
   pinAttempts: number;
@@ -22,32 +23,28 @@ interface StoredPinData {
 class PinService {
   private readonly MAX_ATTEMPTS = 5;
   private readonly LOCK_DURATION_MINUTES = 30;
-  private readonly PIN_STORAGE_KEY = 'quipuk_user_pin_';
-  private readonly RECOVERY_QUESTIONS_KEY = 'quipuk_recovery_questions_';
-  private readonly AUTH_LOG_KEY = 'quipuk_auth_log_';
+  private readonly PIN_STORAGE_KEY = 'quipuk_device_pin';
+  private readonly AUTH_LOG_KEY = 'quipuk_pin_auth_log';
 
-  // 🔧 MÉTODO AUXILIAR: Generar clave única por usuario
-  private getPinKey(userId: number): string {
-    return `${this.PIN_STORAGE_KEY}${userId}`;
-  }
-
-  private getRecoveryKey(userId: number): string {
-    return `${this.RECOVERY_QUESTIONS_KEY}${userId}`;
-  }
-
-  private getAuthLogKey(userId: number): string {
-    return `${this.AUTH_LOG_KEY}${userId}`;
-  }
-
-  // 🔧 CREAR PIN - VERSIÓN LOCAL
-  async createPin(userId: number, pin: string, securityQuestions?: SecurityQuestion[]): Promise<PinCreationResult> {
+  /**
+   * Crea PIN para el usuario vinculado al dispositivo
+   */
+  async createPin(userId: number, pin: string): Promise<PinCreationResult> {
     try {
-      console.log('🔐 [PinService] Iniciando creación de PIN para usuario:', userId);
+      console.log('Creating PIN for user:', userId);
+
+      // Verificar que el dispositivo esté vinculado a este usuario
+      const canAccess = await deviceManagementService.canUserAccessDevice(userId);
+      if (!canAccess) {
+        return {
+          success: false,
+          error: 'Dispositivo no autorizado para este usuario'
+        };
+      }
 
       // Validar fuerza del PIN
       const validation = cryptoService.validatePinStrength(pin);
       if (!validation.isValid) {
-        console.log('❌ [PinService] PIN no válido:', validation.errors);
         return {
           success: false,
           error: validation.errors.join(', ')
@@ -55,45 +52,32 @@ class PinService {
       }
 
       // Verificar que no exista PIN previo
-      const existingConfig = await this.getPinConfig(userId);
+      const existingConfig = await this.getPinConfig();
       if (existingConfig.hasPin) {
-        console.log('❌ [PinService] PIN ya existe para usuario:', userId);
         return {
           success: false,
-          error: 'Ya tienes un PIN configurado'
+          error: 'Ya tienes un PIN configurado en este dispositivo'
         };
       }
 
       // Generar salt y hash
-      console.log('🔐 [PinService] Generando hash del PIN...');
       const salt = await cryptoService.generateSalt();
       const hash = await cryptoService.hashPin(pin, salt);
+      const deviceId = await deviceManagementService.getDeviceId();
 
-      // Preparar datos para almacenamiento local
       const pinData: StoredPinData = {
         userId,
         pinHash: hash,
         pinSalt: salt,
+        deviceId,
         pinCreatedAt: new Date().toISOString(),
         pinLastChanged: new Date().toISOString(),
         pinAttempts: 0,
         pinLockedUntil: null
       };
 
-      // Guardar en SecureStore
-      console.log('💾 [PinService] Guardando PIN en SecureStore...');
-      await SecureStore.setItemAsync(
-        this.getPinKey(userId), 
-        JSON.stringify(pinData)
-      );
+      await SecureStore.setItemAsync(this.PIN_STORAGE_KEY, JSON.stringify(pinData));
 
-      // Guardar preguntas de seguridad si se proporcionan
-      if (securityQuestions && securityQuestions.length > 0) {
-        console.log('💾 [PinService] Guardando preguntas de seguridad...');
-        await this.saveSecurityQuestions(userId, securityQuestions);
-      }
-
-      // Log del evento
       await this.logAuthAttempt({
         userId,
         authType: 'PIN',
@@ -101,11 +85,11 @@ class PinService {
         deviceInfo: { action: 'PIN_CREATED', timestamp: new Date().toISOString() }
       });
 
-      console.log('✅ [PinService] PIN creado exitosamente');
+      console.log('PIN created successfully');
       return { success: true };
 
     } catch (error) {
-      console.error('❌ [PinService] Error creando PIN:', error);
+      console.error('Error creating PIN:', error);
       return {
         success: false,
         error: 'Error al crear PIN: ' + (error instanceof Error ? error.message : 'Error desconocido')
@@ -113,79 +97,88 @@ class PinService {
     }
   }
 
-  // 🔧 VERIFICAR PIN - VERSIÓN LOCAL
-  async verifyPin(userId: number, pin: string): Promise<PinVerificationResult> {
+  /**
+   * Verifica PIN del usuario vinculado
+   */
+  async verifyPin(pin: string): Promise<PinVerificationResult> {
     try {
-      console.log('🔐 [PinService] Verificando PIN para usuario:', userId);
+      console.log('Verifying PIN');
 
-      const config = await this.getPinConfig(userId);
+      const config = await this.getPinConfig();
       
-      // Verificar si tiene PIN configurado
       if (!config.hasPin) {
-        console.log('❌ [PinService] PIN no configurado para usuario:', userId);
         return {
           success: false,
-          error: 'PIN no configurado'
+          error: 'PIN no configurado en este dispositivo'
         };
       }
 
-      // Verificar si está bloqueado
       if (config.isLocked) {
-        console.log('🔒 [PinService] Usuario bloqueado:', userId);
         await this.logAuthAttempt({
-          userId,
+          userId: 0, // Se obtendrá del storage
           authType: 'PIN',
           status: 'LOCKED',
-          failureReason: 'User account locked'
+          failureReason: 'Device locked'
         });
 
         return {
           success: false,
           isLocked: true,
           lockDuration: this.LOCK_DURATION_MINUTES,
-          error: `Cuenta bloqueada. Intenta en ${this.LOCK_DURATION_MINUTES} minutos`
+          error: `Dispositivo bloqueado. Intenta en ${this.LOCK_DURATION_MINUTES} minutos`
         };
       }
 
-      // Obtener datos del PIN desde SecureStore
-      const pinData = await this.getPinDataFromStorage(userId);
+      const pinData = await this.getPinDataFromStorage();
       if (!pinData) {
-        console.log('❌ [PinService] No se pudo obtener datos del PIN');
         return {
           success: false,
           error: 'Error al verificar PIN'
         };
       }
 
-      // Verificar PIN
-      console.log('🔐 [PinService] Comparando PIN...');
+      // Verificar que el dispositivo sigue siendo válido
+      const currentDeviceId = await deviceManagementService.getDeviceId();
+      if (pinData.deviceId !== currentDeviceId) {
+        await this.clearPinData();
+        return {
+          success: false,
+          error: 'Configuración de PIN inválida'
+        };
+      }
+
+      // Verificar que el usuario sigue vinculado
+      const linkedUserId = await deviceManagementService.getLinkedUser();
+      if (!linkedUserId || linkedUserId !== pinData.userId) {
+        await this.clearPinData();
+        return {
+          success: false,
+          error: 'Usuario no autorizado en este dispositivo'
+        };
+      }
+
       const isValid = await cryptoService.verifyPin(pin, pinData.pinHash, pinData.pinSalt);
 
       if (isValid) {
-        // PIN correcto - resetear intentos
-        console.log('✅ [PinService] PIN correcto');
-        await this.resetPinAttempts(userId);
+        await this.resetPinAttempts();
         
         await this.logAuthAttempt({
-          userId,
+          userId: pinData.userId,
           authType: 'PIN',
           status: 'SUCCESS'
         });
 
+        console.log('PIN verification successful');
         return { success: true };
       } else {
-        // PIN incorrecto - incrementar intentos
-        console.log('❌ [PinService] PIN incorrecto');
         const newAttempts = config.attempts + 1;
         const remainingAttempts = this.MAX_ATTEMPTS - newAttempts;
 
         if (newAttempts >= this.MAX_ATTEMPTS) {
-          // Bloquear usuario
-          console.log('🔒 [PinService] Bloqueando usuario por intentos fallidos');
-          await this.lockUser(userId);
+          await this.lockDevice();
           
           await this.logAuthAttempt({
-            userId,
+            userId: pinData.userId,
             authType: 'PIN',
             status: 'LOCKED',
             failureReason: 'Too many failed attempts'
@@ -195,14 +188,13 @@ class PinService {
             success: false,
             isLocked: true,
             lockDuration: this.LOCK_DURATION_MINUTES,
-            error: `Demasiados intentos. Cuenta bloqueada por ${this.LOCK_DURATION_MINUTES} minutos`
+            error: `Demasiados intentos. Dispositivo bloqueado por ${this.LOCK_DURATION_MINUTES} minutos`
           };
         } else {
-          // Incrementar intentos fallidos
-          await this.incrementPinAttempts(userId);
+          await this.incrementPinAttempts();
           
           await this.logAuthAttempt({
-            userId,
+            userId: pinData.userId,
             authType: 'PIN',
             status: 'FAILED',
             failureReason: 'Invalid PIN'
@@ -217,21 +209,22 @@ class PinService {
       }
 
     } catch (error) {
-      console.error('❌ [PinService] Error verificando PIN:', error);
+      console.error('Error verifying PIN:', error);
       return {
         success: false,
-        error: 'Error al verificar PIN: ' + (error instanceof Error ? error.message : 'Error desconocido')
+        error: 'Error al verificar PIN'
       };
     }
   }
 
-  // 🔧 CAMBIAR PIN - VERSIÓN LOCAL
-  async changePin(userId: number, currentPin: string, newPin: string): Promise<PinCreationResult> {
+  /**
+   * Cambia PIN existente
+   */
+  async changePin(currentPin: string, newPin: string): Promise<PinCreationResult> {
     try {
-      console.log('🔐 [PinService] Cambiando PIN para usuario:', userId);
+      console.log('Changing PIN');
 
-      // Verificar PIN actual
-      const verification = await this.verifyPin(userId, currentPin);
+      const verification = await this.verifyPin(currentPin);
       if (!verification.success) {
         return {
           success: false,
@@ -239,7 +232,6 @@ class PinService {
         };
       }
 
-      // Validar nuevo PIN
       const validation = cryptoService.validatePinStrength(newPin);
       if (!validation.isValid) {
         return {
@@ -248,38 +240,54 @@ class PinService {
         };
       }
 
-      // Generar nuevo hash
       const salt = await cryptoService.generateSalt();
       const hash = await cryptoService.hashPin(newPin, salt);
 
-      // Actualizar en storage
-      await this.updatePinInStorage(userId, hash, salt);
+      await this.updatePinInStorage(hash, salt);
 
-      await this.logAuthAttempt({
-        userId,
-        authType: 'PIN',
-        status: 'SUCCESS',
-        deviceInfo: { action: 'PIN_CHANGED', timestamp: new Date().toISOString() }
-      });
+      const pinData = await this.getPinDataFromStorage();
+      if (pinData) {
+        await this.logAuthAttempt({
+          userId: pinData.userId,
+          authType: 'PIN',
+          status: 'SUCCESS',
+          deviceInfo: { action: 'PIN_CHANGED', timestamp: new Date().toISOString() }
+        });
+      }
 
-      console.log('✅ [PinService] PIN cambiado exitosamente');
+      console.log('PIN changed successfully');
       return { success: true };
 
     } catch (error) {
-      console.error('❌ [PinService] Error cambiando PIN:', error);
+      console.error('Error changing PIN:', error);
       return {
         success: false,
-        error: 'Error al cambiar PIN: ' + (error instanceof Error ? error.message : 'Error desconocido')
+        error: 'Error al cambiar PIN'
       };
     }
   }
 
-  // 🔧 OBTENER CONFIGURACIÓN DEL PIN
-  async getPinConfig(userId: number): Promise<PinConfig> {
+  /**
+   * Obtiene configuración del PIN para el dispositivo actual
+   */
+  async getPinConfig(): Promise<PinConfig> {
     try {
-      const data = await this.getPinDataFromStorage(userId);
+      const data = await this.getPinDataFromStorage();
       
       if (!data) {
+        return {
+          hasPin: false,
+          attempts: 0,
+          isLocked: false
+        };
+      }
+
+      // Verificar validez del dispositivo y usuario
+      const currentDeviceId = await deviceManagementService.getDeviceId();
+      const linkedUserId = await deviceManagementService.getLinkedUser();
+      
+      if (data.deviceId !== currentDeviceId || !linkedUserId || linkedUserId !== data.userId) {
+        await this.clearPinData();
         return {
           hasPin: false,
           attempts: 0,
@@ -299,7 +307,7 @@ class PinService {
       };
 
     } catch (error) {
-      console.error('❌ [PinService] Error obteniendo configuración PIN:', error);
+      console.error('Error getting PIN config:', error);
       return {
         hasPin: false,
         attempts: 0,
@@ -308,13 +316,14 @@ class PinService {
     }
   }
 
-  // 🔧 ELIMINAR PIN
-  async removePin(userId: number, currentPin: string): Promise<PinCreationResult> {
+  /**
+   * Elimina PIN del dispositivo
+   */
+  async removePin(currentPin: string): Promise<PinCreationResult> {
     try {
-      console.log('🔐 [PinService] Eliminando PIN para usuario:', userId);
+      console.log('Removing PIN');
 
-      // Verificar PIN actual
-      const verification = await this.verifyPin(userId, currentPin);
+      const verification = await this.verifyPin(currentPin);
       if (!verification.success) {
         return {
           success: false,
@@ -322,42 +331,57 @@ class PinService {
         };
       }
 
-      // Eliminar de storage
-      await this.deletePinFromStorage(userId);
+      const pinData = await this.getPinDataFromStorage();
+      
+      await this.clearPinData();
 
-      await this.logAuthAttempt({
-        userId,
-        authType: 'PIN',
-        status: 'SUCCESS',
-        deviceInfo: { action: 'PIN_REMOVED', timestamp: new Date().toISOString() }
-      });
+      if (pinData) {
+        await this.logAuthAttempt({
+          userId: pinData.userId,
+          authType: 'PIN',
+          status: 'SUCCESS',
+          deviceInfo: { action: 'PIN_REMOVED', timestamp: new Date().toISOString() }
+        });
+      }
 
-      console.log('✅ [PinService] PIN eliminado exitosamente');
+      console.log('PIN removed successfully');
       return { success: true };
 
     } catch (error) {
-      console.error('❌ [PinService] Error eliminando PIN:', error);
+      console.error('Error removing PIN:', error);
       return {
         success: false,
-        error: 'Error al eliminar PIN: ' + (error instanceof Error ? error.message : 'Error desconocido')
+        error: 'Error al eliminar PIN'
       };
     }
   }
 
-  // 🔧 MÉTODOS PRIVADOS PARA SECURESTORE
-  private async getPinDataFromStorage(userId: number): Promise<StoredPinData | null> {
+  /**
+   * Limpia todos los datos de PIN (al desvincular dispositivo)
+   */
+  async clearPinData(): Promise<void> {
     try {
-      const data = await SecureStore.getItemAsync(this.getPinKey(userId));
+      await SecureStore.deleteItemAsync(this.PIN_STORAGE_KEY);
+      console.log('PIN data cleared');
+    } catch (error) {
+      console.error('Error clearing PIN data:', error);
+    }
+  }
+
+  // Métodos privados
+  private async getPinDataFromStorage(): Promise<StoredPinData | null> {
+    try {
+      const data = await SecureStore.getItemAsync(this.PIN_STORAGE_KEY);
       return data ? JSON.parse(data) : null;
     } catch (error) {
-      console.error('❌ [PinService] Error leyendo PIN desde storage:', error);
+      console.error('Error reading PIN from storage:', error);
       return null;
     }
   }
 
-  private async updatePinInStorage(userId: number, hash: string, salt: string): Promise<void> {
+  private async updatePinInStorage(hash: string, salt: string): Promise<void> {
     try {
-      const existingData = await this.getPinDataFromStorage(userId);
+      const existingData = await this.getPinDataFromStorage();
       if (!existingData) {
         throw new Error('PIN data not found');
       }
@@ -367,102 +391,60 @@ class PinService {
         pinHash: hash,
         pinSalt: salt,
         pinLastChanged: new Date().toISOString(),
-        pinAttempts: 0, // Reset attempts
-        pinLockedUntil: null // Remove lock
+        pinAttempts: 0,
+        pinLockedUntil: null
       };
 
-      await SecureStore.setItemAsync(
-        this.getPinKey(userId), 
-        JSON.stringify(updatedData)
-      );
+      await SecureStore.setItemAsync(this.PIN_STORAGE_KEY, JSON.stringify(updatedData));
     } catch (error) {
-      console.error('❌ [PinService] Error actualizando PIN:', error);
+      console.error('Error updating PIN:', error);
       throw error;
     }
   }
 
-  private async deletePinFromStorage(userId: number): Promise<void> {
+  private async resetPinAttempts(): Promise<void> {
     try {
-      await SecureStore.deleteItemAsync(this.getPinKey(userId));
-      await SecureStore.deleteItemAsync(this.getRecoveryKey(userId));
-    } catch (error) {
-      console.error('❌ [PinService] Error eliminando PIN:', error);
-      throw error;
-    }
-  }
-
-  private async resetPinAttempts(userId: number): Promise<void> {
-    try {
-      const data = await this.getPinDataFromStorage(userId);
+      const data = await this.getPinDataFromStorage();
       if (data) {
         data.pinAttempts = 0;
         data.pinLockedUntil = null;
-        await SecureStore.setItemAsync(
-          this.getPinKey(userId), 
-          JSON.stringify(data)
-        );
+        await SecureStore.setItemAsync(this.PIN_STORAGE_KEY, JSON.stringify(data));
       }
     } catch (error) {
-      console.error('❌ [PinService] Error reseteando intentos:', error);
+      console.error('Error resetting PIN attempts:', error);
     }
   }
 
-  private async incrementPinAttempts(userId: number): Promise<void> {
+  private async incrementPinAttempts(): Promise<void> {
     try {
-      const data = await this.getPinDataFromStorage(userId);
+      const data = await this.getPinDataFromStorage();
       if (data) {
         data.pinAttempts = (data.pinAttempts || 0) + 1;
-        await SecureStore.setItemAsync(
-          this.getPinKey(userId), 
-          JSON.stringify(data)
-        );
+        await SecureStore.setItemAsync(this.PIN_STORAGE_KEY, JSON.stringify(data));
       }
     } catch (error) {
-      console.error('❌ [PinService] Error incrementando intentos:', error);
+      console.error('Error incrementing PIN attempts:', error);
     }
   }
 
-  private async lockUser(userId: number): Promise<void> {
+  private async lockDevice(): Promise<void> {
     try {
-      const data = await this.getPinDataFromStorage(userId);
+      const data = await this.getPinDataFromStorage();
       if (data) {
         const lockUntil = new Date();
         lockUntil.setMinutes(lockUntil.getMinutes() + this.LOCK_DURATION_MINUTES);
         
         data.pinLockedUntil = lockUntil.toISOString();
-        await SecureStore.setItemAsync(
-          this.getPinKey(userId), 
-          JSON.stringify(data)
-        );
+        await SecureStore.setItemAsync(this.PIN_STORAGE_KEY, JSON.stringify(data));
       }
     } catch (error) {
-      console.error('❌ [PinService] Error bloqueando usuario:', error);
-    }
-  }
-
-  private async saveSecurityQuestions(userId: number, questions: SecurityQuestion[]): Promise<void> {
-    try {
-      // Hash de las respuestas de seguridad
-      const hashedQuestions = await Promise.all(
-        questions.map(async (q) => ({
-          ...q,
-          answer: await cryptoService.hashPin(q.answer.toLowerCase().trim(), userId.toString())
-        }))
-      );
-
-      await SecureStore.setItemAsync(
-        this.getRecoveryKey(userId),
-        JSON.stringify(hashedQuestions)
-      );
-    } catch (error) {
-      console.error('❌ [PinService] Error guardando preguntas de seguridad:', error);
+      console.error('Error locking device:', error);
     }
   }
 
   private async logAuthAttempt(log: AuthLog): Promise<void> {
     try {
-      // Guardar log localmente (opcional)
-      const existingLogs = await SecureStore.getItemAsync(this.getAuthLogKey(log.userId));
+      const existingLogs = await SecureStore.getItemAsync(this.AUTH_LOG_KEY);
       const logs = existingLogs ? JSON.parse(existingLogs) : [];
       
       logs.push({
@@ -470,15 +452,11 @@ class PinService {
         timestamp: new Date().toISOString()
       });
 
-      // Mantener solo los últimos 50 logs
       const trimmedLogs = logs.slice(-50);
       
-      await SecureStore.setItemAsync(
-        this.getAuthLogKey(log.userId),
-        JSON.stringify(trimmedLogs)
-      );
+      await SecureStore.setItemAsync(this.AUTH_LOG_KEY, JSON.stringify(trimmedLogs));
     } catch (error) {
-      console.error('❌ [PinService] Error guardando log:', error);
+      console.error('Error logging auth attempt:', error);
     }
   }
 }

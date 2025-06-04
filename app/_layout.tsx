@@ -1,4 +1,4 @@
-// app/_layout.tsx - STATUSBAR NEGRO GLOBAL FORZADO
+// app/_layout.tsx - Enhanced with device management
 import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
@@ -27,42 +27,87 @@ import {
 import { ToastProvider } from "./providers/ToastProvider";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { OfflineMessage } from "@/components/OfflineMessage";
+import { deviceManagementService } from "./services/deviceManagementService";
 
 SplashScreen.preventAutoHideAsync();
 
 function AuthHandler() {
   const segments = useSegments();
   const router = useRouter();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  const [authState, setAuthState] = useState<{
+    isAuthenticated: boolean | null;
+    isLinkedDevice: boolean | null;
+    linkedUserId: number | null;
+  }>({
+    isAuthenticated: null,
+    isLinkedDevice: null,
+    linkedUserId: null,
+  });
   const [hasNavigated, setHasNavigated] = useState(false);
   
-  // 🎯 VERIFICACIÓN DE AUTENTICACIÓN (SOLO UNA VEZ AL INICIO)
+  // Verificación de autenticación mejorada
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
-        console.log("🔍 [AuthHandler] Verificación inicial de autenticación");
+        console.log("Checking enhanced auth status");
         
-        const [token, userId] = await Promise.all([
+        const [token, userId, linkedUserId] = await Promise.all([
           AsyncStorage.getItem("token"),
-          AsyncStorage.getItem("userId")
+          AsyncStorage.getItem("userId"),
+          deviceManagementService.getLinkedUser()
         ]);
         
         const isAuth = !!(token && userId);
-        console.log("🔍 [AuthHandler] Estado:", isAuth ? "autenticado" : "no autenticado");
+        const isLinked = linkedUserId !== null;
         
-        setIsAuthenticated(isAuth);
+        // Verificar coherencia entre autenticación y vinculación
+        if (isAuth && userId) {
+          const userIdNum = parseInt(userId, 10);
+          const canAccess = await deviceManagementService.canUserAccessDevice(userIdNum);
+          
+          if (!canAccess && isLinked) {
+            // Usuario autenticado pero dispositivo vinculado a otra cuenta
+            console.log("Device linked to different user, clearing auth");
+            await AsyncStorage.multiRemove(["token", "userId"]);
+            setAuthState({
+              isAuthenticated: false,
+              isLinkedDevice: true,
+              linkedUserId: linkedUserId
+            });
+            return;
+          }
+        }
+        
+        console.log("Auth state:", {
+          isAuth,
+          isLinked,
+          linkedUserId,
+          userId: userId ? parseInt(userId, 10) : null
+        });
+        
+        setAuthState({
+          isAuthenticated: isAuth,
+          isLinkedDevice: isLinked,
+          linkedUserId: linkedUserId
+        });
       } catch (error) {
-        console.error("❌ [AuthHandler] Error:", error);
-        setIsAuthenticated(false);
+        console.error("Error checking auth status:", error);
+        setAuthState({
+          isAuthenticated: false,
+          isLinkedDevice: false,
+          linkedUserId: null
+        });
       }
     };
 
     checkAuthStatus();
-  }, []); // ✅ Solo al montar el componente
+  }, []);
 
-  // 🎯 NAVEGACIÓN INTELIGENTE (SOLO CUANDO CAMBIA EL ESTADO DE AUTH)
+  // Navegación inteligente basada en estado de dispositivo
   useEffect(() => {
-    if (isAuthenticated === null) return; // Esperamos la verificación inicial
+    if (authState.isAuthenticated === null || authState.isLinkedDevice === null) {
+      return; // Esperar verificación inicial
+    }
     
     const currentPath = `/${segments.join('/')}`;
     const isInTabsGroup = segments[0] === "(tabs)";
@@ -70,27 +115,53 @@ function AuthHandler() {
                          currentPath.includes("RegisterScreen") || 
                          currentPath.includes("EmailVerificationScreen");
     
-    console.log("🧭 [AuthHandler] Evaluando navegación:", {
+    console.log("Evaluating enhanced navigation:", {
       currentPath,
-      isAuthenticated,
+      isAuthenticated: authState.isAuthenticated,
+      isLinkedDevice: authState.isLinkedDevice,
+      linkedUserId: authState.linkedUserId,
       isInTabsGroup,
       isInAuthRoute,
       hasNavigated
     });
 
-    // 🎯 CASOS DE REDIRECCIÓN (solo si es necesario)
-    if (!isAuthenticated && (isInTabsGroup || (!isInAuthRoute && !hasNavigated))) {
-      console.log("🔄 Usuario no autenticado -> LoginScreen");
-      router.replace("/LoginScreen");
-      setHasNavigated(true);
-    } else if (isAuthenticated && (isInAuthRoute || (!isInTabsGroup && !hasNavigated))) {
-      console.log("🔄 Usuario autenticado -> tabs");
-      router.replace("/(tabs)");
-      setHasNavigated(true);
-    } else {
-      console.log("✅ Navegación correcta - sin cambios");
+    // Casos de redirección mejorados
+    if (!authState.isAuthenticated) {
+      if (isInTabsGroup || (!isInAuthRoute && !hasNavigated)) {
+        console.log("User not authenticated -> LoginScreen");
+        router.replace("/LoginScreen");
+        setHasNavigated(true);
+      }
+    } else if (authState.isAuthenticated) {
+      // Usuario autenticado
+      if (authState.isLinkedDevice && authState.linkedUserId) {
+        // Dispositivo vinculado - verificar si es el usuario correcto
+        const storedUserId = AsyncStorage.getItem("userId").then(id => {
+          if (id && parseInt(id, 10) === authState.linkedUserId) {
+            // Usuario correcto en dispositivo vinculado
+            if (isInAuthRoute || (!isInTabsGroup && !hasNavigated)) {
+              console.log("Authenticated user on linked device -> tabs");
+              router.replace("/(tabs)");
+              setHasNavigated(true);
+            }
+          } else {
+            // Usuario incorrecto en dispositivo vinculado
+            console.log("Wrong user on linked device -> LoginScreen");
+            AsyncStorage.multiRemove(["token", "userId"]);
+            router.replace("/LoginScreen");
+            setHasNavigated(true);
+          }
+        });
+      } else {
+        // Dispositivo no vinculado - proceder normalmente
+        if (isInAuthRoute || (!isInTabsGroup && !hasNavigated)) {
+          console.log("Authenticated user on unlinked device -> tabs");
+          router.replace("/(tabs)");
+          setHasNavigated(true);
+        }
+      }
     }
-  }, [isAuthenticated]); // ✅ Solo cuando cambia el estado de autenticación
+  }, [authState]);
 
   return null;
 }
@@ -112,24 +183,20 @@ function MainLayout() {
     Outfit_300Light,
   });
 
-  // 🖤 CONFIGURACIÓN GLOBAL DEL STATUSBAR - SIEMPRE NEGRO
+  // Configuración global del StatusBar
   useEffect(() => {
-    console.log("🖤 [StatusBar] Configurando StatusBar negro global");
+    console.log("Configuring global StatusBar");
     
     if (Platform.OS === "android") {
-      // Android: Configuración completa
       StatusBar.setBarStyle("light-content", true);
       StatusBar.setBackgroundColor("#000000", true);
       StatusBar.setTranslucent(false);
-      console.log("🖤 [StatusBar] Android configurado: light-content + fondo negro");
     } else if (Platform.OS === "ios") {
-      // iOS: Solo el estilo (el fondo se maneja con SafeAreaView)
       StatusBar.setBarStyle("light-content", true);
-      console.log("🖤 [StatusBar] iOS configurado: light-content");
     }
-  }, []); // Solo una vez al cargar la app
+  }, []);
 
-  // 🖤 FORZAR STATUSBAR NEGRO EN CADA CAMBIO DE RUTA
+  // Forzar StatusBar negro en cada cambio de ruta
   useEffect(() => {
     const interval = setInterval(() => {
       if (Platform.OS === "android") {
@@ -138,7 +205,7 @@ function MainLayout() {
       } else if (Platform.OS === "ios") {
         StatusBar.setBarStyle("light-content");
       }
-    }, 500); // Verificar cada 500ms
+    }, 500);
 
     return () => clearInterval(interval);
   }, []);
@@ -157,12 +224,10 @@ function MainLayout() {
     return <OfflineMessage />;
   }
 
-  // 🖤 THEME PERSONALIZADO CON STATUSBAR NEGRO FORZADO
   const customTheme = {
     ...(colorScheme === "dark" ? DarkTheme : DefaultTheme),
     colors: {
       ...(colorScheme === "dark" ? DarkTheme.colors : DefaultTheme.colors),
-      // Forzar colores que mantengan el StatusBar negro
       primary: "#00DC5A",
       background: "#F5F5F5",
       card: "#FFFFFF",
@@ -174,7 +239,6 @@ function MainLayout() {
 
   return (
     <ThemeProvider value={customTheme}>
-      {/* 🖤 STATUSBAR GLOBAL FORZADO */}
       <StatusBar 
         barStyle="light-content" 
         backgroundColor="#000000" 

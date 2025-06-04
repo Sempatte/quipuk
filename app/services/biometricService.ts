@@ -1,16 +1,18 @@
+// app/services/BiometricService.ts
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import { deviceManagementService } from './deviceManagementService';
 import { BiometricConfig, AuthResult, BiometricError, User } from '../types/auth.types';
 
 class BiometricService {
   private readonly BIOMETRIC_CONFIG_KEY = 'quipuk_biometric_config';
-  private readonly USER_CREDENTIALS_KEY = 'quipuk_user_credentials';
-  private readonly DEVICE_USER_KEY = 'quipuk_device_user';
-  private failedAttempts = 0;
   private readonly MAX_ATTEMPTS = 3;
+  private failedAttempts = 0;
 
-  // Verificar disponibilidad de Face ID
+  /**
+   * Verifica disponibilidad de Face ID/TouchID
+   */
   async isBiometricAvailable(): Promise<boolean> {
     if (Platform.OS !== 'ios') return false;
     
@@ -26,7 +28,9 @@ class BiometricService {
     }
   }
 
-  // Verificar si el usuario tiene Face ID configurado en el dispositivo
+  /**
+   * Verifica si el usuario tiene biometría configurada en el dispositivo
+   */
   async isBiometricEnrolled(): Promise<boolean> {
     try {
       return await LocalAuthentication.isEnrolledAsync();
@@ -36,44 +40,15 @@ class BiometricService {
     }
   }
 
-  // Verificar si el dispositivo ya está vinculado a un usuario
-  async getDeviceUser(): Promise<string | null> {
-    try {
-      return await SecureStore.getItemAsync(this.DEVICE_USER_KEY);
-    } catch (error) {
-      console.error('Error getting device user:', error);
-      return null;
-    }
-  }
-
-  // Vincular dispositivo a usuario (como Yape)
-  async linkDeviceToUser(userId: number): Promise<void> {
-    try {
-      await SecureStore.setItemAsync(this.DEVICE_USER_KEY, userId.toString());
-    } catch (error) {
-      console.error('Error linking device to user:', error);
-      throw new Error('No se pudo vincular el dispositivo');
-    }
-  }
-
-  // Desvincular dispositivo
-  async unlinkDevice(): Promise<void> {
-    try {
-      await SecureStore.deleteItemAsync(this.DEVICE_USER_KEY);
-      await SecureStore.deleteItemAsync(this.BIOMETRIC_CONFIG_KEY);
-      await SecureStore.deleteItemAsync(this.USER_CREDENTIALS_KEY);
-    } catch (error) {
-      console.error('Error unlinking device:', error);
-    }
-  }
-
-  // Configurar biometría después del registro
+  /**
+   * Configura biometría después del login exitoso (solo usuarios vinculados)
+   */
   async setupBiometric(user: User): Promise<boolean> {
     try {
-      // Verificar que el dispositivo no esté vinculado a otro usuario
-      const existingUser = await this.getDeviceUser();
-      if (existingUser && existingUser !== user.id.toString()) {
-        throw new Error('Este dispositivo ya está vinculado a otra cuenta');
+      // Verificar que el dispositivo esté vinculado a este usuario
+      const canAccess = await deviceManagementService.canUserAccessDevice(user.id);
+      if (!canAccess) {
+        throw new Error('Dispositivo no autorizado para este usuario');
       }
 
       const isAvailable = await this.isBiometricAvailable();
@@ -88,23 +63,24 @@ class BiometricService {
 
       // Solicitar autenticación para configurar
       const authResult = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Configura Face ID para Quipuk',
+        promptMessage: 'Configura Face ID para acceso rápido',
         cancelLabel: 'Cancelar',
-        fallbackLabel: 'Usar contraseña',
+        fallbackLabel: 'Usar PIN',
         disableDeviceFallback: false,
       });
 
       if (authResult.success) {
+        const deviceId = await deviceManagementService.getDeviceId();
+        
         const config: BiometricConfig = {
           isEnabled: true,
-          deviceId: user.deviceId || 'unknown',
-          userId: user.id.toString(), // Convertir a string para almacenamiento
+          deviceId,
+          userId: user.id.toString(),
           enrolledAt: new Date(),
         };
 
         await SecureStore.setItemAsync(this.BIOMETRIC_CONFIG_KEY, JSON.stringify(config));
-        await this.linkDeviceToUser(user.id);
-        
+        console.log('Biometric setup completed for user:', user.id);
         return true;
       }
 
@@ -115,30 +91,37 @@ class BiometricService {
     }
   }
 
-  // Autenticar con Face ID
+  /**
+   * Autentica con Face ID (solo para usuario vinculado)
+   */
   async authenticateWithBiometric(): Promise<AuthResult> {
     try {
       const config = await this.getBiometricConfig();
       if (!config?.isEnabled) {
-        return { success: false, error: 'Biometría no configurada' };
+        return { success: false, error: 'Face ID no configurado' };
       }
 
-      // Verificar usuario del dispositivo
-      const deviceUser = await this.getDeviceUser();
-      if (!deviceUser || deviceUser !== config.userId) {
-        return { success: false, error: 'Dispositivo no autorizado' };
+      // Verificar que el dispositivo sigue vinculado al usuario correcto
+      const linkedUserId = await deviceManagementService.getLinkedUser();
+      if (!linkedUserId || linkedUserId.toString() !== config.userId) {
+        await this.disableBiometric(); // Limpiar configuración inválida
+        return { 
+          success: false, 
+          error: 'Configuración de Face ID inválida',
+          requiresManualLogin: true 
+        };
       }
 
       if (this.failedAttempts >= this.MAX_ATTEMPTS) {
         return { 
           success: false, 
-          error: 'Demasiados intentos fallidos',
+          error: 'Demasiados intentos fallidos. Usa tu PIN.',
           requiresManualLogin: true 
         };
       }
 
       const authResult = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Accede a Quipuk',
+        promptMessage: 'Accede con Face ID',
         cancelLabel: 'Cancelar',
         fallbackLabel: `Intentos restantes: ${this.MAX_ATTEMPTS - this.failedAttempts}`,
         disableDeviceFallback: false,
@@ -146,6 +129,7 @@ class BiometricService {
 
       if (authResult.success) {
         this.resetFailedAttempts();
+        console.log('Biometric authentication successful');
         return { success: true };
       } else {
         this.failedAttempts++;
@@ -153,12 +137,11 @@ class BiometricService {
         if (this.failedAttempts >= this.MAX_ATTEMPTS) {
           return { 
             success: false, 
-            error: 'Demasiados intentos fallidos. Ingresa tu contraseña.',
+            error: 'Demasiados intentos fallidos. Usa tu PIN.',
             requiresManualLogin: true 
           };
         }
 
-        const error = this.mapBiometricError(authResult.error);
         return { 
           success: false, 
           error: `Face ID falló. Intentos restantes: ${this.MAX_ATTEMPTS - this.failedAttempts}` 
@@ -166,60 +149,121 @@ class BiometricService {
       }
     } catch (error) {
       console.error('Biometric authentication error:', error);
-      return { success: false, error: 'Error de autenticación' };
+      return { success: false, error: 'Error de autenticación biométrica' };
     }
   }
 
-  // Obtener configuración de biometría
+  /**
+   * Obtiene configuración de biometría
+   */
   async getBiometricConfig(): Promise<BiometricConfig | null> {
     try {
       const configStr = await SecureStore.getItemAsync(this.BIOMETRIC_CONFIG_KEY);
-      return configStr ? JSON.parse(configStr) : null;
+      if (!configStr) return null;
+
+      const config = JSON.parse(configStr);
+      
+      // Verificar que la configuración sigue siendo válida
+      const linkedUserId = await deviceManagementService.getLinkedUser();
+      if (!linkedUserId || linkedUserId.toString() !== config.userId) {
+        await this.disableBiometric();
+        return null;
+      }
+
+      return config;
     } catch (error) {
       console.error('Error getting biometric config:', error);
       return null;
     }
   }
 
-  // Deshabilitar biometría
+  /**
+   * Deshabilita biometría
+   */
   async disableBiometric(): Promise<void> {
     try {
       await SecureStore.deleteItemAsync(this.BIOMETRIC_CONFIG_KEY);
+      this.resetFailedAttempts();
+      console.log('Biometric disabled');
     } catch (error) {
       console.error('Error disabling biometric:', error);
       throw new Error('No se pudo deshabilitar Face ID');
     }
   }
 
-  // Resetear intentos fallidos
+  /**
+   * Verifica si biometría está habilitada para el usuario actual
+   */
+  async isBiometricEnabled(): Promise<boolean> {
+    const config = await this.getBiometricConfig();
+    if (!config) return false;
+
+    // Verificar que el usuario vinculado coincida
+    const linkedUserId = await deviceManagementService.getLinkedUser();
+    return linkedUserId?.toString() === config.userId;
+  }
+
+  /**
+   * Resetea intentos fallidos
+   */
   resetFailedAttempts(): void {
     this.failedAttempts = 0;
   }
 
-  // Mapear errores de biometría
-  private mapBiometricError(error?: string): BiometricError {
-    if (!error) return BiometricError.UNKNOWN;
-    
-    switch (error) {
-      case 'UserCancel':
-        return BiometricError.USER_CANCELLED;
-      case 'SystemCancel':
-        return BiometricError.SYSTEM_CANCELLED;
-      case 'BiometryLockout':
-        return BiometricError.LOCKOUT;
-      case 'BiometryNotAvailable':
-        return BiometricError.NOT_AVAILABLE;
-      case 'BiometryNotEnrolled':
-        return BiometricError.NOT_ENROLLED;
-      default:
-        return BiometricError.UNKNOWN;
+  /**
+   * Limpia toda la configuración biométrica (al desvincular dispositivo)
+   */
+  async clearBiometricData(): Promise<void> {
+    try {
+      await SecureStore.deleteItemAsync(this.BIOMETRIC_CONFIG_KEY);
+      this.resetFailedAttempts();
+      console.log('Biometric data cleared');
+    } catch (error) {
+      console.error('Error clearing biometric data:', error);
     }
   }
 
-  // Verificar si biometría está habilitada
-  async isBiometricEnabled(): Promise<boolean> {
-    const config = await this.getBiometricConfig();
-    return config?.isEnabled || false;
+  /**
+   * Migra configuración existente para compatibilidad
+   */
+  async migrateLegacyConfig(): Promise<void> {
+    try {
+      const config = await this.getBiometricConfig();
+      if (!config) return;
+
+      // Verificar si necesita migración (verificar estructura)
+      if (!config.deviceId) {
+        const deviceId = await deviceManagementService.getDeviceId();
+        config.deviceId = deviceId;
+        
+        await SecureStore.setItemAsync(this.BIOMETRIC_CONFIG_KEY, JSON.stringify(config));
+        console.log('Biometric config migrated');
+      }
+    } catch (error) {
+      console.error('Error migrating biometric config:', error);
+    }
+  }
+
+  /**
+   * Valida la integridad de la configuración biométrica
+   */
+  async validateBiometricIntegrity(): Promise<boolean> {
+    try {
+      const config = await this.getBiometricConfig();
+      if (!config) return false;
+
+      const linkedUserId = await deviceManagementService.getLinkedUser();
+      const deviceId = await deviceManagementService.getDeviceId();
+
+      return (
+        linkedUserId?.toString() === config.userId &&
+        deviceId === config.deviceId &&
+        config.isEnabled
+      );
+    } catch (error) {
+      console.error('Error validating biometric integrity:', error);
+      return false;
+    }
   }
 }
 
