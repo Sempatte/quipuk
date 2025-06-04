@@ -1,4 +1,3 @@
-// app/_layout.tsx - EXPO ROUTER VERSION CORREGIDA
 import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
@@ -30,20 +29,82 @@ import { OfflineMessage } from "@/components/OfflineMessage";
 
 SplashScreen.preventAutoHideAsync();
 
+function AuthHandler() {
+  const segments = useSegments();
+  const router = useRouter();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+
+  // Verificación de autenticación
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        console.log("🔍 [AuthHandler] Verificando autenticación...");
+        
+        const token = await AsyncStorage.getItem("token");
+        const userId = await AsyncStorage.getItem("userId");
+        
+        const isAuth = !!(token && userId);
+        console.log("🔍 [AuthHandler] Estado de auth:", { hasToken: !!token, hasUserId: !!userId, isAuth });
+        
+        setIsAuthenticated(isAuth);
+      } catch (error) {
+        console.error("❌ [AuthHandler] Error verificando auth:", error);
+        setIsAuthenticated(false);
+      }
+    };
+
+    checkAuth();
+  }, []);
+
+  // Navegación automática
+  useEffect(() => {
+    if (isAuthenticated === null) return;
+
+    const inTabsGroup = segments[0] === "(tabs)";
+    const isPublicRoute = segments[0] === "LoginScreen" || 
+                         segments[0] === "RegisterScreen" || 
+                         segments[0] === "EmailVerificationScreen";
+
+    console.log("🔍 [AuthHandler] Navegación:", {
+      segments,
+      inTabsGroup,
+      isPublicRoute,
+      isAuthenticated
+    });
+
+    // Redirigir si no está autenticado y está en tabs
+    if (!isAuthenticated && inTabsGroup) {
+      console.log("🔄 [AuthHandler] Redirigiendo a LoginScreen (no autenticado)");
+      router.replace("/LoginScreen");
+      return;
+    }
+
+    // Redirigir si está autenticado y está en pantalla pública
+    if (isAuthenticated && isPublicRoute) {
+      console.log("🔄 [AuthHandler] Redirigiendo a tabs (autenticado)");
+      router.replace("/(tabs)");
+      return;
+    }
+
+    // Navegación inicial
+    if (segments[0]?.length === 0) {
+      if (isAuthenticated) {
+        router.replace("/(tabs)");
+      } else {
+        router.replace("/LoginScreen");
+      }
+    }
+  }, [isAuthenticated, segments, router]);
+
+  return null;
+}
+
 function MainLayout() {
   const colorScheme = useColorScheme();
   const { isBackendActive, isLoading } = useBackendHealth({
     showErrorToast: false,
     retryInterval: 60000,
   });
-
-  // 🔥 EXPO ROUTER: useSegments y useRouter para manejar navegación
-  const segments = useSegments();
-  const router = useRouter();
-  
-  // 🔥 Estados para autenticación
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   const [fontsLoaded] = useFonts({
     Outfit_100Thin,
@@ -55,7 +116,6 @@ function MainLayout() {
     Outfit_300Light,
   });
 
-  // 🔥 Configuración del StatusBar una sola vez al inicio
   useEffect(() => {
     if (Platform.OS === "android") {
       StatusBar.setBarStyle("light-content", true);
@@ -64,86 +124,13 @@ function MainLayout() {
     }
   }, []);
 
-  // 🔥 VERIFICACIÓN DE AUTENTICACIÓN INICIAL
   useEffect(() => {
-    const checkInitialAuth = async () => {
-      try {
-        console.log("🔍 [RootLayout] Verificando autenticación inicial...");
-        
-        const token = await AsyncStorage.getItem("token");
-        const userId = await AsyncStorage.getItem("userId");
-        
-        if (token && userId) {
-          console.log("✅ [RootLayout] Usuario autenticado encontrado");
-          setIsAuthenticated(true);
-        } else {
-          console.log("❌ [RootLayout] No hay usuario autenticado");
-          setIsAuthenticated(false);
-        }
-      } catch (error) {
-        console.error("❌ [RootLayout] Error verificando auth inicial:", error);
-        setIsAuthenticated(false);
-      } finally {
-        setIsCheckingAuth(false);
-      }
-    };
-
-    checkInitialAuth();
-  }, []);
-
-  // 🔥 EXPO ROUTER: Lógica de navegación automática
-  useEffect(() => {
-    if (isCheckingAuth || isLoading) return;
-
-    // Determinar si estamos en una ruta protegida o pública
-    const inAuthGroup = segments[0] === "(tabs)";
-    // Asegurarse de que se compara con la ruta absoluta si los segmentos pueden no tenerla
-    const currentRoute = segments.join('/') === '' ? '/' : `/${segments.join('/')}`;
-
-    const inPublicRoute = currentRoute === "/LoginScreen" || 
-                         currentRoute === "/RegisterScreen" || 
-                         currentRoute === "/EmailVerificationScreen";
-
-    console.log("🔍 [RootLayout] Navegación:", {
-      segments,
-      inAuthGroup,
-      inPublicRoute,
-      isAuthenticated
-    });
-
-    // Si no está autenticado y está en ruta protegida, redirigir a login
-    if (!isAuthenticated && inAuthGroup) {
-      console.log("🔄 [RootLayout] Redirigiendo a /LoginScreen (no autenticado)");
-      router.replace("/LoginScreen");
-      return;
-    }
-
-    // Si está autenticado y está en ruta pública, redirigir a tabs
-    if (isAuthenticated && inPublicRoute) {
-      console.log("🔄 [RootLayout] Redirigiendo a (tabs) (autenticado)");
-      router.replace("/(tabs)" as any);
-      return;
-    }
-
-    // Si es la primera carga y no hay segmentos, navegar según autenticación
-    if (segments.length < 1) {
-      if (isAuthenticated) {
-        router.replace("/(tabs)");
-      } else {
-        router.replace("/LoginScreen");
-      }
-    }
-  }, [isAuthenticated, segments, isCheckingAuth, isLoading, router]);
-
-  // 🔥 Ocultar splash cuando todo esté listo
-  useEffect(() => {
-    if (fontsLoaded && !isLoading && !isCheckingAuth) {
+    if (fontsLoaded && !isLoading) {
       SplashScreen.hideAsync();
     }
-  }, [fontsLoaded, isLoading, isCheckingAuth]);
+  }, [fontsLoaded, isLoading]);
 
-  // 🔥 NO RENDERIZAR HASTA QUE TODO ESTÉ LISTO
-  if (!fontsLoaded || isLoading || isCheckingAuth) {
+  if (!fontsLoaded || isLoading) {
     return null;
   }
 
@@ -153,14 +140,13 @@ function MainLayout() {
 
   return (
     <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
-      {/* 🔥 StatusBar global - configuración principal */}
       <StatusBar 
         barStyle="light-content" 
         backgroundColor="#000000" 
         translucent={Platform.OS === 'ios'}
       />
       
-      {/* 🔥 EXPO ROUTER: Usar Slot en lugar de Stack */}
+      <AuthHandler />
       <Slot />
     </ThemeProvider>
   );

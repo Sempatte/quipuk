@@ -1,29 +1,52 @@
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 
-// Define los nombres de las rutas con el formato correcto para Expo Router
+// Tipos simplificados para Expo Router
 export type RootStackParamList = {
-  "/LoginScreen": undefined;
-  "/RegisterScreen": undefined;
-  "/EmailVerificationScreen": {
+  // Pantallas de autenticación (en la raíz)
+  "LoginScreen": undefined;
+  "RegisterScreen": undefined;
+  "EmailVerificationScreen": {
     email: string;
-    userId?: number;
-    fromRegistration?: boolean;
+    userId?: string;
+    fromRegistration?: string;
   };
-  "/(tabs)": undefined;
-  "/(tabs)/movements": undefined;
-  "/(tabs)/index": undefined;
-  "/(tabs)/board": undefined;
-  "/(tabs)/add": {
+  
+  // Grupo de tabs
+  "(tabs)": undefined;
+  "(tabs)/index": undefined;
+  "(tabs)/movements": undefined;
+  "(tabs)/board": undefined;
+  "(tabs)/add": {
     forcePaymentStatus?: 'pending' | 'completed';
     statusReadOnly?: boolean;
     preselectedTab?: string;
   } | undefined;
+  "(tabs)/profile": undefined;
+  
+  // Rutas individuales de tabs (para compatibilidad)
+  "movements": undefined;
+  "index": undefined;
+  "board": undefined;
+  "add": {
+    forcePaymentStatus?: 'pending' | 'completed';
+    statusReadOnly?: boolean;
+    preselectedTab?: string;
+  } | undefined;
+  "profile": undefined;
 };
 
-// Para usar con router.replace/push
-export type RoutePathParam = keyof RootStackParamList;
+// Para router de Expo
+export type ExpoRouterPath = 
+  | "/LoginScreen"
+  | "/RegisterScreen" 
+  | "/EmailVerificationScreen"
+  | "/(tabs)"
+  | "/(tabs)/movements"
+  | "/(tabs)/board"
+  | "/(tabs)/add"
+  | "/(tabs)/profile"
+  | "/(tabs)/index";
 
-// Para compatibilidad con código existente
 export type RootStackNavigationProp<T extends keyof RootStackParamList> = NativeStackNavigationProp<
   RootStackParamList,
   T

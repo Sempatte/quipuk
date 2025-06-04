@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx - CORRECCIÓN CRÍTICA: USAR CACHE BUSTED URL
+// app/(tabs)/profile.tsx - CORRECCIÓN COMPLETA
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
@@ -12,17 +12,15 @@ import {
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons } from "@expo/vector-icons";
 import client from "@/app/apolloClient";
 
-import { RootStackNavigationProp } from "../interfaces/navigation";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
 import { useProfilePicture } from "@/hooks/useProfilePicture";
 import Avatar from "@/components/ui/Avatar";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 interface UserProfile {
   fullName: string;
@@ -33,29 +31,29 @@ interface UserProfile {
 }
 
 export default function Profile() {
-  const navigation = useNavigation<RootStackNavigationProp<"/(tabs)">>();
+  // 🔥 CORRECCIÓN: Removemos useNavigation y solo usamos useRouter
   const router = useRouter();
 
   // Query del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
     GET_USER_PROFILE,
     {
-      fetchPolicy: 'cache-first',
-      errorPolicy: 'all',
+      fetchPolicy: "cache-first",
+      errorPolicy: "all",
       notifyOnNetworkStatusChange: true,
     }
   );
 
   // Hook personalizado para foto de perfil
-  const { 
-    state: profilePictureState, 
-    selectAndUploadImage, 
+  const {
+    state: profilePictureState,
+    selectAndUploadImage,
     deleteProfilePicture,
     forceRefresh,
-    retryImageLoad // 🆕 Para reintentar
+    retryImageLoad,
   } = useProfilePicture();
 
-  // Función de logout
+  // 🔥 FUNCIÓN DE LOGOUT CORREGIDA
   const handleLogout = useCallback(async () => {
     try {
       Alert.alert(
@@ -67,20 +65,24 @@ export default function Profile() {
             text: "Cerrar Sesión",
             onPress: async () => {
               try {
+                console.log("🔄 [Profile] Iniciando logout...");
                 
-                
+                // 1. Limpiar AsyncStorage
                 await AsyncStorage.multiRemove(["token", "userId"]);
-                router.replace("/LoginScreen"); // Redirigir inmediatamente
+                console.log("✅ [Profile] AsyncStorage limpiado");
                 
-                // Resetear el store de Apollo después de la redirección
-                // para evitar queries sin token en la pantalla actual.
-                await client.resetStore(); 
+                // 2. Resetear Apollo store
+                await client.resetStore();
+                console.log("✅ [Profile] Apollo store reseteado");
                 
-                
+                // 3. Navegar al login
+                router.replace("/LoginScreen");
+                console.log("✅ [Profile] Navegación completada");
                 
               } catch (error) {
                 console.error("❌ [Profile] Error durante logout:", error);
-                Alert.alert("Error", "Hubo un problema al cerrar sesión. Intenta nuevamente.");
+                // Fallback: intentar navegación de emergencia
+                router.replace("/LoginScreen");
               }
             },
             style: "destructive"
@@ -89,33 +91,34 @@ export default function Profile() {
       );
     } catch (error) {
       console.error("❌ [Profile] Error en logout:", error);
-      Alert.alert("Error", "No se pudo cerrar sesión.");
+      // Navegación de emergencia
+      router.replace("/LoginScreen");
     }
   }, [router]);
 
   // Manejar acciones del avatar
   const handleAvatarPress = useCallback(() => {
     if (profilePictureState.profilePictureUrl) {
-      Alert.alert(
-        'Foto de perfil',
-        'Selecciona una acción',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Cambiar foto', 
-            onPress: selectAndUploadImage 
-          },
-          { 
-            text: 'Eliminar foto', 
-            onPress: deleteProfilePicture,
-            style: 'destructive' 
-          },
-        ]
-      );
+      Alert.alert("Foto de perfil", "Selecciona una acción", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cambiar foto",
+          onPress: selectAndUploadImage,
+        },
+        {
+          text: "Eliminar foto",
+          onPress: deleteProfilePicture,
+          style: "destructive",
+        },
+      ]);
     } else {
       selectAndUploadImage();
     }
-  }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
+  }, [
+    profilePictureState.profilePictureUrl,
+    selectAndUploadImage,
+    deleteProfilePicture,
+  ]);
 
   // Determinar estados de loading
   const shouldShowAvatarLoading = useCallback(() => {
@@ -133,7 +136,7 @@ export default function Profile() {
           <Ionicons name="alert-circle" size={50} color="#E86F51" />
           <Text style={styles.errorText}>Error al cargar el perfil</Text>
           <Text style={styles.errorSubtext}>{error.message}</Text>
-          
+
           <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
             <Text style={styles.logoutText}>Cerrar Sesión</Text>
           </TouchableOpacity>
@@ -148,7 +151,10 @@ export default function Profile() {
         <Text style={styles.headerTitle}>Mi Perfil</Text>
       </View>
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Avatar Section */}
         <View style={styles.avatarContainer}>
           <Avatar
@@ -161,10 +167,10 @@ export default function Profile() {
             loading={shouldShowAvatarLoading()}
             progress={profilePictureState.uploadProgress}
           />
-          {/* Eliminar Debug Information visual y tarjetas de debug */}
           {profilePictureState.isUploading && (
             <Text style={styles.uploadingText}>
-              Subiendo imagen... {Math.round(profilePictureState.uploadProgress)}%
+              Subiendo imagen...{" "}
+              {Math.round(profilePictureState.uploadProgress)}%
             </Text>
           )}
           {profilePictureState.isDeleting && (
@@ -181,8 +187,10 @@ export default function Profile() {
           ) : (
             data?.getUserProfile && (
               <>
-                <Text style={styles.userName}>{data.getUserProfile.fullName}</Text>
-                
+                <Text style={styles.userName}>
+                  {data.getUserProfile.fullName}
+                </Text>
+
                 {/* Tarjeta de información de contacto */}
                 <View style={styles.infoCard}>
                   <View style={styles.infoItem}>
@@ -191,57 +199,80 @@ export default function Profile() {
                     </View>
                     <View>
                       <Text style={styles.infoLabel}>Teléfono</Text>
-                      <Text style={styles.infoValue}>{data.getUserProfile.phoneNumber || 'No especificado'}</Text>
+                      <Text style={styles.infoValue}>
+                        {data.getUserProfile.phoneNumber || "No especificado"}
+                      </Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.divider} />
-                  
+
                   <View style={styles.infoItem}>
                     <View style={styles.iconContainer}>
                       <Ionicons name="mail-outline" size={24} color="#00DC5A" />
                     </View>
                     <View>
                       <Text style={styles.infoLabel}>Correo</Text>
-                      <Text style={styles.infoValue}>{data.getUserProfile.email}</Text>
+                      <Text style={styles.infoValue}>
+                        {data.getUserProfile.email}
+                      </Text>
                     </View>
                   </View>
                 </View>
-                
+
                 {/* Tarjeta de opciones */}
                 <View style={styles.optionsCard}>
-                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+                  <TouchableOpacity
+                    style={styles.optionItem}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.optionIconContainer}>
-                      <Ionicons name="settings-outline" size={22} color="#333" />
+                      <Ionicons
+                        name="settings-outline"
+                        size={22}
+                        color="#333"
+                      />
                     </View>
                     <Text style={styles.optionText}>Configuraciones</Text>
                     <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
-                  
+
                   <View style={styles.optionDivider} />
-                  
-                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+
+                  <TouchableOpacity
+                    style={styles.optionItem}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.optionIconContainer}>
                       <Ionicons name="shield-outline" size={22} color="#333" />
                     </View>
-                    <Text style={styles.optionText}>Privacidad y Seguridad</Text>
+                    <Text style={styles.optionText}>
+                      Privacidad y Seguridad
+                    </Text>
                     <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
-                  
+
                   <View style={styles.optionDivider} />
-                  
-                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+
+                  <TouchableOpacity
+                    style={styles.optionItem}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.optionIconContainer}>
-                      <Ionicons name="help-circle-outline" size={22} color="#333" />
+                      <Ionicons
+                        name="help-circle-outline"
+                        size={22}
+                        color="#333"
+                      />
                     </View>
                     <Text style={styles.optionText}>Ayuda y Soporte</Text>
                     <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
                 </View>
-                
+
                 {/* Botón de cierre de sesión */}
-                <TouchableOpacity 
-                  style={styles.logoutButton} 
+                <TouchableOpacity
+                  style={styles.logoutButton}
                   onPress={handleLogout}
                   activeOpacity={0.8}
                 >
@@ -272,7 +303,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    position: 'relative',
+    position: "relative",
   },
   headerTitle: {
     fontSize: 35,
@@ -348,9 +379,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: 'rgba(0, 220, 90, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0, 220, 90, 0.1)",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 15,
   },
   infoLabel: {
@@ -378,7 +409,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   optionItem: {
     flexDirection: "row",
@@ -389,9 +420,9 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f5f5f5', 
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#f5f5f5",
+    justifyContent: "center",
+    alignItems: "center",
     marginRight: 15,
   },
   optionText: {

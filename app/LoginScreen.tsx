@@ -1,4 +1,4 @@
-// app/LoginScreen.tsx - VERSIÓN ACTUALIZADA CON PIN + BIOMETRÍA
+// app/(auth)/LoginScreen.tsx - NAVEGACIÓN CORREGIDA
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -14,28 +14,20 @@ import {
   Alert,
 } from "react-native";
 import { useMutation } from "@apollo/client";
-import { useNavigation } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
 
 // Imports del sistema de autenticación
-import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
 import { useBiometricAuth } from "@/hooks/useBiometricAuth";
 import { usePinAuth } from "@/hooks/usePinAuth";
 import { PinInput } from "@/components/ui/PinInput";
 import { BiometricSetupModal } from "@/components/BiometricSetupModal";
 import { PinSetup } from "@/components/ui/PinSetup";
 
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "./interfaces/navigation";
-import { useToast } from "./providers/ToastProvider";
 import QuipukLogo from "@/assets/images/Logo.svg";
-
-type LoginScreenNavigationProp = NativeStackNavigationProp<
-  RootStackParamList,
-  "/LoginScreen"
->;
+import { useToast } from "./providers/ToastProvider";
+import { LOGIN_MUTATION } from "./graphql/mutations.graphql";
 
 interface UserProfile {
   id: number;
@@ -47,7 +39,6 @@ interface UserProfile {
 type AuthMethod = "biometric" | "pin" | "password" | "setup";
 
 export default function LoginScreen() {
-  const navigation = useNavigation<LoginScreenNavigationProp>();
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -92,11 +83,11 @@ export default function LoginScreen() {
           id: user.id,
           email: user.email,
           username: user.username,
-          deviceId: await generateDeviceId(), // Función para generar ID único del dispositivo
+          deviceId: await generateDeviceId(),
         };
 
         setUserProfile(profile);
-        setIsNewUser(false); // Usuario existente
+        setIsNewUser(false);
 
         // Determinar método de autenticación según configuración
         await determineAuthMethod(profile);
@@ -120,6 +111,7 @@ export default function LoginScreen() {
             "Necesitas verificar tu email antes de iniciar sesión"
           );
 
+          // 🔥 NAVEGACIÓN CORREGIDA
           router.push({
             pathname: "/EmailVerificationScreen",
             params: {
@@ -163,7 +155,6 @@ export default function LoginScreen() {
 
   // Determinar método de autenticación según configuración del usuario
   const determineAuthMethod = async (profile: UserProfile) => {
-    // Verificar si es un dispositivo nuevo o usuario sin configuración
     const hasPin = pinConfig.hasPin;
     const hasBiometric = biometricEnabled;
 
@@ -174,17 +165,15 @@ export default function LoginScreen() {
       isNewUser,
     });
 
-    // Si no tiene PIN ni biometría configurados, mostrar setup
     if (!hasPin && !hasBiometric) {
       setAuthMethod("setup");
       setShowPinSetup(true);
       return;
     }
 
-    // Prioridad: Biometría > PIN > Contraseña
     if (hasBiometric && biometricAvailable) {
       setAuthMethod("biometric");
-      setTimeout(() => handleBiometricAuth(), 500); // Delay para UX
+      setTimeout(() => handleBiometricAuth(), 500);
       return;
     }
 
@@ -193,7 +182,6 @@ export default function LoginScreen() {
       return;
     }
 
-    // Fallback: ir directamente a la app si solo tiene login tradicional
     navigateToApp();
   };
 
@@ -221,7 +209,6 @@ export default function LoginScreen() {
       if (result.success) {
         navigateToApp();
       } else if (result.requiresManualLogin) {
-        // Fallback a PIN o contraseña
         if (pinConfig.hasPin) {
           setAuthMethod("pin");
         } else {
@@ -273,14 +260,12 @@ export default function LoginScreen() {
     setShowPinSetup(false);
 
     if (success) {
-      // Después de configurar PIN, ofrecer biometría si está disponible
       if (biometricAvailable) {
         setShowBiometricSetup(true);
       } else {
         navigateToApp();
       }
     } else {
-      // Si rechaza el setup, ir directamente a la app
       navigateToApp();
     }
   };
@@ -290,11 +275,9 @@ export default function LoginScreen() {
     setShowBiometricSetup(false);
 
     if (enabled) {
-      // Si habilitó biometría, usarla inmediatamente
       setAuthMethod("biometric");
       handleBiometricAuth();
     } else {
-      // Si rechaza biometría, usar PIN o ir a la app
       if (pinConfig.hasPin) {
         setAuthMethod("pin");
       } else {
@@ -303,7 +286,7 @@ export default function LoginScreen() {
     }
   };
 
-  // Navegar a la app principal
+  // 🔥 NAVEGACIÓN CORREGIDA
   const navigateToApp = () => {
     router.replace("/(tabs)");
   };
@@ -319,7 +302,7 @@ export default function LoginScreen() {
   const renderAuthMethod = () => {
     switch (authMethod) {
       case "setup":
-        return null; // Los modales se manejan por separado
+        return null;
 
       case "pin":
         return (
@@ -458,6 +441,7 @@ export default function LoginScreen() {
             </TouchableOpacity>
 
             <TouchableOpacity
+              // 🔥 NAVEGACIÓN CORREGIDA
               onPress={() => router.push("/RegisterScreen")}
               disabled={loginLoading}
               style={styles.registerContainer}
