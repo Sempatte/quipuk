@@ -1,4 +1,3 @@
-// app/(auth)/LoginScreen.tsx - DISEÑO MEJORADO CON SAFEAREAVIEW
 import React, { useState, useEffect } from "react";
 import {
   View,
@@ -33,6 +32,7 @@ import { PinSetup } from "@/components/ui/PinSetup";
 import QuipukLogo from "@/assets/images/Logo.svg";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
+import { useBlackStatusBar } from "@/hooks/useStatusBar";
 
 const { width, height } = Dimensions.get("window");
 
@@ -46,6 +46,9 @@ interface UserProfile {
 type AuthMethod = "biometric" | "pin" | "password" | "setup";
 
 export default function LoginScreen() {
+  // 🖤 HOOK CENTRALIZADO PARA STATUSBAR
+  useBlackStatusBar();
+
   const router = useRouter();
   const { showToast } = useToast();
 
@@ -504,7 +507,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBar style="dark" backgroundColor="#000000" />
+      <StatusBar style="light" />
       
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -552,7 +555,6 @@ export default function LoginScreen() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -579,7 +581,6 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
   },
 
-  // Form container styles
   formContainer: {
     flex: 1,
   },
@@ -602,7 +603,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
 
-  // Input styles
   inputContainer: {
     marginBottom: 20,
   },
@@ -645,7 +645,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
-  // Options styles
   optionsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -682,7 +681,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_500Medium",
   },
 
-  // Button styles
   loginButton: {
     borderRadius: 25,
     overflow: "hidden",
@@ -715,7 +713,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
   },
 
-  // Register link styles
   registerContainer: {
     alignItems: "center",
     paddingVertical: 16,
@@ -731,7 +728,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_600SemiBold",
   },
 
-  // Auth container styles (PIN & Biometric)
   authContainer: {
     flex: 1,
     alignItems: "center",
@@ -762,7 +758,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_400Regular",
   },
 
-  // Biometric styles
   biometricSection: {
     alignItems: "center",
     marginBottom: 40,
@@ -806,7 +801,6 @@ const styles = StyleSheet.create({
     fontFamily: "Outfit_500Medium",
   },
 
-  // Shared styles
   changeAccountButton: {
     alignSelf: "center",
     paddingVertical: 12,

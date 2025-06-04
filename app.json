@@ -6,7 +6,7 @@
     "orientation": "portrait",
     "icon": "./assets/images/Logo1024x1024.png",
     "scheme": "quipuk",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "jsEngine": "hermes",
     "primaryColor": "#00D865",
@@ -19,7 +19,7 @@
     ],
     "ios": {
       "jsEngine": "hermes",
-      "userInterfaceStyle": "dark",
+      "userInterfaceStyle": "light",
       "supportsTablet": true,
       "bundleIdentifier": "com.quipuk.app",
       "buildNumber": "1",
@@ -33,7 +33,9 @@
         "NSCameraUsageDescription": "Quipuk necesita acceso a la cámara para escanear comprobantes de gastos y facturas.",
         "NSPhotoLibraryUsageDescription": "Quipuk necesita acceso a la galería para seleccionar comprobantes de gastos desde tus fotos.",
         "NSMicrophoneUsageDescription": "Quipuk puede necesitar acceso al micrófono para funciones de grabación de notas.",
-        "UIBackgroundModes": ["background-fetch"]
+        "UIBackgroundModes": ["background-fetch"],
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
       },
       "associatedDomains": ["applinks:quipuk.app"]
     },

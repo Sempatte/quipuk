@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { StatusBar as RNStatusBar } from "react-native";
 
 // Importaciones de componentes
 import BellIcon from "@/assets/images/icons/mdi_bell.svg";
@@ -30,6 +31,25 @@ export default function Index() {
   const { data, loading, error } = useQuery(GET_USER_PROFILE);
   const router = useRouter();
 
+  // 🖤 CONFIGURACIÓN DIRECTA DEL STATUSBAR
+  useEffect(() => {
+    const configureStatusBar = () => {
+      try {
+        if (Platform.OS === 'android') {
+          RNStatusBar.setBarStyle('light-content', true);
+          RNStatusBar.setBackgroundColor('#000000', true);
+          RNStatusBar.setTranslucent(false);
+        } else if (Platform.OS === 'ios') {
+          RNStatusBar.setBarStyle('light-content', true);
+        }
+      } catch (error) {
+        console.warn('Error configurando StatusBar:', error);
+      }
+    };
+
+    configureStatusBar();
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       if (error?.message === "Token expired or invalid") {
@@ -45,6 +65,7 @@ export default function Index() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar style="light" />
 
       <View style={styles.header}>
         <View style={styles.headerContent}>
@@ -61,7 +82,6 @@ export default function Index() {
           </View>
         </View>
         
-        {/* Welcome Message */}
         <View style={styles.welcomeContainer}>
           <Text style={styles.welcome}>
             Hola,{" "}
@@ -72,7 +92,6 @@ export default function Index() {
         </View>
       </View>
 
-      {/* 🔥 Contenido scrollable */}
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
@@ -91,7 +110,7 @@ export default function Index() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#000000", // 🔥 Fondo negro para evitar flasheo
+    backgroundColor: "#000000",
   },
   header: {
     backgroundColor: "#000000",
@@ -99,7 +118,6 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
-    // 🔥 Eliminamos paddingTop ya que SafeAreaView se encarga
   },
   headerContent: {
     flexDirection: "row",

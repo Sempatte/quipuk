@@ -8,10 +8,11 @@ import { Calendar } from "react-native-calendars";
 import { format, startOfMonth, endOfMonth, isSameMonth, addDays, isLastDayOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
+import { StatusBar as RNStatusBar } from "react-native";
 
 import TransactionItem from "@/components/ui/TransactionItem";
 import BalanceHeader from "@/components/ui/BalancerHeader";
-import TransactionSkeleton from "@/components/ui/TransactionSkeleton"; // 🎨 Importar skeleton
+import TransactionSkeleton from "@/components/ui/TransactionSkeleton";
 import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
 import { RootStackParamList } from "../interfaces/navigation";
 import { Transaction } from "../interfaces/transaction.interface";
@@ -112,14 +113,33 @@ function useTransactionData(transactions: Transaction[], selectedDate: Date | nu
 export default function Movements() {
   const { loading, error, data, refetch } = useQuery(GET_TRANSACTIONS_BY_USER, { 
     fetchPolicy: 'cache-first',
-    errorPolicy: 'all' // 🎨 Mejor manejo de errores
+    errorPolicy: 'all'
   });
   const navigation = useNavigation<NativeStackNavigationProp<RootStackParamList, "LoginScreen">>();
   const [referenceDay, setReferenceDay] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [calendarVisible, setCalendarVisible] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false); // 🎨 Estado para pull-to-refresh
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const daysListRef = useRef<FlatList<Date>>(null);
+
+  // 🖤 CONFIGURACIÓN DIRECTA DEL STATUSBAR
+  useEffect(() => {
+    const configureStatusBar = () => {
+      try {
+        if (Platform.OS === 'android') {
+          RNStatusBar.setBarStyle('light-content', true);
+          RNStatusBar.setBackgroundColor('#000000', true);
+          RNStatusBar.setTranslucent(false);
+        } else if (Platform.OS === 'ios') {
+          RNStatusBar.setBarStyle('light-content', true);
+        }
+      } catch (error) {
+        console.warn('Error configurando StatusBar:', error);
+      }
+    };
+
+    configureStatusBar();
+  }, []);
 
   const transactions = useMemo(() => {
     const arr = data?.getTransactions || [];
@@ -147,7 +167,6 @@ export default function Movements() {
     setSelectedDate(null);
   }, [referenceDay]);
 
-  // 🎨 Función de refresh mejorada
   const handleRefresh = useCallback(async () => {
     setIsRefreshing(true);
     try {
@@ -159,7 +178,6 @@ export default function Movements() {
     }
   }, [refetch]);
 
-  // Scroll automático al día actual cuando cambian los días o el mes
   useEffect(() => {
     if (!daysListRef.current || !days.length) return;
     const today = new Date();
@@ -171,18 +189,16 @@ export default function Movements() {
     }
   }, [days, referenceDay]);
 
-  // Refrescar movimientos al volver a la pantalla
   useFocusEffect(
     React.useCallback(() => {
       refetch();
     }, [refetch])
   );
 
-  // 🎨 MANEJO DE ESTADOS DE CARGA Y ERROR MEJORADO
   if (error) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" backgroundColor="#000000" />
+        <StatusBar style="light" />
         <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
           <View style={styles.header}>
             <Text style={styles.title}>Transacciones</Text>
@@ -199,11 +215,10 @@ export default function Movements() {
     );
   }
 
-  // 🎨 MOSTRAR SKELETON DURANTE LA CARGA
   if (loading && !data) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" backgroundColor="#000000" />
+        <StatusBar style="light" />
         <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
           <View style={styles.header}>
             <Text style={styles.title}>Transacciones</Text>
@@ -219,7 +234,6 @@ export default function Movements() {
               </TouchableOpacity>
             </View>
             
-            {/* 🎨 Skeleton para los días del header */}
             <View style={styles.daysWrapper}>
               <View style={styles.daysSkeletonContainer}>
                 {Array.from({ length: 7 }).map((_, index) => (
@@ -232,9 +246,7 @@ export default function Movements() {
           </View>
         </SafeAreaView>
         
-        {/* 🎨 SKELETON PARA EL CONTENIDO PRINCIPAL */}
         <View style={styles.listContainer}>
-          {/* Skeleton para BalanceHeader */}
           <View style={styles.balanceHeaderSkeleton}>
             <View style={styles.balanceSkeletonRow}>
               <View style={styles.balanceSkeletonBox} />
@@ -243,7 +255,6 @@ export default function Movements() {
             </View>
           </View>
           
-          {/* Skeleton para las transacciones */}
           <TransactionSkeleton count={8} />
         </View>
       </View>
@@ -255,7 +266,7 @@ export default function Movements() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" backgroundColor="#000000" />
+      <StatusBar style="light" />
       <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
         <View style={styles.header}>
           <Text style={styles.title}>Transacciones</Text>
@@ -341,7 +352,6 @@ export default function Movements() {
           initialNumToRender={4}
           style={styles.flatList}
           contentContainerStyle={styles.flatListContent}
-          // 🎨 PULL TO REFRESH
           refreshing={isRefreshing}
           onRefresh={handleRefresh}
         />
@@ -377,7 +387,7 @@ export default function Movements() {
       </Modal>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { 

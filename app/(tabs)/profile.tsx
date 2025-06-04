@@ -1,4 +1,4 @@
-// app/(tabs)/profile.tsx - CORRECCIÓN COMPLETA
+// app/(tabs)/profile.tsx - PROFILE CON STATUSBAR CORRECTO
 import React, { useCallback } from "react";
 import {
   ActivityIndicator,
@@ -14,10 +14,13 @@ import { useQuery } from "@apollo/client";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { StatusBar } from "expo-status-bar";
+import { SafeAreaView } from "react-native-safe-area-context";
 import client from "@/app/apolloClient";
 
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
 import { useProfilePicture } from "@/hooks/useProfilePicture";
+import { useBlackStatusBar } from "@/hooks/useStatusBar";
 import Avatar from "@/components/ui/Avatar";
 
 const { width } = Dimensions.get("window");
@@ -31,7 +34,9 @@ interface UserProfile {
 }
 
 export default function Profile() {
-  // 🔥 CORRECCIÓN: Removemos useNavigation y solo usamos useRouter
+  // 🖤 HOOK CENTRALIZADO PARA STATUSBAR
+  useBlackStatusBar();
+
   const router = useRouter();
 
   // Query del perfil
@@ -56,39 +61,34 @@ export default function Profile() {
   // 🔥 FUNCIÓN DE LOGOUT CORREGIDA
   const handleLogout = useCallback(async () => {
     try {
-      Alert.alert(
-        "Cerrar Sesión",
-        "¿Estás seguro que deseas cerrar sesión?",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Cerrar Sesión",
-            onPress: async () => {
-              try {
-                console.log("🔄 [Profile] Iniciando logout...");
-                
-                // 1. Limpiar AsyncStorage
-                await AsyncStorage.multiRemove(["token", "userId"]);
-                console.log("✅ [Profile] AsyncStorage limpiado");
-                
-                // 2. Resetear Apollo store
-                await client.resetStore();
-                console.log("✅ [Profile] Apollo store reseteado");
-                
-                // 3. Navegar al login
-                router.replace("/LoginScreen");
-                console.log("✅ [Profile] Navegación completada");
-                
-              } catch (error) {
-                console.error("❌ [Profile] Error durante logout:", error);
-                // Fallback: intentar navegación de emergencia
-                router.replace("/LoginScreen");
-              }
-            },
-            style: "destructive"
-          }
-        ]
-      );
+      Alert.alert("Cerrar Sesión", "¿Estás seguro que deseas cerrar sesión?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cerrar Sesión",
+          onPress: async () => {
+            try {
+              console.log("🔄 [Profile] Iniciando logout...");
+
+              // 1. Limpiar AsyncStorage
+              await AsyncStorage.multiRemove(["token", "userId"]);
+              console.log("✅ [Profile] AsyncStorage limpiado");
+
+              // 2. Resetear Apollo store
+              await client.resetStore();
+              console.log("✅ [Profile] Apollo store reseteado");
+
+              // 3. Navegar al login
+              router.replace("/LoginScreen");
+              console.log("✅ [Profile] Navegación completada");
+            } catch (error) {
+              console.error("❌ [Profile] Error durante logout:", error);
+              // Fallback: intentar navegación de emergencia
+              router.replace("/LoginScreen");
+            }
+          },
+          style: "destructive",
+        },
+      ]);
     } catch (error) {
       console.error("❌ [Profile] Error en logout:", error);
       // Navegación de emergencia
@@ -132,6 +132,7 @@ export default function Profile() {
   if (error) {
     return (
       <View style={styles.container}>
+        <StatusBar style="light" />
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle" size={50} color="#E86F51" />
           <Text style={styles.errorText}>Error al cargar el perfil</Text>
@@ -147,9 +148,13 @@ export default function Profile() {
 
   return (
     <View style={styles.mainContainer}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Mi Perfil</Text>
-      </View>
+      <StatusBar style="light" />
+
+      <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Mi Perfil</Text>
+        </View>
+      </SafeAreaView>
 
       <ScrollView
         style={styles.scrollContainer}
@@ -296,14 +301,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F8F8F8",
   },
+  headerSafeArea: {
+    backgroundColor: "#000000",
+  },
   header: {
     backgroundColor: "#000000",
-    paddingTop: 60,
-    paddingBottom: 10,
+    paddingBottom: 20,
     alignItems: "center",
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    position: "relative",
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
   },
   headerTitle: {
     fontSize: 35,
