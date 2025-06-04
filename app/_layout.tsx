@@ -1,5 +1,5 @@
 // app/_layout.tsx - STATUSBAR NEGRO GLOBAL FORZADO
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
   DefaultTheme,
@@ -34,109 +34,63 @@ function AuthHandler() {
   const segments = useSegments();
   const router = useRouter();
   const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
-  const [initialCheckDone, setInitialCheckDone] = useState(false);
-  const navigationInProgress = useRef(false);
-
-  // 🔥 VERIFICACIÓN DE AUTENTICACIÓN UNA SOLA VEZ
+  const [hasNavigated, setHasNavigated] = useState(false);
+  
+  // 🎯 VERIFICACIÓN DE AUTENTICACIÓN (SOLO UNA VEZ AL INICIO)
   useEffect(() => {
-    if (initialCheckDone) return;
-
-    const checkAuth = async () => {
+    const checkAuthStatus = async () => {
       try {
-        console.log("🔍 [AuthHandler] Verificación inicial de autenticación...");
+        console.log("🔍 [AuthHandler] Verificación inicial de autenticación");
         
-        const token = await AsyncStorage.getItem("token");
-        const userId = await AsyncStorage.getItem("userId");
+        const [token, userId] = await Promise.all([
+          AsyncStorage.getItem("token"),
+          AsyncStorage.getItem("userId")
+        ]);
         
         const isAuth = !!(token && userId);
-        console.log("🔍 [AuthHandler] Estado inicial:", { 
-          hasToken: !!token, 
-          hasUserId: !!userId, 
-          isAuth 
-        });
+        console.log("🔍 [AuthHandler] Estado:", isAuth ? "autenticado" : "no autenticado");
         
         setIsAuthenticated(isAuth);
-        setInitialCheckDone(true);
       } catch (error) {
-        console.error("❌ [AuthHandler] Error verificando auth:", error);
+        console.error("❌ [AuthHandler] Error:", error);
         setIsAuthenticated(false);
-        setInitialCheckDone(true);
       }
     };
 
-    checkAuth();
-  }, [initialCheckDone]);
+    checkAuthStatus();
+  }, []); // ✅ Solo al montar el componente
 
-  // 🔥 NAVEGACIÓN CONTROLADA CON PROTECCIÓN CONTRA BUCLES
+  // 🎯 NAVEGACIÓN INTELIGENTE (SOLO CUANDO CAMBIA EL ESTADO DE AUTH)
   useEffect(() => {
-    if (isAuthenticated === null || !initialCheckDone || navigationInProgress.current) {
-      return;
-    }
-
-    const currentPath = segments.join('/') || 'root';
-    console.log("🔍 [AuthHandler] Evaluando navegación:", {
-      segments,
+    if (isAuthenticated === null) return; // Esperamos la verificación inicial
+    
+    const currentPath = `/${segments.join('/')}`;
+    const isInTabsGroup = segments[0] === "(tabs)";
+    const isInAuthRoute = currentPath.includes("LoginScreen") || 
+                         currentPath.includes("RegisterScreen") || 
+                         currentPath.includes("EmailVerificationScreen");
+    
+    console.log("🧭 [AuthHandler] Evaluando navegación:", {
       currentPath,
       isAuthenticated,
-      navigationInProgress: navigationInProgress.current
+      isInTabsGroup,
+      isInAuthRoute,
+      hasNavigated
     });
 
-    // Determinar si está en ruta protegida o pública
-    const isInTabsGroup = segments[0] === "(tabs)";
-    const isInAuthRoute = segments[0] === "LoginScreen" || 
-                         segments[0] === "RegisterScreen" || 
-                         segments[0] === "EmailVerificationScreen" ||
-                         currentPath.includes("Login") ||
-                         currentPath.includes("Register") ||
-                         currentPath.includes("EmailVerification");
-
-    // CASO 1: Usuario NO autenticado en ruta protegida -> Redirigir a Login
-    if (!isAuthenticated && isInTabsGroup) {
-      console.log("🔄 [AuthHandler] Usuario no autenticado en tabs -> LoginScreen");
-      navigationInProgress.current = true;
-      
+    // 🎯 CASOS DE REDIRECCIÓN (solo si es necesario)
+    if (!isAuthenticated && (isInTabsGroup || (!isInAuthRoute && !hasNavigated))) {
+      console.log("🔄 Usuario no autenticado -> LoginScreen");
       router.replace("/LoginScreen");
-      
-      setTimeout(() => {
-        navigationInProgress.current = false;
-      }, 1000);
-      return;
-    }
-
-    // CASO 2: Usuario autenticado en ruta pública -> Redirigir a tabs
-    if (isAuthenticated && isInAuthRoute) {
-      console.log("🔄 [AuthHandler] Usuario autenticado en auth -> tabs");
-      navigationInProgress.current = true;
-      
+      setHasNavigated(true);
+    } else if (isAuthenticated && (isInAuthRoute || (!isInTabsGroup && !hasNavigated))) {
+      console.log("🔄 Usuario autenticado -> tabs");
       router.replace("/(tabs)");
-      
-      setTimeout(() => {
-        navigationInProgress.current = false;
-      }, 1000);
-      return;
+      setHasNavigated(true);
+    } else {
+      console.log("✅ Navegación correcta - sin cambios");
     }
-
-    // CASO 3: Primera carga - determinar ruta inicial
-    if (!segments.length || currentPath === 'root') {
-      console.log("🔄 [AuthHandler] Primera carga - determinando ruta inicial");
-      navigationInProgress.current = true;
-      
-      if (isAuthenticated) {
-        console.log("🔄 [AuthHandler] Primera carga -> tabs (autenticado)");
-        router.replace("/(tabs)");
-      } else {
-        console.log("🔄 [AuthHandler] Primera carga -> LoginScreen (no autenticado)");
-        router.replace("/LoginScreen");
-      }
-      
-      setTimeout(() => {
-        navigationInProgress.current = false;
-      }, 1000);
-      return;
-    }
-
-    console.log("✅ [AuthHandler] Navegación ya es correcta - no se requiere acción");
-  }, [isAuthenticated, segments, router, initialCheckDone]);
+  }, [isAuthenticated]); // ✅ Solo cuando cambia el estado de autenticación
 
   return null;
 }
