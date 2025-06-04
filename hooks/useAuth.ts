@@ -1,5 +1,5 @@
-// hooks/useAuth.ts
-import { useState, useEffect, useCallback } from 'react';
+// hooks/useAuth.ts - CORREGIDO Y MEJORADO
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { deviceManagementService } from '@/app/services/deviceManagementService';
 import { biometricService } from '@/app/services/biometricService';
 import { pinService } from '@/app/services/pinService';
@@ -16,25 +16,46 @@ export interface AuthState {
   pinConfig: PinConfig;
 }
 
-export const useAuth = () => {
-  const [authState, setAuthState] = useState<AuthState>({
-    isLoading: true,
-    isLinkedDevice: false,
-    linkedUserId: null,
-    hasBiometric: false,
+// 🎯 CONSTANTES PARA MEJOR GESTIÓN
+const INITIAL_AUTH_STATE: AuthState = {
+  isLoading: true,
+  isLinkedDevice: false,
+  linkedUserId: null,
+  hasBiometric: false,
+  hasPin: false,
+  canUseBiometric: false,
+  pinConfig: {
     hasPin: false,
-    canUseBiometric: false,
-    pinConfig: {
-      hasPin: false,
-      attempts: 0,
-      isLocked: false
+    attempts: 0,
+    isLocked: false
+  }
+};
+
+export const useAuth = () => {
+  const [authState, setAuthState] = useState<AuthState>(INITIAL_AUTH_STATE);
+  
+  // 🔧 FIX: Usar useRef con valor inicial
+  const mountedRef = useRef<boolean>(true);
+
+  // 🔧 FIX: Cleanup effect para manejar el unmount
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // 🎯 OPTIMIZACIÓN: Función helper para actualizaciones seguras del estado
+  const safeSetAuthState = useCallback((updater: (prev: AuthState) => AuthState) => {
+    if (mountedRef.current) {
+      setAuthState(updater);
     }
-  });
+  }, []);
 
   // Cargar estado inicial
   const loadAuthState = useCallback(async () => {
     try {
-      setAuthState(prev => ({ ...prev, isLoading: true }));
+      safeSetAuthState(prev => ({ ...prev, isLoading: true }));
 
       const [
         linkedUserId,
@@ -48,7 +69,11 @@ export const useAuth = () => {
         pinService.getPinConfig()
       ]);
 
-      setAuthState({
+      // 🔧 Verificación adicional de que el componente sigue montado
+      if (!mountedRef.current) return;
+
+      safeSetAuthState(prev => ({
+        ...prev,
         isLoading: false,
         isLinkedDevice: linkedUserId !== null,
         linkedUserId,
@@ -56,13 +81,15 @@ export const useAuth = () => {
         hasPin: pinConfig.hasPin,
         canUseBiometric: isBiometricAvailable && isBiometricEnabled,
         pinConfig
-      });
+      }));
 
     } catch (error) {
       console.error('Error loading auth state:', error);
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      if (mountedRef.current) {
+        safeSetAuthState(prev => ({ ...prev, isLoading: false }));
+      }
     }
-  }, []);
+  }, [safeSetAuthState]);
 
   useEffect(() => {
     loadAuthState();
@@ -90,7 +117,7 @@ export const useAuth = () => {
   const setupBiometric = useCallback(async (user: User): Promise<boolean> => {
     try {
       const success = await biometricService.setupBiometric(user);
-      if (success) {
+      if (success && mountedRef.current) {
         await loadAuthState();
       }
       return success;
@@ -114,7 +141,7 @@ export const useAuth = () => {
   const createPin = useCallback(async (userId: number, pin: string): Promise<PinCreationResult> => {
     try {
       const result = await pinService.createPin(userId, pin);
-      if (result.success) {
+      if (result.success && mountedRef.current) {
         await loadAuthState();
       }
       return result;
@@ -128,7 +155,9 @@ export const useAuth = () => {
   const verifyPin = useCallback(async (pin: string): Promise<PinVerificationResult> => {
     try {
       const result = await pinService.verifyPin(pin);
-      await loadAuthState(); // Actualizar estado después de verificación
+      if (mountedRef.current) {
+        await loadAuthState(); // Actualizar estado después de verificación
+      }
       return result;
     } catch (error) {
       console.error('Error verifying PIN:', error);
@@ -140,7 +169,7 @@ export const useAuth = () => {
   const changePin = useCallback(async (currentPin: string, newPin: string): Promise<PinCreationResult> => {
     try {
       const result = await pinService.changePin(currentPin, newPin);
-      if (result.success) {
+      if (result.success && mountedRef.current) {
         await loadAuthState();
       }
       return result;
@@ -154,7 +183,7 @@ export const useAuth = () => {
   const removePin = useCallback(async (currentPin: string): Promise<PinCreationResult> => {
     try {
       const result = await pinService.removePin(currentPin);
-      if (result.success) {
+      if (result.success && mountedRef.current) {
         await loadAuthState();
       }
       return result;
@@ -168,7 +197,9 @@ export const useAuth = () => {
   const disableBiometric = useCallback(async (): Promise<void> => {
     try {
       await biometricService.disableBiometric();
-      await loadAuthState();
+      if (mountedRef.current) {
+        await loadAuthState();
+      }
     } catch (error) {
       console.error('Error disabling biometric:', error);
       throw error;
@@ -193,11 +224,22 @@ export const useAuth = () => {
         biometricService.clearBiometricData(),
         pinService.clearPinData()
       ]);
-      await loadAuthState();
+      if (mountedRef.current) {
+        await loadAuthState();
+      }
     } catch (error) {
       console.error('Error resetting device:', error);
     }
   }, [loadAuthState]);
+
+  // 🔧 FIX: Calcular propiedades computadas de forma correcta
+  const computedProperties = {
+    requiresSetup: authState.isLinkedDevice && !authState.hasPin && !authState.hasBiometric,
+    isDeviceReady: authState.isLinkedDevice && (authState.hasPin || authState.hasBiometric),
+    authMethod: authState.canUseBiometric ? 'biometric' as const : 
+               authState.hasPin ? 'pin' as const : 
+               'password' as const
+  };
 
   return {
     // Estado
@@ -218,14 +260,12 @@ export const useAuth = () => {
     loadAuthState,
     resetDevice, // Solo para desarrollo
     
-    // Estado computado
-    requiresSetup: authState.isLinkedDevice && !authState.hasPin && !authState.hasBiometric,
-    isDeviceReady: authState.isLinkedDevice && (authState.hasPin || authState.hasBiometric),
-    authMethod: authState.canUseBiometric ? 'biometric' : authState.hasPin ? 'pin' : 'password'
+    // 🔧 FIX: Estado computado declarado correctamente
+    ...computedProperties
   };
 };
 
-// Hook específico para PIN
+// 🎯 MEJORADO: Hook específico para PIN con mejor gestión de estado
 export const useEnhancedPin = () => {
   const [pinConfig, setPinConfig] = useState<PinConfig>({
     hasPin: false,
@@ -233,11 +273,22 @@ export const useEnhancedPin = () => {
     isLocked: false
   });
   const [isLoading, setIsLoading] = useState(false);
+  const mountedRef = useRef<boolean>(true);
+
+  // 🔧 Cleanup effect
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const loadPinConfig = useCallback(async () => {
     try {
       const config = await pinService.getPinConfig();
-      setPinConfig(config);
+      if (mountedRef.current) {
+        setPinConfig(config);
+      }
     } catch (error) {
       console.error('Error loading PIN config:', error);
     }
@@ -248,52 +299,74 @@ export const useEnhancedPin = () => {
   }, [loadPinConfig]);
 
   const createPin = useCallback(async (userId: number, pin: string): Promise<PinCreationResult> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       const result = await pinService.createPin(userId, pin);
-      if (result.success) {
+      if (result.success && mountedRef.current) {
         await loadPinConfig();
       }
       return result;
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [loadPinConfig]);
 
   const verifyPin = useCallback(async (pin: string): Promise<PinVerificationResult> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       const result = await pinService.verifyPin(pin);
-      await loadPinConfig();
+      if (mountedRef.current) {
+        await loadPinConfig();
+      }
       return result;
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [loadPinConfig]);
 
   const changePin = useCallback(async (currentPin: string, newPin: string): Promise<PinCreationResult> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       const result = await pinService.changePin(currentPin, newPin);
-      if (result.success) {
+      if (result.success && mountedRef.current) {
         await loadPinConfig();
       }
       return result;
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [loadPinConfig]);
 
   const removePin = useCallback(async (currentPin: string): Promise<PinCreationResult> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       const result = await pinService.removePin(currentPin);
-      if (result.success) {
+      if (result.success && mountedRef.current) {
         await loadPinConfig();
       }
       return result;
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [loadPinConfig]);
 
@@ -308,29 +381,46 @@ export const useEnhancedPin = () => {
   };
 };
 
-// Hook específico para biometría
+// 🎯 MEJORADO: Hook específico para biometría con mejor gestión de estado
 export const useEnhancedBiometric = () => {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const mountedRef = useRef<boolean>(true);
+
+  // 🔧 Cleanup effect
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   const checkAvailability = useCallback(async () => {
     try {
       const available = await biometricService.isBiometricAvailable();
-      setIsAvailable(available);
+      if (mountedRef.current) {
+        setIsAvailable(available);
+      }
     } catch (error) {
       console.error('Error checking biometric availability:', error);
-      setIsAvailable(false);
+      if (mountedRef.current) {
+        setIsAvailable(false);
+      }
     }
   }, []);
 
   const checkIfEnabled = useCallback(async () => {
     try {
       const enabled = await biometricService.isBiometricEnabled();
-      setIsEnabled(enabled);
+      if (mountedRef.current) {
+        setIsEnabled(enabled);
+      }
     } catch (error) {
       console.error('Error checking biometric status:', error);
-      setIsEnabled(false);
+      if (mountedRef.current) {
+        setIsEnabled(false);
+      }
     }
   }, []);
 
@@ -340,10 +430,13 @@ export const useEnhancedBiometric = () => {
   }, [checkAvailability, checkIfEnabled]);
 
   const setupBiometric = useCallback(async (user: User): Promise<boolean> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       const success = await biometricService.setupBiometric(user);
-      if (success) {
+      if (success && mountedRef.current) {
         setIsEnabled(true);
       }
       return success;
@@ -351,26 +444,40 @@ export const useEnhancedBiometric = () => {
       console.error('Setup biometric error:', error);
       throw error;
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   const authenticate = useCallback(async (): Promise<AuthResult> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       return await biometricService.authenticateWithBiometric();
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 
   const disable = useCallback(async (): Promise<void> => {
-    setIsLoading(true);
+    if (mountedRef.current) {
+      setIsLoading(true);
+    }
+    
     try {
       await biometricService.disableBiometric();
-      setIsEnabled(false);
+      if (mountedRef.current) {
+        setIsEnabled(false);
+      }
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
     }
   }, []);
 

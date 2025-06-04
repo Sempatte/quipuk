@@ -76,7 +76,8 @@
     "expo-local-authentication": "~16.0.4",
     "expo-secure-store": "~14.2.3",
     "expo-crypto": "~14.1.4",
-    "expo-device": "~7.1.4"
+    "expo-device": "~7.1.4",
+    "expo-navigation-bar": "~4.2.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

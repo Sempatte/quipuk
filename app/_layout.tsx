@@ -1,4 +1,4 @@
-// app/_layout.tsx - ENHANCED WITH IMPROVED AUTH FLOW
+// app/_layout.tsx - SOLUCIÓN SIMPLIFICADA SIN PLUGINS EXTERNOS
 import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
@@ -130,8 +130,7 @@ function EnhancedAuthHandler() {
     const isInTabsGroup = segments[0] === "(tabs)";
     const isInAuthRoute = currentPath.includes("LoginScreen") || 
                          currentPath.includes("RegisterScreen") || 
-                         currentPath.includes("EmailVerificationScreen") ||
-                         currentPath.includes("AuthenticationScreen");
+                         currentPath.includes("EmailVerificationScreen");
     
     console.log("🧭 [Layout] Navigation evaluation:", {
       currentPath,
@@ -145,7 +144,7 @@ function EnhancedAuthHandler() {
     // 🎯 IMPROVED: Better navigation decisions
     if (!authState.isAuthenticated) {
       if (isInTabsGroup || (!isInAuthRoute && currentPath !== "/")) {
-        console.log("🔄 [Layout] Not authenticated -> AuthenticationScreen");
+        console.log("🔄 [Layout] Not authenticated -> LoginScreen");
         router.replace("/LoginScreen");
       }
     } else {
@@ -160,7 +159,24 @@ function EnhancedAuthHandler() {
   return null;
 }
 
-// 🎯 ENHANCED: MainLayout with better error handling
+// 🔧 SIMPLIFIED: StatusBar configuration function
+const configureStatusBar = () => {
+  try {
+    if (Platform.OS === "ios") {
+      // 🎯 SOLUCIÓN SIMPLE PARA iOS: Solo configurar estilo
+      StatusBar.setBarStyle("light-content");
+    } else if (Platform.OS === "android") {
+      // Android puede usar configuración completa
+      StatusBar.setBarStyle("light-content", true);
+      StatusBar.setBackgroundColor("#000000", true);
+      StatusBar.setTranslucent(false);
+    }
+  } catch (error) {
+    console.warn("⚠️ [Layout] StatusBar config failed:", error);
+  }
+};
+
+// 🎯 ENHANCED: MainLayout with SIMPLIFIED StatusBar
 function EnhancedMainLayout() {
   const colorScheme = useColorScheme();
   const { isBackendActive, isLoading } = useBackendHealth({
@@ -178,30 +194,10 @@ function EnhancedMainLayout() {
     Outfit_300Light,
   });
 
-  // 🎯 ENHANCED: Global StatusBar configuration
+  // 🔧 SIMPLIFIED: StatusBar configuration
   useEffect(() => {
-    const configureGlobalStatusBar = () => {
-      console.log("⚙️ [Layout] Configuring global StatusBar");
-      
-      try {
-        if (Platform.OS === "android") {
-          StatusBar.setBarStyle("light-content", true);
-          StatusBar.setBackgroundColor("#000000", true);
-          StatusBar.setTranslucent(false);
-        } else if (Platform.OS === "ios") {
-          StatusBar.setBarStyle("light-content", true);
-        }
-      } catch (error) {
-        console.warn("⚠️ [Layout] StatusBar configuration failed:", error);
-      }
-    };
-
-    configureGlobalStatusBar();
-
-    // 🔧 FIX: Periodic enforcement for stubborn cases
-    const interval = setInterval(configureGlobalStatusBar, 1000);
-
-    return () => clearInterval(interval);
+    // Configurar una sola vez al inicio
+    configureStatusBar();
   }, []);
 
   // Hide splash screen when ready
@@ -235,7 +231,6 @@ function EnhancedMainLayout() {
       text: "#000000",
       border: "#E5E8EB",
       notification: "#FF5252",
-      // 🆕 Additional theme colors
       success: "#00DC5A",
       warning: "#FF9800", 
       error: "#FF5252",
@@ -245,15 +240,11 @@ function EnhancedMainLayout() {
 
   return (
     <ThemeProvider value={enhancedTheme}>
-      {/* 🎯 ENHANCED: More robust StatusBar */}
+      {/* 🔧 SIMPLIFIED: StatusBar sin configuraciones complejas */}
       <StatusBar 
         barStyle="light-content" 
-        backgroundColor="#000000" 
+        backgroundColor="#000000"
         translucent={false}
-        hidden={false}
-        animated={true}
-        networkActivityIndicatorVisible={false}
-        showHideTransition="fade"
       />
       
       <EnhancedAuthHandler />
@@ -262,7 +253,7 @@ function EnhancedMainLayout() {
   );
 }
 
-// 🎯 ENHANCED: Root component with better error boundaries
+// 🎯 ENHANCED: Root component
 export default function EnhancedRootLayout() {
   return (
     <SafeAreaProvider>
