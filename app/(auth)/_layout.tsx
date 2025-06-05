@@ -65,11 +65,7 @@ export default function AuthLayout() {
         animationDuration: 250, // Animación más rápida
         presentation: 'card', // Presentación tipo tarjeta
         orientation: 'portrait', // Forzar orientación vertical
-        
-        // 🔧 CONFIGURACIÓN DE ESTADO
-        statusBarStyle: 'light',
-        statusBarBackgroundColor: '#000000',
-        statusBarTranslucent: false,
+
       }}
     >
       <Stack.Screen 

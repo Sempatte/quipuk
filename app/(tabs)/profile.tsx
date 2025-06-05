@@ -22,6 +22,7 @@ import { useProfilePicture } from "@/hooks/useProfilePicture";;
 import Avatar from "@/components/ui/Avatar";
 import { useAuth } from "@/hooks/useAuth";
 import { DeviceUnlinkModal, useDeviceUnlink } from "@/components/DeviceUnlinkModal";
+import { StatusBarManager, StatusBarPresets } from "@/components/ui/StatusBarManager";
 
 const { width } = Dimensions.get('window');
 
@@ -179,6 +180,14 @@ export default function EnhancedProfile() {
           <Ionicons name="alert-circle" size={50} color="#E86F51" />
           <Text style={styles.errorText}>Error al cargar el perfil</Text>
           <Text style={styles.errorSubtext}>{error.message}</Text>
+          <TouchableOpacity 
+                  style={styles.logoutButton} 
+                  onPress={quickUnlink}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="log-out-outline" size={20} color="#FFF" />
+                  <Text style={styles.logoutText}>Cerrar Sesión</Text>
+                </TouchableOpacity>
         </View>
       </View>
     );
@@ -186,6 +195,7 @@ export default function EnhancedProfile() {
 
   return (
     <View style={styles.mainContainer}>
+      <StatusBarManager {...StatusBarPresets.tabs} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mi Perfil</Text>
         {isLinkedDevice && (

@@ -47,16 +47,28 @@ export const useAuth = () => {
 
   // 🎯 OPTIMIZACIÓN: Función helper para actualizaciones seguras del estado
   const safeSetAuthState = useCallback((updater: (prev: AuthState) => AuthState) => {
+    // Log para ver cuándo se llama a safeSetAuthState y el estado anterior
+    // console.log('[useAuth] safeSetAuthState called. Prev isLoading:', authState.isLoading);
     if (mountedRef.current) {
-      setAuthState(updater);
+      setAuthState(prevState => {
+        const nextState = updater(prevState);
+        // Log para ver el nuevo estado, especialmente isLoading
+        console.log('[useAuth] safeSetAuthState updated. New isLoading:', nextState.isLoading, 'Prev isLoading:', prevState.isLoading);
+        return nextState;
+      });
+    } else {
+      console.log('[useAuth] safeSetAuthState called but component unmounted.');
     }
   }, []);
 
   // Cargar estado inicial
   const loadAuthState = useCallback(async () => {
+    console.log('[useAuth] loadAuthState: START');
     try {
       safeSetAuthState(prev => ({ ...prev, isLoading: true }));
+      console.log('[useAuth] loadAuthState: Set isLoading to true');
 
+      console.log('[useAuth] loadAuthState: Calling Promise.all for device/auth services...');
       const [
         linkedUserId,
         isBiometricAvailable,
@@ -68,10 +80,16 @@ export const useAuth = () => {
         biometricService.isBiometricEnabled(),
         pinService.getPinConfig()
       ]);
+      
+      console.log('[useAuth] loadAuthState: Promise.all results - linkedUserId:', linkedUserId, 'isBiometricAvailable:', isBiometricAvailable, 'isBiometricEnabled:', isBiometricEnabled, 'pinConfig:', JSON.stringify(pinConfig));
 
       // 🔧 Verificación adicional de que el componente sigue montado
-      if (!mountedRef.current) return;
+      if (!mountedRef.current) {
+        console.log('[useAuth] loadAuthState: Component unmounted after Promise.all. Aborting state update.');
+        return;
+      }
 
+      console.log('[useAuth] loadAuthState: Preparing to set final auth state...');
       safeSetAuthState(prev => ({
         ...prev,
         isLoading: false,
@@ -82,13 +100,18 @@ export const useAuth = () => {
         canUseBiometric: isBiometricAvailable && isBiometricEnabled,
         pinConfig
       }));
+      console.log('[useAuth] loadAuthState: Set final auth state, isLoading should be false.');
 
     } catch (error) {
-      console.error('Error loading auth state:', error);
+      console.error('[useAuth] loadAuthState: ERROR', error);
       if (mountedRef.current) {
+        console.log('[useAuth] loadAuthState: Setting isLoading to false due to error.');
         safeSetAuthState(prev => ({ ...prev, isLoading: false }));
+      } else {
+        console.log('[useAuth] loadAuthState: Component unmounted during error handling.');
       }
     }
+    console.log('[useAuth] loadAuthState: END');
   }, [safeSetAuthState]);
 
   useEffect(() => {

@@ -1,13 +1,16 @@
-// app/(tabs)/board.tsx - IMPORTS CORREGIDOS CON RUTAS ABSOLUTAS
+// app/(tabs)/board.tsx - ACTUALIZADO CON EXPO STATUS BAR
 import React, { useCallback, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@apollo/client';
 import { ThemedView } from "@/components/ThemedView";
 import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
-import { globalStyles } from '@/app/styles/globalStyles'; // 🔧 CAMBIADO A RUTA ABSOLUTA
-import { GET_TRANSACTIONS } from '@/app/graphql/transaction.graphql'; // 🔧 CAMBIADO A RUTA ABSOLUTA
+import { globalStyles } from '@/app/styles/globalStyles';
+import { GET_TRANSACTIONS } from '@/app/graphql/transaction.graphql';
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// 🔧 REEMPLAZADO: StatusBar de expo-status-bar
+import { StatusBarManager, StatusBarPresets } from "@/components/ui/StatusBarManager";
 
 // Import all chart components
 import FinancialSituation from '@/components/ui/FinancialSituation';
@@ -50,7 +53,6 @@ export default function Board() {
         refetch().then(() => {
           if (!isCancelled) {
             setRefreshTrigger(prev => prev + 1);
-            
           }
         }).catch(error => {
           if (!isCancelled) {
@@ -68,6 +70,9 @@ export default function Board() {
 
   return (
     <ThemedView style={styles.mainContainer}>
+      {/* 🎯 NUEVA IMPLEMENTACIÓN: StatusBar usando expo-status-bar */}
+      <StatusBarManager {...StatusBarPresets.tabs} />
+      
       <SafeAreaView style={{ backgroundColor: "#FFF" }} edges={["top"]}>
         <View style={globalStyles.header}>
           <QuipuBoardLogo width={400} height={60} />

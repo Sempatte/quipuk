@@ -1,14 +1,16 @@
+// app/(tabs)/movements.tsx - ACTUALIZADO CON EXPO STATUS BAR
 import React, { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Modal, Dimensions, Platform } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "expo-status-bar";
 import { useQuery } from "@apollo/client";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Calendar } from "react-native-calendars";
 import { format, startOfMonth, endOfMonth, isSameMonth, addDays, isLastDayOfMonth } from "date-fns";
 import { es } from "date-fns/locale";
 import { capitalize } from "lodash";
-import { StatusBar as RNStatusBar } from "react-native";
+
+// 🔧 REEMPLAZADO: StatusBar de expo-status-bar
+import { StatusBarManager, StatusBarPresets } from "@/components/ui/StatusBarManager";
 
 import TransactionItem from "@/components/ui/TransactionItem";
 import BalanceHeader from "@/components/ui/BalancerHeader";
@@ -22,7 +24,8 @@ const { width } = Dimensions.get("window");
 const DAY_WIDTH = width * 0.15;
 const DAY_MARGIN = 8;
 
-// Parseo robusto de fechas
+// ... (resto de las funciones helper permanecen igual) ...
+
 function robustParseDateString(dueDateValue: any): Date | null {
   if (!dueDateValue) return null;
   if (dueDateValue instanceof Date && !isNaN(dueDateValue.getTime())) return dueDateValue;
@@ -122,25 +125,6 @@ export default function Movements() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const daysListRef = useRef<FlatList<Date>>(null);
 
-  // 🖤 CONFIGURACIÓN DIRECTA DEL STATUSBAR
-  useEffect(() => {
-    const configureStatusBar = () => {
-      try {
-        if (Platform.OS === 'android') {
-          RNStatusBar.setBarStyle('light-content', true);
-          RNStatusBar.setBackgroundColor('#000000', true);
-          RNStatusBar.setTranslucent(false);
-        } else if (Platform.OS === 'ios') {
-          RNStatusBar.setBarStyle('light-content', true);
-        }
-      } catch (error) {
-        console.warn('Error configurando StatusBar:', error);
-      }
-    };
-
-    configureStatusBar();
-  }, []);
-
   const transactions = useMemo(() => {
     const arr = data?.getTransactions || [];
     return arr.map((t: any) => ({
@@ -198,7 +182,9 @@ export default function Movements() {
   if (error) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" />
+        {/* 🎯 NUEVA IMPLEMENTACIÓN: StatusBar usando expo-status-bar */}
+        <StatusBarManager {...StatusBarPresets.tabs} />
+        
         <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
           <View style={styles.header}>
             <Text style={styles.title}>Transacciones</Text>
@@ -218,7 +204,9 @@ export default function Movements() {
   if (loading && !data) {
     return (
       <View style={styles.container}>
-        <StatusBar style="light" />
+        {/* 🎯 NUEVA IMPLEMENTACIÓN: StatusBar usando expo-status-bar */}
+        <StatusBarManager {...StatusBarPresets.tabs} />
+        
         <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
           <View style={styles.header}>
             <Text style={styles.title}>Transacciones</Text>
@@ -266,7 +254,9 @@ export default function Movements() {
 
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      {/* 🎯 NUEVA IMPLEMENTACIÓN: StatusBar usando expo-status-bar */}
+      <StatusBarManager {...StatusBarPresets.tabs} />
+      
       <SafeAreaView style={styles.headerSafeArea} edges={["top"]}>
         <View style={styles.header}>
           <Text style={styles.title}>Transacciones</Text>
@@ -388,6 +378,7 @@ export default function Movements() {
     </View>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: { 

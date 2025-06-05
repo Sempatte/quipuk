@@ -33,7 +33,7 @@
         "NSCameraUsageDescription": "Quipuk necesita acceso a la cámara para escanear comprobantes de gastos y facturas.",
         "NSPhotoLibraryUsageDescription": "Quipuk necesita acceso a la galería para seleccionar comprobantes de gastos desde tus fotos.",
         "NSMicrophoneUsageDescription": "Quipuk puede necesitar acceso al micrófono para funciones de grabación de notas.",
-        "UIBackgroundModes": ["background-fetch"]
+        "UIViewControllerBasedStatusBarAppearance": true
       },
       "associatedDomains": ["applinks:quipuk.app"]
     },

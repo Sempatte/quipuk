@@ -55,6 +55,7 @@ import { RootStackParamList } from "../interfaces/navigation";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
 import { useToast } from "../providers/ToastProvider";
+import { StatusBarManager } from "@/components/ui/StatusBarManager";
 
 // 🎯 INTERFACES
 interface AddTransactionRouteParams {
@@ -285,6 +286,11 @@ export default function AddTransactionWithHook() {
   // 🎯 RENDER PRINCIPAL
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBarManager 
+        style="light" 
+        backgroundColor={TRANSACTION_COLORS[formState.selectedOption]}
+        translucent={false}
+      />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoid}

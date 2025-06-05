@@ -13,6 +13,8 @@ export interface PinConfig {
     isLocked?: boolean;
     lockDuration?: number; // minutes
     error?: string;
+    token?: string;
+    user?: any;
   }
   
   export interface PinCreationResult {
