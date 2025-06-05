@@ -1,4 +1,3 @@
-// app/_layout.tsx - SOLUCIÓN NUCLEAR SIN STATUSBAR MANUAL
 import React, { useEffect, useState } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
 import { Slot, useRouter, useSegments } from "expo-router";
@@ -14,7 +13,6 @@ import { useFonts, Outfit_100Thin, Outfit_200ExtraLight, Outfit_400Regular, Outf
 import { ToastProvider } from "./providers/ToastProvider";
 import { useBackendHealth } from "@/hooks/useBackendHealth";
 import { OfflineMessage } from "@/components/OfflineMessage";
-import { deviceManagementService } from "./services/deviceManagementService";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -111,7 +109,7 @@ function MainLayout() {
 
   return (
     <ThemeProvider value={theme}>
-      {/* NO StatusBar configuration at all - let iOS handle it naturally */}
+      {/* 🚫 REMOVED: NO StatusBar configuration - let each screen handle it */}
       <AuthHandler />
       <Slot />
     </ThemeProvider>
