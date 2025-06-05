@@ -1,4 +1,4 @@
-// app/_layout.tsx - SOLUCIÓN SIMPLIFICADA SIN PLUGINS EXTERNOS
+// app/_layout.tsx - SOLUCIÓN DEFINITIVA SIN CONFLICTOS DE STATUSBAR
 import React, { useEffect, useState } from "react";
 import {
   DarkTheme,
@@ -7,7 +7,7 @@ import {
 } from "@react-navigation/native";
 import { Slot, useRouter, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import { StatusBar, Platform } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { ApolloProvider } from "@apollo/client";
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -159,24 +159,7 @@ function EnhancedAuthHandler() {
   return null;
 }
 
-// 🔧 SIMPLIFIED: StatusBar configuration function
-const configureStatusBar = () => {
-  try {
-    if (Platform.OS === "ios") {
-      // 🎯 SOLUCIÓN SIMPLE PARA iOS: Solo configurar estilo
-      StatusBar.setBarStyle("light-content");
-    } else if (Platform.OS === "android") {
-      // Android puede usar configuración completa
-      StatusBar.setBarStyle("light-content", true);
-      StatusBar.setBackgroundColor("#000000", true);
-      StatusBar.setTranslucent(false);
-    }
-  } catch (error) {
-    console.warn("⚠️ [Layout] StatusBar config failed:", error);
-  }
-};
-
-// 🎯 ENHANCED: MainLayout with SIMPLIFIED StatusBar
+// 🎯 ENHANCED: MainLayout SIMPLIFICADO - SIN configuraciones de StatusBar
 function EnhancedMainLayout() {
   const colorScheme = useColorScheme();
   const { isBackendActive, isLoading } = useBackendHealth({
@@ -193,12 +176,6 @@ function EnhancedMainLayout() {
     Outfit_500Medium,
     Outfit_300Light,
   });
-
-  // 🔧 SIMPLIFIED: StatusBar configuration
-  useEffect(() => {
-    // Configurar una sola vez al inicio
-    configureStatusBar();
-  }, []);
 
   // Hide splash screen when ready
   useEffect(() => {
@@ -240,12 +217,8 @@ function EnhancedMainLayout() {
 
   return (
     <ThemeProvider value={enhancedTheme}>
-      {/* 🔧 SIMPLIFIED: StatusBar sin configuraciones complejas */}
-      <StatusBar 
-        barStyle="light-content" 
-        backgroundColor="#000000"
-        translucent={false}
-      />
+      {/* 🔧 CLAVE: Usar StatusBar de expo-status-bar SOLAMENTE */}
+      <StatusBar style="light" backgroundColor="#000000" />
       
       <EnhancedAuthHandler />
       <Slot />
