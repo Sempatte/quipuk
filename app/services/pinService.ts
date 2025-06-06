@@ -7,7 +7,7 @@ import {
   PinVerificationResult, 
   PinCreationResult, 
   AuthLog
-} from '../types/pin.types';
+} from '../interfaces/pin.interface';
 
 interface StoredPinData {
   userId: number;

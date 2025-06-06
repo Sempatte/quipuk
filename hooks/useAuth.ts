@@ -3,8 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { deviceManagementService } from '@/app/services/deviceManagementService';
 import { biometricService } from '@/app/services/biometricService';
 import { pinService } from '@/app/services/pinService';
-import { AuthResult, User } from '@/app/types/auth.types';
-import { PinConfig, PinVerificationResult, PinCreationResult } from '@/app/types/pin.types';
+import { AuthResult, User } from '@/app/interfaces/auth.interface';
+import { PinConfig, PinVerificationResult, PinCreationResult } from '@/app/interfaces/pin.interface';
 
 export interface AuthState {
   isLoading: boolean;

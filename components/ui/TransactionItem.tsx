@@ -4,7 +4,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Transaction } from '@/app/interfaces/transaction.interface';
-import { getCategoryColor } from '@/app/contants/categories';
+import { getCategoryColor } from '@/app/interfaces/categories.interface';
 import DynamicIcon from '@/components/ui/DynamicIcon';
 
 interface TransactionItemProps {

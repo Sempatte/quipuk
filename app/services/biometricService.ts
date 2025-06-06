@@ -3,7 +3,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { Platform, Alert } from 'react-native';
 import { deviceManagementService } from './deviceManagementService';
-import { BiometricConfig, AuthResult, BiometricError, User } from '../types/auth.types';
+import { BiometricConfig, AuthResult, BiometricError, User } from '../interfaces/auth.interface';
 
 class BiometricService {
   private readonly BIOMETRIC_CONFIG_KEY = 'quipuk_biometric_config';

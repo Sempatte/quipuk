@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Modal } from "react-native";
-import { constPaymentMethodsIcons } from "@/app/contants/iconDictionary";
+import { constPaymentMethodsIcons } from "@/app/constants/categoryIcons";
 import { TransactionType, TRANSACTION_COLORS, TransactionOption } from "@/app/interfaces/transaction.interface";
 
 interface PaymentMethodSelectorProps {

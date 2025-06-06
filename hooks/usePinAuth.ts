@@ -1,6 +1,6 @@
 // hooks/usePinAuth.ts
 import { pinService } from '@/app/services/pinService';
-import { PinConfig, PinCreationResult, PinVerificationResult, SecurityQuestion } from '@/app/types/pin.types';
+import { PinConfig, PinCreationResult, PinVerificationResult, SecurityQuestion } from '@/app/interfaces/pin.interface';
 import { useState, useEffect } from 'react';
 
 export const usePinAuth = (userId?: number) => {

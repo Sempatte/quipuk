@@ -1,6 +1,6 @@
 // constants/styles.ts
 import { StyleSheet } from "react-native";
-import { Colors } from "@/constants/Colors";
+import { Colors } from "@/app/constants/colors";
 
 /**
  * Estilos globales compartidos entre componentes

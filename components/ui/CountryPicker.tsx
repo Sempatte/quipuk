@@ -12,7 +12,7 @@ import {
   Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { countries, Country } from '@/app/contants/countries';
+import { countries, Country } from '@/app/constants/countries';
 
 const { height } = Dimensions.get('window');
 

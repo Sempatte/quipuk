@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { useBiometricAuth } from '../hooks/useBiometricAuth';
-import { User } from '@/app/types/auth.types';
+import { User } from '@/app/interfaces/auth.interface';
 
 interface BiometricSetupModalProps {
   visible: boolean;

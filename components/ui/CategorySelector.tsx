@@ -8,7 +8,7 @@ import {
   ScrollView,
   Dimensions,
 } from 'react-native';
-import { gastosIcons, ingresosIcons } from '@/app/contants/iconDictionary';
+import { gastosIcons, ingresosIcons } from '@/app/constants/categoryIcons';
 import { useCategories, Category } from '@/hooks/useCategories';
 import { TransactionType } from '@/app/interfaces/transaction.interface';
 

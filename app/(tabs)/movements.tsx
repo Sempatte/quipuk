@@ -16,7 +16,7 @@ import TransactionItem from "@/components/ui/TransactionItem";
 import BalanceHeader from "@/components/ui/BalancerHeader";
 import TransactionSkeleton from "@/components/ui/TransactionSkeleton";
 import { GET_TRANSACTIONS_BY_USER } from "../graphql/transaction.graphql";
-import { RootStackParamList } from "../interfaces/navigation";
+import { RootStackParamList } from "../interfaces/navigation.type";
 import { Transaction } from "../interfaces/transaction.interface";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 

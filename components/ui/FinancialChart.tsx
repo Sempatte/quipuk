@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Animated, Dimensions } from "react-native";
 import Svg, { Line, Text as SvgText, Rect, G } from "react-native-svg";
 import { MonthData } from "@/hooks/useFinancialData";
-import { Colors } from "@/constants/Colors";
+import { Colors } from "@/app/constants/colors";
 
 // Obtener las dimensiones de la pantalla
 const { width: screenWidth } = Dimensions.get("window");

@@ -8,7 +8,7 @@ import {
     getCategoryColor,
     getAllCategories,
     CATEGORY_COLORS_MAP
-  } from '../app/contants/categories'
+  } from '../app/interfaces/categories.interface'
   import { TransactionType } from '@/app/interfaces/transaction.interface';
   
   export interface UseCategoriesReturn {

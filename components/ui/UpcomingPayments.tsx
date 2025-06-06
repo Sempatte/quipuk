@@ -14,14 +14,14 @@ import { useMutation, useQuery } from "@apollo/client";
 import { format, differenceInDays, isToday, isTomorrow } from "date-fns";
 import { es } from "date-fns/locale";
 import { GET_PENDING_TRANSACTIONS } from "@/app/graphql/transaction.graphql";
-import { getTransactionIcon } from "@/app/contants/iconDictionary";
+import { getTransactionIcon } from "@/app/constants/categoryIcons";
 import { useFocusEffect } from "@react-navigation/native";
 import UpcomingPaymentsSkeleton from "./UpcomingPaymentsSkeleton";
 import PaymentConfirmationModal from "./PaymentConfirmationModal";
 import NewPaymentCard from "./NewPaymentCard";
 import { useNavigation } from "@react-navigation/native";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@/app/interfaces/navigation";
+import { RootStackParamList } from "@/app/interfaces/navigation.type";
 
 const { width } = Dimensions.get("window");
 const ITEM_WIDTH = width - 80;

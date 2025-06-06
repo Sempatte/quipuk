@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   View,
   Text,
@@ -36,6 +36,7 @@ import { useAuth } from "@/hooks/useAuth";
 
 const { width, height } = Dimensions.get("window");
 
+// Mover interfaces fuera del componente
 interface UserProfile {
   id: number;
   email: string;
@@ -45,13 +46,13 @@ interface UserProfile {
 }
 
 type AuthStep = 
-  | "loading"           // Verificando estado inicial
-  | "biometric"         // Face ID disponible
-  | "pin"              // PIN requerido
-  | "setup"            // Configuración inicial
-  | "blocked"          // Dispositivo bloqueado
-  | "traditional"      // Login con email/password
-  | "registration";    // Permitir registro
+  | "loading"
+  | "biometric"
+  | "pin"
+  | "setup"
+  | "blocked"
+  | "traditional"
+  | "registration";
 
 interface AuthState {
   step: AuthStep;
@@ -60,10 +61,180 @@ interface AuthState {
   attempts: number;
 }
 
-export default function LoginScren() {
+// Componentes memorizados
+const UserProfileHeader = React.memo(({ userProfile }: { userProfile: UserProfile | null }) => {
+  if (!userProfile) return null;
+
+  return (
+    <View style={styles.userInfo}>
+      <View style={styles.avatarContainer}>
+        {userProfile.profilePictureUrl ? (
+          <Image 
+            source={{ uri: userProfile.profilePictureUrl }} 
+            style={styles.avatarImage}
+          />
+        ) : (
+          <View style={styles.avatarPlaceholder}>
+            <Ionicons name="person" size={32} color="#FFF" />
+          </View>
+        )}
+      </View>
+      <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
+      <Text style={styles.userDisplayName}>
+        {userProfile.fullName || userProfile.username}
+      </Text>
+      <Text style={styles.userEmail}>{userProfile.email}</Text>
+    </View>
+  );
+});
+
+UserProfileHeader.displayName = 'UserProfileHeader';
+
+// Extraer el formulario tradicional como componente separado
+const TraditionalLoginForm = React.memo(({
+  email,
+  password,
+  showPassword,
+  loginLoading,
+  isLinkedDevice,
+  onEmailChange,
+  onPasswordChange,
+  onTogglePassword,
+  onSubmit,
+  onRegister
+}: {
+  email: string;
+  password: string;
+  showPassword: boolean;
+  loginLoading: boolean;
+  isLinkedDevice: boolean;
+  onEmailChange: (text: string) => void;
+  onPasswordChange: (text: string) => void;
+  onTogglePassword: () => void;
+  onSubmit: () => void;
+  onRegister: () => void;
+}) => {
+  return (
+    <View style={styles.formContainer}>
+      <Text style={styles.welcomeTitle}>
+        Bienvenido a <Text style={styles.brandName}>Quipuk</Text>
+      </Text>
+      <Text style={styles.welcomeSubtitle}>
+        {isLinkedDevice ? "Inicia sesión para continuar" : "Inicia sesión o regístrate"}
+      </Text>
+
+      {isLinkedDevice && (
+        <View style={styles.deviceLinkedNotice}>
+          <Ionicons name="phone-portrait" size={20} color="#00c450" />
+          <Text style={styles.deviceLinkedText}>
+            Este dispositivo está registrado
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Correo electrónico</Text>
+        <View style={styles.inputWrapper}>
+          <Ionicons 
+            name="mail-outline" 
+            size={20} 
+            color="#666" 
+            style={styles.inputIcon}
+          />
+          <TextInput
+            style={styles.input}
+            placeholder="tu@email.com"
+            placeholderTextColor="#999"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            value={email}
+            onChangeText={onEmailChange}
+            editable={!loginLoading}
+            autoComplete="email"
+            textContentType="emailAddress"
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.inputLabel}>Contraseña</Text>
+        <View style={styles.inputWrapper}>
+          <Ionicons 
+            name="lock-closed-outline" 
+            size={20} 
+            color="#666" 
+            style={styles.inputIcon}
+          />
+          <TextInput
+            style={[styles.input, styles.passwordInput]}
+            placeholder="Tu contraseña"
+            placeholderTextColor="#999"
+            secureTextEntry={!showPassword}
+            value={password}
+            onChangeText={onPasswordChange}
+            editable={!loginLoading}
+            autoComplete="password"
+            textContentType="password"
+          />
+          <TouchableOpacity
+            style={styles.passwordToggle}
+            onPress={onTogglePassword}
+            disabled={loginLoading}
+          >
+            <Ionicons
+              name={showPassword ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color="#666"
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <TouchableOpacity
+        style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
+        onPress={onSubmit}
+        disabled={loginLoading}
+        activeOpacity={0.8}
+      >
+        <LinearGradient
+          colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
+          style={styles.loginGradient}
+        >
+          {loginLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#FFF" size="small" />
+              <Text style={styles.loginButtonText}>Ingresando...</Text>
+            </View>
+          ) : (
+            <Text style={styles.loginButtonText}>Ingresar</Text>
+          )}
+        </LinearGradient>
+      </TouchableOpacity>
+
+      {!isLinkedDevice && (
+        <TouchableOpacity
+          onPress={onRegister}
+          disabled={loginLoading}
+          style={styles.registerContainer}
+        >
+          <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
+            ¿Aún no tienes una cuenta?{" "}
+            <Text style={styles.registerLink}>Regístrate</Text>
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+});
+
+TraditionalLoginForm.displayName = 'TraditionalLoginForm';
+
+export default function LoginScreen() {
+  console.log('[LoginScreen] Component rendered'); // Solo un log al inicio
+  
   const router = useRouter();
   const { showToast } = useToast();
-  console.log('[LoginScreen] Initializing or re-rendering');
 
   // Estados del formulario tradicional
   const [email, setEmail] = useState("");
@@ -71,37 +242,19 @@ export default function LoginScren() {
   const [showPassword, setShowPassword] = useState(false);
 
   // Estado principal de autenticación
-  const [authState, _setAuthState] = useState<AuthState>({
+  const [authState, setAuthState] = useState<AuthState>({
     step: "loading",
     userProfile: null,
     error: null,
     attempts: 0,
   });
 
-  // Wrapper para setAuthState con logging
-  const setAuthState = useCallback((updater: AuthState | ((prevState: AuthState) => AuthState)) => {
-    _setAuthState(prev => {
-      const newState = typeof updater === 'function' ? updater(prev) : updater;
-      if (prev.step !== newState.step) {
-        console.log(`[LoginScreen] authState.step changing from ${prev.step} to ${newState.step}`);
-      }
-      return newState;
-    });
-  }, []);
-
-  // Loguear cambios de authState.step independientemente
-  useEffect(() => {
-    console.log(`[LoginScreen] useEffect: authState.step is now: ${authState.step}`);
-  }, [authState.step]);
-
   // Estados para modales
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
-
-  // Nueva bandera para manejar la finalización de la autenticación local
   const [localAuthCompleted, setLocalAuthCompleted] = useState(false);
 
-  // Hook de autenticación mejorada
+  // Hook de autenticación
   const {
     isLoading: authLoading,
     isLinkedDevice,
@@ -116,17 +269,15 @@ export default function LoginScren() {
     loadAuthState
   } = useAuth();
 
-  // ==================================================================================
-  // START: Funciones de Ayuda y Navegación (Movidas aquí para resolver linter)
-  // ==================================================================================
+  // Callbacks memorizados
   const navigateToApp = useCallback(() => {
-    console.log("[LoginScreen] navigateToApp: Navigating to /(tabs) and setting localAuthCompleted to true.");
+    console.log("[LoginScreen] Navigating to app");
     setLocalAuthCompleted(true);
     router.replace("/(tabs)");
   }, [router]);
 
   const forceTraditionalLogin = useCallback(async (reason?: string) => {
-    console.log(`[LoginScreen] forceTraditionalLogin: Reason: ${reason}. Forcing traditional login. Clearing token/userId.`);
+    console.log(`[LoginScreen] Forcing traditional login: ${reason}`);
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("userId");
     setAuthState(prev => ({
@@ -135,32 +286,27 @@ export default function LoginScren() {
       userProfile: null,
       error: reason || "Se requiere inicio de sesión manual."
     }));
-    // Es importante recargar el estado del hook useAuth después de limpiar el token,
-    // para que isLinkedDevice etc. se actualicen.
     if (loadAuthState) {
-      console.log("[LoginScreen] forceTraditionalLogin: Calling loadAuthState from useAuth.");
       await loadAuthState(); 
     }
-  }, [setAuthState, loadAuthState]);
+  }, [loadAuthState]);
 
   const handleTokenExpired = useCallback(() => {
-    console.log("[LoginScreen] handleTokenExpired: Token expired or invalid. Forcing traditional login.");
+    console.log("[LoginScreen] Token expired");
     forceTraditionalLogin("Tu sesión ha expirado. Por favor, inicia sesión de nuevo.");
   }, [forceTraditionalLogin]);
 
   const handleBiometricAuth = useCallback(async () => {
-    console.log("[LoginScreen] handleBiometricAuth: Attempting biometric authentication.");
+    console.log("[LoginScreen] Biometric auth attempt");
     try {
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
       const result = await authenticateWithBiometric();
-      console.log("[LoginScreen] handleBiometricAuth: Result:", result);
-
+      
       if (result.success) {
         navigateToApp();
       } else if (result.requiresManualLogin) {
-        console.log("[LoginScreen] handleBiometricAuth: Biometric auth requires manual login.");
         if (hasPin) {
           setAuthState(prev => ({ ...prev, step: "pin" }));
           showToast("info", "Face ID falló", "Usa tu PIN para acceder");
@@ -179,7 +325,7 @@ export default function LoginScren() {
                 if (hasPin) {
                   setAuthState(prev => ({ ...prev, step: "pin" }));
                 } else {
-                  forceTraditionalLogin("Fallback a tradicional desde biométrico fallido.");
+                  forceTraditionalLogin("Fallback desde biométrico");
                 }
               }
             }
@@ -187,19 +333,16 @@ export default function LoginScren() {
         );
       }
     } catch (error) {
-      console.error("[LoginScreen] handleBiometricAuth: ERROR", error);
+      console.error("[LoginScreen] Biometric auth error:", error);
       if (hasPin) {
         setAuthState(prev => ({ ...prev, step: "pin", error: "Error en autenticación biométrica." }));
       } else {
-        forceTraditionalLogin("Error en autenticación biométrica y sin PIN.");
+        forceTraditionalLogin("Error en autenticación biométrica");
       }
     }
-  }, [authenticateWithBiometric, navigateToApp, hasPin, setAuthState, showToast, forceTraditionalLogin]);
-  // ==================================================================================
-  // END: Funciones de Ayuda y Navegación
-  // ==================================================================================
+  }, [authenticateWithBiometric, navigateToApp, hasPin, showToast, forceTraditionalLogin]);
 
-  // Query para datos del usuario (solo cuando hay usuario vinculado)
+  // Query para datos del usuario
   const { data: userProfileData, loading: profileLoading, refetch: refetchProfile } = useQuery(
     GET_USER_PROFILE,
     {
@@ -261,35 +404,17 @@ export default function LoginScren() {
     },
   });
 
-  // 🎯 FLUJO PRINCIPAL: Determinar paso de autenticación
+  // Determinar paso de autenticación
   const determineAuthStep = useCallback(async () => {
-    console.log(`[LoginScreen] determineAuthStep: START. localAuthCompleted: ${localAuthCompleted}, current authState.step: ${authState.step}`);
-    if (localAuthCompleted) {
-      console.log("[LoginScreen] determineAuthStep: localAuthCompleted is true, skipping logic.");
-      return;
-    }
+    if (localAuthCompleted) return;
+    
     try {
-      console.log('[LoginScreen] determineAuthStep: Evaluating conditions...',
-        `authLoading: ${authLoading}`,
-        `profileLoading: ${profileLoading}`
-      );
-      
       if (authLoading || profileLoading) {
-        console.log('[LoginScreen] determineAuthStep: authLoading or profileLoading is true. Setting step to "loading".');
         setAuthState(prev => ({ ...prev, step: "loading" }));
         return;
       }
 
-      console.log('[LoginScreen] determineAuthStep: Further conditions...',
-        `isLinkedDevice: ${isLinkedDevice}`,
-        `linkedUserId: ${linkedUserId}`,
-        `current userProfile: ${JSON.stringify(authState.userProfile)}`,
-        `userProfileData: ${JSON.stringify(userProfileData)}`
-      );
-
-      // 1. Si no hay dispositivo vinculado -> Permitir login tradicional
       if (!isLinkedDevice || !linkedUserId) {
-        console.log("[LoginScreen] determineAuthStep: No linked device or no linkedUserId. Setting step to \"traditional\".");
         setAuthState(prev => ({ 
           ...prev, 
           step: "traditional",
@@ -298,12 +423,8 @@ export default function LoginScren() {
         return;
       }
 
-      // 2. Dispositivo vinculado -> Cargar perfil del usuario
-      console.log("[LoginScreen] determineAuthStep: Device linked to user:", linkedUserId, "Attempting to ensure user profile.");
-      
       let userProfile = authState.userProfile;
       if (!userProfile && userProfileData?.getUserProfile) {
-        console.log('[LoginScreen] determineAuthStep: Assigning profile from userProfileData.getUserProfile');
         userProfile = {
           id: userProfileData.getUserProfile.id,
           email: userProfileData.getUserProfile.email,
@@ -311,115 +432,72 @@ export default function LoginScren() {
           fullName: userProfileData.getUserProfile.fullName,
           profilePictureUrl: userProfileData.getUserProfile.profilePictureUrl
         };
-        setAuthState(prev => ({ ...prev, userProfile })); // Actualizar el estado con el perfil cargado
-      } else if (!userProfile) {
-        console.log('[LoginScreen] determineAuthStep: User profile still null, creating fallback profile.');
-        // Fallback: crear perfil mínimo si aún no hay uno (debería ser raro si linkedUserId existe)
-        userProfile = {
-          id: linkedUserId, // Asegurarse que el ID es el correcto
-          email: "usuario@ejemplo.com", // Podría obtenerse de otro lado si es posible
-          username: "Usuario",
-          fullName: "Usuario"
-        };
-        setAuthState(prev => ({ ...prev, userProfile })); // Actualizar el estado con el perfil fallback
+        setAuthState(prev => ({ ...prev, userProfile }));
       }
-      console.log("[LoginScreen] determineAuthStep: User profile after checks:", JSON.stringify(userProfile));
 
-      console.log('[LoginScreen] determineAuthStep: Checking device lock state...', `pinConfig.isLocked: ${pinConfig.isLocked}`);
-      // 3. Verificar si el dispositivo está bloqueado
       if (pinConfig.isLocked) {
-        console.log("[LoginScreen] determineAuthStep: Device is locked. Setting step to \"blocked\".");
         setAuthState(prev => ({ ...prev, step: "blocked" }));
         return;
       }
 
-      console.log('[LoginScreen] determineAuthStep: Checking auth configuration...',
-        `canUseBiometric: ${canUseBiometric}`,
-        `hasPin: ${hasPin}`
-      );
-      // 4. Verificar configuración de autenticación
       if (canUseBiometric) {
-        console.log("[LoginScreen] determineAuthStep: canUseBiometric is true. Setting step to \"biometric\".");
         setAuthState(prev => ({ ...prev, step: "biometric" }));
-        
-        // Auto-intentar biometría después de un delay
-        console.log("[LoginScreen] determineAuthStep: Scheduling biometric auth attempt.");
         setTimeout(() => handleBiometricAuth(), 1000);
         return;
       }
 
       if (hasPin) {
-        console.log("[LoginScreen] determineAuthStep: hasPin is true. Setting step to \"pin\".");
         setAuthState(prev => ({ ...prev, step: "pin" }));
         return;
       }
 
-      // 5. Dispositivo vinculado pero sin configuración -> Setup
-      console.log("[LoginScreen] determineAuthStep: No biometric or PIN configured. Setting step to \"setup\".");
       setAuthState(prev => ({ ...prev, step: "setup" }));
       setShowPinSetup(true);
-      console.log("[LoginScreen] determineAuthStep: setShowPinSetup(true) called.");
 
     } catch (error) {
-      console.error("[LoginScreen] determineAuthStep: ERROR", error);
+      console.error("[LoginScreen] determineAuthStep error:", error);
       setAuthState(prev => ({ 
         ...prev, 
         step: "traditional",
         error: "Error de configuración"
       }));
     }
-    console.log("[LoginScreen] determineAuthStep: END");
   }, [
     localAuthCompleted, 
-    authState.step, // Added to see if its own changes trigger re-runs excessively
-    authState.userProfile, // Crucial for profile checks
     authLoading, 
     profileLoading, 
     isLinkedDevice, 
     linkedUserId, 
+    authState.userProfile,
     userProfileData, 
     pinConfig.isLocked, 
     canUseBiometric, 
     hasPin, 
-    handleBiometricAuth, 
-    setAuthState // Dependency on the wrapped setAuthState
+    handleBiometricAuth
   ]);
 
-  // Loguear el valor de localAuthCompleted cuando cambia
   useEffect(() => {
-    console.log(`[LoginScreen] useEffect: localAuthCompleted changed to: ${localAuthCompleted}`);
-  }, [localAuthCompleted]);
-
-  // Efecto principal para determinar el paso
-  useEffect(() => {
-    if (localAuthCompleted) {
-      console.log("useEffect: localAuthCompleted es true, no llamando a determineAuthStep.");
-      return;
+    if (!localAuthCompleted) {
+      determineAuthStep();
     }
-    determineAuthStep();
   }, [determineAuthStep, localAuthCompleted]);
 
-  // 🎯 HANDLERS DE AUTENTICACIÓN
-
-  const handlePinAuth = async (pin: string) => {
+  // Handlers optimizados con useCallback
+  const handlePinAuth = useCallback(async (pin: string) => {
     try {
       const result = await verifyPin(pin);
 
       if (result.success && result.token) {
         await AsyncStorage.setItem('token', result.token);
-        const savedToken = await AsyncStorage.getItem('token');
-        console.log('✅ Token guardado:', savedToken);
         if (result.user) {
           await AsyncStorage.setItem('userProfile', JSON.stringify(result.user));
         }
-        // Espera a que el estado de autenticación se recargue
         if (loadAuthState) {
           await loadAuthState();
         }
-        // Espera un pequeño delay para asegurar que el contexto se actualizó
         setTimeout(() => {
           navigateToApp();
-        }, 300); // 300ms suele ser suficiente, puedes ajustar
+        }, 300);
       } else {
         setAuthState(prev => ({ 
           ...prev, 
@@ -459,9 +537,9 @@ export default function LoginScren() {
         error: "Error al verificar PIN" 
       }));
     }
-  };
+  }, [verifyPin, loadAuthState, navigateToApp]);
 
-  const handleTraditionalLogin = () => {
+  const handleTraditionalLogin = useCallback(() => {
     if (!email || !password) {
       showToast("error", "Error", "Todos los campos son obligatorios");
       return;
@@ -474,12 +552,11 @@ export default function LoginScren() {
     }
 
     login({ variables: { email: email.toLowerCase().trim(), password } });
-  };
+  }, [email, password, login, showToast]);
 
-  const handleSuccessfulLogin = async (profile: UserProfile) => {
+  const handleSuccessfulLogin = useCallback(async (profile: UserProfile) => {
     try {
       if (!isLinkedDevice) {
-        // Primer login -> Vincular dispositivo
         const linkSuccess = await linkDevice(profile.id);
         
         if (!linkSuccess) {
@@ -487,13 +564,11 @@ export default function LoginScren() {
           return;
         }
 
-        // Después de vincular -> Configurar PIN
         setAuthState(prev => ({ ...prev, step: "setup" }));
         setShowPinSetup(true);
         return;
       }
 
-      // Verificar que el usuario puede acceder a este dispositivo
       const canAccess = await canUserAccessDevice(profile.id);
       if (!canAccess) {
         showToast("error", "Acceso denegado", "Este dispositivo está vinculado a otra cuenta");
@@ -502,16 +577,15 @@ export default function LoginScren() {
         return;
       }
 
-      // Login exitoso -> Ir a la app
       navigateToApp();
       
     } catch (error) {
       console.error("Error handling successful login:", error);
       showToast("error", "Error", "Hubo un problema procesando el login");
     }
-  };
+  }, [isLinkedDevice, linkDevice, canUserAccessDevice, navigateToApp, showToast]);
 
-  const handleLoginError = (errorMessage: string) => {
+  const handleLoginError = useCallback((errorMessage: string) => {
     setPassword("");
     
     if (errorMessage.includes("EMAIL_NOT_VERIFIED")) {
@@ -535,9 +609,9 @@ export default function LoginScren() {
     } else {
       showToast("error", "Error de login", errorMessage);
     }
-  };
+  }, [email, router, showToast]);
 
-  const handlePinSetupComplete = async (success: boolean) => {
+  const handlePinSetupComplete = useCallback(async (success: boolean) => {
     setShowPinSetup(false);
 
     if (success) {
@@ -549,9 +623,9 @@ export default function LoginScren() {
     } else {
       navigateToApp();
     }
-  };
+  }, [canUseBiometric, navigateToApp]);
 
-  const handleBiometricSetupComplete = (enabled: boolean) => {
+  const handleBiometricSetupComplete = useCallback((enabled: boolean) => {
     setShowBiometricSetup(false);
 
     if (enabled) {
@@ -560,11 +634,10 @@ export default function LoginScren() {
     } else {
       navigateToApp();
     }
-  };
+  }, [handleBiometricAuth, navigateToApp]);
 
-  // 🎯 RENDER BASED ON AUTH STEP
-
-  const renderContent = () => {
+  // Memoizar el contenido renderizado
+  const renderContent = useMemo(() => {
     switch (authState.step) {
       case "loading":
         return (
@@ -678,153 +751,53 @@ export default function LoginScren() {
         );
 
       case "traditional":
-        return <TraditionalLoginForm />;
+        return (
+          <TraditionalLoginForm
+            email={email}
+            password={password}
+            showPassword={showPassword}
+            loginLoading={loginLoading}
+            isLinkedDevice={isLinkedDevice}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            onTogglePassword={() => setShowPassword(!showPassword)}
+            onSubmit={handleTraditionalLogin}
+            onRegister={() => router.push("/RegisterScreen")}
+          />
+        );
 
       default:
-        return <TraditionalLoginForm />;
+        return (
+          <TraditionalLoginForm
+            email={email}
+            password={password}
+            showPassword={showPassword}
+            loginLoading={loginLoading}
+            isLinkedDevice={isLinkedDevice}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            onTogglePassword={() => setShowPassword(!showPassword)}
+            onSubmit={handleTraditionalLogin}
+            onRegister={() => router.push("/RegisterScreen")}
+          />
+        );
     }
-  };
-
-  // Componente para mostrar perfil del usuario
-  const UserProfileHeader = ({ userProfile }: { userProfile: UserProfile | null }) => {
-    if (!userProfile) return null;
-
-    return (
-      <View style={styles.userInfo}>
-        <View style={styles.avatarContainer}>
-          {userProfile.profilePictureUrl ? (
-            <Image 
-              source={{ uri: userProfile.profilePictureUrl }} 
-              style={styles.avatarImage}
-            />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Ionicons name="person" size={32} color="#FFF" />
-            </View>
-          )}
-        </View>
-        <Text style={styles.welcomeText}>¡Hola de nuevo!</Text>
-        <Text style={styles.userDisplayName}>
-          {userProfile.fullName || userProfile.username}
-        </Text>
-        <Text style={styles.userEmail}>{userProfile.email}</Text>
-      </View>
-    );
-  };
-
-  // Componente para login tradicional
-  const TraditionalLoginForm = () => (
-    <View style={styles.formContainer}>
-      <Text style={styles.welcomeTitle}>
-        Bienvenido a <Text style={styles.brandName}>Quipuk</Text>
-      </Text>
-      <Text style={styles.welcomeSubtitle}>
-        {isLinkedDevice ? "Inicia sesión para continuar" : "Inicia sesión o regístrate"}
-      </Text>
-
-      {isLinkedDevice && (
-        <View style={styles.deviceLinkedNotice}>
-          <Ionicons name="phone-portrait" size={20} color="#00c450" />
-          <Text style={styles.deviceLinkedText}>
-            Este dispositivo está registrado
-          </Text>
-        </View>
-      )}
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Correo electrónico</Text>
-        <View style={styles.inputWrapper}>
-          <Ionicons 
-            name="mail-outline" 
-            size={20} 
-            color="#666" 
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={styles.input}
-            placeholder="tu@email.com"
-            placeholderTextColor="#999"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            value={email}
-            onChangeText={setEmail}
-            editable={!loginLoading}
-            autoComplete="email"
-            textContentType="emailAddress"
-          />
-        </View>
-      </View>
-
-      <View style={styles.inputContainer}>
-        <Text style={styles.inputLabel}>Contraseña</Text>
-        <View style={styles.inputWrapper}>
-          <Ionicons 
-            name="lock-closed-outline" 
-            size={20} 
-            color="#666" 
-            style={styles.inputIcon}
-          />
-          <TextInput
-            style={[styles.input, styles.passwordInput]}
-            placeholder="Tu contraseña"
-            placeholderTextColor="#999"
-            secureTextEntry={!showPassword}
-            value={password}
-            onChangeText={setPassword}
-            editable={!loginLoading}
-            autoComplete="password"
-            textContentType="password"
-          />
-          <TouchableOpacity
-            style={styles.passwordToggle}
-            onPress={() => setShowPassword(!showPassword)}
-            disabled={loginLoading}
-          >
-            <Ionicons
-              name={showPassword ? "eye-off-outline" : "eye-outline"}
-              size={20}
-              color="#666"
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      <TouchableOpacity
-        style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
-        onPress={handleTraditionalLogin}
-        disabled={loginLoading}
-        activeOpacity={0.8}
-      >
-        <LinearGradient
-          colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
-          style={styles.loginGradient}
-        >
-          {loginLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#FFF" size="small" />
-              <Text style={styles.loginButtonText}>Ingresando...</Text>
-            </View>
-          ) : (
-            <Text style={styles.loginButtonText}>Ingresar</Text>
-          )}
-        </LinearGradient>
-      </TouchableOpacity>
-
-      {!isLinkedDevice && (
-        <TouchableOpacity
-          onPress={() => router.push("/RegisterScreen")}
-          disabled={loginLoading}
-          style={styles.registerContainer}
-        >
-          <Text style={[styles.registerText, loginLoading && styles.disabledText]}>
-            ¿Aún no tienes una cuenta?{" "}
-            <Text style={styles.registerLink}>Regístrate</Text>
-          </Text>
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  }, [
+    authState,
+    authLoading,
+    pinConfig.lockedUntil,
+    email,
+    password,
+    showPassword,
+    loginLoading,
+    isLinkedDevice,
+    handlePinAuth,
+    handleBiometricAuth,
+    handleTraditionalLogin,
+    forceTraditionalLogin,
+    hasPin,
+    router
+  ]);
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -840,7 +813,6 @@ export default function LoginScren() {
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* Header con logo */}
             <LinearGradient
               colors={["#000000", "#1a1a1a"]}
               style={styles.logoContainer}
@@ -848,15 +820,13 @@ export default function LoginScren() {
               <QuipukLogo width={120} height={60} />
             </LinearGradient>
 
-            {/* Contenido principal */}
             <View style={styles.contentContainer}>
-              {renderContent()}
+              {renderContent}
             </View>
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
 
-      {/* Modales */}
       {authState.userProfile && (
         <>
           <PinSetup

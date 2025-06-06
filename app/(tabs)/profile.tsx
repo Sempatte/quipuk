@@ -1,5 +1,5 @@
 // app/(tabs)/EnhancedProfile.tsx
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 import {
   ActivityIndicator,
   Text,
@@ -7,24 +7,16 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  Dimensions,
-  ScrollView,
-  Switch,
+  ScrollView
 } from "react-native";
 import { useQuery } from "@apollo/client";
-import { useNavigation } from "@react-navigation/native";
-import { useRouter } from "expo-router";
 import { Ionicons } from '@expo/vector-icons';
 
-import { RootStackNavigationProp } from "../interfaces/navigation";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
 import { useProfilePicture } from "@/hooks/useProfilePicture";;
 import Avatar from "@/components/ui/Avatar";
-import { useAuth } from "@/hooks/useAuth";
-import { DeviceUnlinkModal, useDeviceUnlink } from "@/components/DeviceUnlinkModal";
+import {  useDeviceUnlink } from "@/components/DeviceUnlinkModal";
 import { StatusBarManager, StatusBarPresets } from "@/components/ui/StatusBarManager";
-
-const { width } = Dimensions.get('window');
 
 interface UserProfile {
   fullName: string;
@@ -34,9 +26,7 @@ interface UserProfile {
 }
 
 export default function EnhancedProfile() {
-  const navigation = useNavigation<RootStackNavigationProp<"(tabs)">>();
-  const router = useRouter();
-  const [showSecurityOptions, setShowSecurityOptions] = useState(false);
+
 
   // Query del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
@@ -49,31 +39,16 @@ export default function EnhancedProfile() {
   );
 
   // Hook personalizado para foto de perfil
-  const { 
-    state: profilePictureState, 
-    selectAndUploadImage, 
-    deleteProfilePicture,
-    retryImageLoad
+  const {
+    state: profilePictureState,
+    selectAndUploadImage,
+    deleteProfilePicture
   } = useProfilePicture();
 
-  // Hook de autenticación mejorada
-  const {
-    isLinkedDevice,
-    linkedUserId,
-    hasPin,
-    hasBiometric,
-    canUseBiometric,
-    pinConfig,
-    disableBiometric,
-    removePin,
-    loadAuthState
-  } = useAuth();
+
 
   // Hook de desvinculación
   const {
-    isModalVisible,
-    showUnlinkModal,
-    hideUnlinkModal,
     quickUnlink
   } = useDeviceUnlink();
 
@@ -85,14 +60,14 @@ export default function EnhancedProfile() {
         'Selecciona una acción',
         [
           { text: 'Cancelar', style: 'cancel' },
-          { 
-            text: 'Cambiar foto', 
-            onPress: selectAndUploadImage 
+          {
+            text: 'Cambiar foto',
+            onPress: selectAndUploadImage
           },
-          { 
-            text: 'Eliminar foto', 
+          {
+            text: 'Eliminar foto',
             onPress: deleteProfilePicture,
-            style: 'destructive' 
+            style: 'destructive'
           },
         ]
       );
@@ -101,68 +76,8 @@ export default function EnhancedProfile() {
     }
   }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
 
-  // Manejar toggle de biometría
-  const handleBiometricToggle = async (enabled: boolean) => {
-    if (!enabled && hasBiometric) {
-      Alert.alert(
-        "Deshabilitar Face ID",
-        "¿Estás seguro de que deseas deshabilitar Face ID? Tendrás que usar tu PIN para acceder.",
-        [
-          { text: "Cancelar", style: "cancel" },
-          {
-            text: "Deshabilitar",
-            style: "destructive",
-            onPress: async () => {
-              try {
-                await disableBiometric();
-                loadAuthState();
-              } catch (error) {
-                Alert.alert("Error", "No se pudo deshabilitar Face ID");
-              }
-            },
-          },
-        ]
-      );
-    }
-  };
 
-  // Manejar eliminación de PIN
-  const handleRemovePin = async () => {
-    if (!hasPin) return;
-
-    Alert.alert(
-      "Eliminar PIN",
-      "Necesitas tu PIN actual para eliminarlo. ¿Continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Continuar",
-          onPress: () => {
-            // Aquí podrías implementar un modal para ingresar el PIN actual
-            Alert.prompt(
-              "Ingresa tu PIN actual",
-              "Necesitamos verificar tu identidad",
-              async (pin) => {
-                if (pin) {
-                  try {
-                    const result = await removePin(pin);
-                    if (result.success) {
-                      Alert.alert("Éxito", "PIN eliminado correctamente");
-                    } else {
-                      Alert.alert("Error", result.error || "No se pudo eliminar el PIN");
-                    }
-                  } catch (error) {
-                    Alert.alert("Error", "Ocurrió un problema eliminando el PIN");
-                  }
-                }
-              },
-              "secure-text"
-            );
-          },
-        },
-      ]
-    );
-  };
+  
 
   // Determinar estados de loading
   const shouldShowAvatarLoading = useCallback(() => {
@@ -180,14 +95,7 @@ export default function EnhancedProfile() {
           <Ionicons name="alert-circle" size={50} color="#E86F51" />
           <Text style={styles.errorText}>Error al cargar el perfil</Text>
           <Text style={styles.errorSubtext}>{error.message}</Text>
-          <TouchableOpacity 
-                  style={styles.logoutButton} 
-                  onPress={quickUnlink}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="log-out-outline" size={20} color="#FFF" />
-                  <Text style={styles.logoutText}>Cerrar Sesión</Text>
-                </TouchableOpacity>
+
         </View>
       </View>
     );
@@ -198,15 +106,6 @@ export default function EnhancedProfile() {
       <StatusBarManager {...StatusBarPresets.tabs} />
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Mi Perfil</Text>
-        {isLinkedDevice && (
-          <TouchableOpacity 
-            style={styles.deviceBadge}
-            onPress={() => setShowSecurityOptions(!showSecurityOptions)}
-          >
-            <Ionicons name="phone-portrait" size={16} color="#00DC5A" />
-            <Text style={styles.deviceBadgeText}>Dispositivo Registrado</Text>
-          </TouchableOpacity>
-        )}
       </View>
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
@@ -222,7 +121,7 @@ export default function EnhancedProfile() {
             loading={shouldShowAvatarLoading()}
             progress={profilePictureState.uploadProgress}
           />
-          
+
           {profilePictureState.isUploading && (
             <Text style={styles.uploadingText}>
               Subiendo imagen... {Math.round(profilePictureState.uploadProgress)}%
@@ -243,7 +142,7 @@ export default function EnhancedProfile() {
             data?.getUserProfile && (
               <>
                 <Text style={styles.userName}>{data.getUserProfile.fullName}</Text>
-                
+
                 {/* Información de contacto */}
                 <View style={styles.infoCard}>
                   <View style={styles.infoItem}>
@@ -255,9 +154,9 @@ export default function EnhancedProfile() {
                       <Text style={styles.infoValue}>{data.getUserProfile.phoneNumber || 'No especificado'}</Text>
                     </View>
                   </View>
-                  
+
                   <View style={styles.divider} />
-                  
+
                   <View style={styles.infoItem}>
                     <View style={styles.iconContainer}>
                       <Ionicons name="mail-outline" size={24} color="#00DC5A" />
@@ -268,79 +167,8 @@ export default function EnhancedProfile() {
                     </View>
                   </View>
                 </View>
-                
-                {/* Opciones de seguridad (solo para dispositivos vinculados) */}
-                {isLinkedDevice && showSecurityOptions && (
-                  <View style={styles.securityCard}>
-                    <View style={styles.securityHeader}>
-                      <Ionicons name="shield-checkmark" size={24} color="#00DC5A" />
-                      <Text style={styles.securityTitle}>Seguridad del Dispositivo</Text>
-                    </View>
 
-                    {/* Estado del PIN */}
-                    <View style={styles.securityItem}>
-                      <View style={styles.securityItemLeft}>
-                        <Ionicons name="keypad" size={20} color="#333" />
-                        <View style={styles.securityItemText}>
-                          <Text style={styles.securityItemTitle}>PIN de Acceso</Text>
-                          <Text style={styles.securityItemSubtitle}>
-                            {hasPin ? "Configurado" : "No configurado"}
-                          </Text>
-                        </View>
-                      </View>
-                      {hasPin && (
-                        <TouchableOpacity
-                          style={styles.removeButton}
-                          onPress={handleRemovePin}
-                        >
-                          <Text style={styles.removeButtonText}>Eliminar</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
 
-                    {/* Estado de Face ID */}
-                    {canUseBiometric && (
-                      <View style={styles.securityItem}>
-                        <View style={styles.securityItemLeft}>
-                          <Ionicons name="scan" size={20} color="#333" />
-                          <View style={styles.securityItemText}>
-                            <Text style={styles.securityItemTitle}>Face ID</Text>
-                            <Text style={styles.securityItemSubtitle}>
-                              {hasBiometric ? "Habilitado" : "Deshabilitado"}
-                            </Text>
-                          </View>
-                        </View>
-                        <Switch
-                          value={hasBiometric}
-                          onValueChange={handleBiometricToggle}
-                          trackColor={{ false: "#E5E8EB", true: "#00DC5A" }}
-                          thumbColor="#FFF"
-                        />
-                      </View>
-                    )}
-
-                    {/* Estado del dispositivo */}
-                    <View style={styles.securityItem}>
-                      <View style={styles.securityItemLeft}>
-                        <Ionicons name="phone-portrait" size={20} color="#333" />
-                        <View style={styles.securityItemText}>
-                          <Text style={styles.securityItemTitle}>Dispositivo Vinculado</Text>
-                          <Text style={styles.securityItemSubtitle}>
-                            Registrado a tu cuenta
-                          </Text>
-                        </View>
-                      </View>
-                      <TouchableOpacity
-                        style={styles.unlinkButton}
-                        onPress={showUnlinkModal}
-                      >
-                        <Ionicons name="unlink" size={16} color="#E74C3C" />
-                        <Text style={styles.unlinkButtonText}>Desvincular</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                )}
-                
                 {/* Opciones generales */}
                 <View style={styles.optionsCard}>
                   <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
@@ -350,27 +178,13 @@ export default function EnhancedProfile() {
                     <Text style={styles.optionText}>Configuraciones</Text>
                     <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
-                  
+
                   <View style={styles.optionDivider} />
-                  
-                  <TouchableOpacity 
-                    style={styles.optionItem} 
-                    activeOpacity={0.7}
-                    onPress={() => setShowSecurityOptions(!showSecurityOptions)}
-                  >
-                    <View style={styles.optionIconContainer}>
-                      <Ionicons name="shield-outline" size={22} color="#333" />
-                    </View>
-                    <Text style={styles.optionText}>Privacidad y Seguridad</Text>
-                    <Ionicons 
-                      name={showSecurityOptions ? "chevron-up" : "chevron-forward"} 
-                      size={20} 
-                      color="#999" 
-                    />
-                  </TouchableOpacity>
-                  
+
+
+
                   <View style={styles.optionDivider} />
-                  
+
                   <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
                     <View style={styles.optionIconContainer}>
                       <Ionicons name="help-circle-outline" size={22} color="#333" />
@@ -379,28 +193,23 @@ export default function EnhancedProfile() {
                     <Ionicons name="chevron-forward" size={20} color="#999" />
                   </TouchableOpacity>
                 </View>
-                
+
                 {/* Botón de cierre de sesión */}
-                <TouchableOpacity 
-                  style={styles.logoutButton} 
+                {__DEV__ && (
+                  <TouchableOpacity
+                  style={styles.logoutButton}
                   onPress={quickUnlink}
                   activeOpacity={0.8}
                 >
-                  <Ionicons name="log-out-outline" size={20} color="#FFF" />
-                  <Text style={styles.logoutText}>Cerrar Sesión</Text>
+                  <Text style={styles.logoutText}>Desvincular dispositivo [DEV]</Text>
                 </TouchableOpacity>
+                )} 
               </>
             )
           )}
         </View>
       </ScrollView>
 
-      {/* Modal de desvinculación */}
-      <DeviceUnlinkModal
-        visible={isModalVisible}
-        onClose={hideUnlinkModal}
-        userEmail={data?.getUserProfile?.email}
-      />
     </View>
   );
 }
@@ -642,7 +451,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#f5f5f5', 
+    backgroundColor: '#f5f5f5',
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 15,

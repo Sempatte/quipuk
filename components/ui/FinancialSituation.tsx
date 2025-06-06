@@ -11,7 +11,7 @@ import { GET_TRANSACTIONS } from "@/app/graphql/transaction.graphql";
 import { useFocusEffect } from "@react-navigation/native";
 import { FinancialChart } from "./FinancialChart";
 import { useFinancialData } from "@/hooks/useFinancialData";
-import { Colors } from "@/constants/Colors";
+import { Colors } from "@/app/constants/colors";
 import { globalStyles } from "@/app/styles/globalStyles";
 import FinancialSituationSkeleton from "./FinancialSituationSkeleton";
 

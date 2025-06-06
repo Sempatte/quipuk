@@ -1,5 +1,5 @@
 import { biometricService } from '@/app/services/biometricService';
-import { AuthResult, User } from '@/app/types/auth.types';
+import { AuthResult, User } from '@/app/interfaces/auth.interface';
 import { useState, useEffect } from 'react';
 
 export const useBiometricAuth = () => {

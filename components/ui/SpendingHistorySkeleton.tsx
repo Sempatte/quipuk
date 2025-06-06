@@ -3,7 +3,7 @@ import React from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import SkeletonLoader from './SkeletonLoader';
 import { globalStyles } from '@/app/styles/globalStyles';
-import { Colors } from '@/constants/Colors';
+import { Colors } from '@/app/constants/colors';
 
 const { width } = Dimensions.get('window');
 const CHART_HEIGHT = 200;

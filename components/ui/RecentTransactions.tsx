@@ -14,16 +14,16 @@ import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { GET_TRANSACTIONS_BY_USER } from "@/app/graphql/transaction.graphql";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "@/app/interfaces/navigation";
+import { RootStackParamList } from "@/app/interfaces/navigation.type";
 import { Transaction } from "@/app/interfaces/transaction.interface";
-import { getTransactionIcon } from "@/app/contants/iconDictionary";
+import { getTransactionIcon } from "@/app/constants/categoryIcons";
 import EyeIcon from "@/assets/images/icons/eye.svg";
 import EyeOffIcon from "@/assets/images/icons/eye-off.svg";
 import ChevronDownIcon from "@/assets/images/icons/chevron-down.svg";
 import ChevronUpIcon from "@/assets/images/icons/chevron-up.svg";
 import TransactionSkeleton from "@/components/ui/TransactionSkeleton";
 import { globalStyles } from "@/app/styles/globalStyles";
-import { Colors } from "@/constants/Colors";
+import { Colors } from "@/app/constants/colors";
 
 type MovementsNavigationProp = NativeStackNavigationProp<
   RootStackParamList,

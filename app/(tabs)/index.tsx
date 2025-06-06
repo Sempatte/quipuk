@@ -14,7 +14,7 @@ import QuipukLogo from "@/assets/images/LogoV2.svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { RootStackParamList } from "../interfaces/navigation";
+import { RootStackParamList } from "../interfaces/navigation.type";
 import Loader from "@/components/ui/Loader";
 import RecentTransactions from "@/components/ui/RecentTransactions"; // Importamos el nuevo componente
 import UpcomingPayments from "@/components/ui/UpcomingPayments";

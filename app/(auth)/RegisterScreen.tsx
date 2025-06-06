@@ -23,7 +23,7 @@ import { useToast } from "@/app/providers/ToastProvider";
 import { useRegisterForm } from "@/hooks/useRegisterForm";
 import { PhoneInput } from "@/components/ui/PhoneInput";
 import QuipukLogo from "@/assets/images/Logo.svg";
-import { defaultCountry, getCountryByCode } from "@/app/contants/countries";
+import { defaultCountry, getCountryByCode } from "@/app/constants/countries";
 
 const { width, height } = Dimensions.get("window");
 

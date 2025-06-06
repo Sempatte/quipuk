@@ -26,7 +26,7 @@ interface HealthCheckResponse {
 export const checkBackendHealth = async (retries = 2): Promise<boolean> => {
   try {
     // Se ha aumentado el timeout para entornos de producción
-    const timeout = env.isProduction ? 8000 : 5000;
+    const timeout = env.isProduction ? 8000 : 10000;
     
     const response = await axios.get<HealthCheckResponse>(`${env.API_URL}/health`, {
       timeout,

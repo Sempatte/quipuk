@@ -43,8 +43,8 @@ const dotStyles = StyleSheet.create({
     marginHorizontal: 8,
   },
   dotFilled: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: '#00DC5A',
+    borderColor: '#00DC5A',
   },
   dotError: {
     backgroundColor: '#FF3B30',

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CountryPicker } from './CountryPicker';
-import { Country } from '@/app/contants/countries';
+import { Country } from '@/app/constants/countries';
 
 interface PhoneInputProps extends Omit<TextInputProps, 'style'> {
   label?: string;

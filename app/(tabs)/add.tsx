@@ -50,8 +50,8 @@ import {
   FrequentTransactionsData,
 } from "../interfaces/transaction.interface";
 import { useTransactionForm } from "@/hooks/useTransactionForm";
-import { getCategoryIcon } from "../contants/iconDictionary";
-import { RootStackParamList } from "../interfaces/navigation";
+import { getCategoryIcon } from "../constants/categoryIcons";
+import { RootStackParamList } from "../interfaces/navigation.type";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
 import { useToast } from "../providers/ToastProvider";
