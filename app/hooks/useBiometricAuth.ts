@@ -1,88 +1,60 @@
+import { useState, useEffect, useCallback } from 'react';
 import { biometricService } from '@/app/services/biometricService';
-import { AuthResult, User } from '@/app/interfaces/auth.interface';
-import { useState, useEffect } from 'react';
+import { User } from '@/app/interfaces/auth.interface';
 
-export const useBiometricAuth = () => {
+export function useBiometricAuthManager(user: User | null) {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isEnabled, setIsEnabled] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const initializeAuth = async () => {
-      await checkAvailability();
-      await checkIfEnabled();
-    };
-    initializeAuth();
-  }, []);
-
-  const checkAvailability = async () => {
+  const refreshState = useCallback(async () => {
+    setIsLoading(true);
     const available = await biometricService.isBiometricAvailable();
     setIsAvailable(available);
-  };
+    if (available) {
+      const enabled = await biometricService.isBiometricEnabled();
+      setIsEnabled(enabled);
+    }
+    setIsLoading(false);
+  }, []);
 
-  const checkIfEnabled = async () => {
-    const enabled = await biometricService.isBiometricEnabled();
-    setIsEnabled(enabled);
-  };
+  useEffect(() => {
+    refreshState();
+  }, [refreshState]);
 
-  const setupBiometric = async (user: User): Promise<boolean> => {
+  const toggleBiometrics = useCallback(async () => {
+    if (!isAvailable) return;
+
+    // User is required to enable biometrics.
+    if (!isEnabled && !user) {
+        console.error("User object is required to enable biometrics.");
+        return;
+    }
+
     setIsLoading(true);
     try {
-      const success = await biometricService.setupBiometric(user);
-      if (success) {
-        setIsEnabled(true);
+      if (isEnabled) {
+        await biometricService.disableBiometric();
+        setIsEnabled(false);
+      } else if (user) {
+        const success = await biometricService.setupBiometric(user);
+        if (success) {
+          setIsEnabled(true);
+        }
       }
-      return success;
     } catch (error) {
-      console.error('Setup biometric error:', error);
-      throw error;
+      console.error("Error toggling biometrics", error);
     } finally {
       setIsLoading(false);
+      await refreshState();
     }
-  };
-
-  const authenticate = async (): Promise<AuthResult> => {
-    setIsLoading(true);
-    try {
-      return await biometricService.authenticateWithBiometric();
-    } catch (error) {
-      console.error('Authentication error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const disable = async (): Promise<void> => {
-    setIsLoading(true);
-    try {
-      await biometricService.disableBiometric();
-      setIsEnabled(false);
-    } catch (error) {
-      console.error('Disable biometric error:', error);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [isEnabled, isAvailable, user, refreshState]);
 
   return {
+    isLoading,
     isAvailable,
     isEnabled,
-    isLoading,
-    setupBiometric,
-    authenticate,
-    disable,
-    refresh: () => {
-      const refreshAuth = async () => {
-        try {
-          await checkAvailability();
-          await checkIfEnabled();
-        } catch (error) {
-          console.error('Refresh error:', error);
-        }
-      };
-      refreshAuth();
-    }
+    toggleBiometrics,
+    refreshState,
   };
-};
+}

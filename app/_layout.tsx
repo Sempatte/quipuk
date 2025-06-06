@@ -20,10 +20,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { pinService } from "@/app/services/pinService";
 import { StatusBar } from 'expo-status-bar';
 import { useCustomToast } from "@/app/hooks/useCustomToast";
+import { LoadingDots } from "./components/ui/LoadingDots";
 
 SplashScreen.preventAutoHideAsync();
 
-type LocalAuthStep = 
+type LocalAuthStep =
   | 'idle'
   | 'checkingToken'
   | 'tokenChecked'
@@ -37,13 +38,13 @@ type LocalAuthStep =
 function AuthHandler() {
   const segments = useSegments();
   const router = useRouter();
-  const { 
-    isLoading: authHookLoading, 
-    isLinkedDevice, 
-    canUseBiometric, 
-    hasPin, 
+  const {
+    isLoading: authHookLoading,
+    isLinkedDevice,
+    canUseBiometric,
+    hasPin,
     pinConfig,
-    authenticateWithBiometric, 
+    authenticateWithBiometric,
     verifyPin,
     loadAuthState
   } = useAuth();
@@ -55,7 +56,7 @@ function AuthHandler() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
   const [splashHidden, setSplashHidden] = useState(false);
-  
+
   // Ref para prevenir múltiples navigaciones
   const navigationInProgressRef = useRef(false);
   const hasNavigatedRef = useRef(false);
@@ -67,7 +68,7 @@ function AuthHandler() {
     if (currentLocalAuthStepVal === 'idle') {
       console.log('[AuthHandler] Starting token check...');
       setLocalAuthStep('checkingToken');
-      
+
       AsyncStorage.getItem("token")
         .then(storedToken => {
           console.log('[AuthHandler] Token check complete:', storedToken ? 'Token exists' : 'No token');
@@ -185,27 +186,27 @@ function AuthHandler() {
 
   const handlePinSubmit = async (submittedPin: string) => {
     if (pinConfig?.isLocked) {
-      Alert.alert("Dispositivo Bloqueado", "Demasiados intentos. Intenta más tarde.");
+      showError("Dispositivo Bloqueado", "Demasiados intentos. Intenta más tarde.");
       handleLogout();
       return;
     }
 
     setLocalAuthStep('authenticatingPin');
     setAuthError(null);
-    
+
     try {
       const result = await verifyPin(submittedPin);
-      
+
       if (result.success) {
         if (Platform.OS === 'ios') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         }
-        
+
         if (result.token) {
           await AsyncStorage.setItem('token', result.token);
           setToken(result.token);
         }
-        
+
         hasNavigatedRef.current = false; // Reset para permitir navegación
         setLocalAuthStep('localAuthSuccess');
         setAttempts(0);
@@ -213,7 +214,7 @@ function AuthHandler() {
         if (Platform.OS === 'ios') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
-        
+
         setAuthError(result.error || "PIN incorrecto");
         setAttempts(prev => prev + 1);
         // Mostrar toast de error
@@ -222,10 +223,10 @@ function AuthHandler() {
         } else {
           showError("PIN incorrecto", "Intenta nuevamente");
         }
-        
+
         if (result.isLocked) {
           Alert.alert(
-            "Dispositivo Bloqueado", 
+            "Dispositivo Bloqueado",
             result.error || "Demasiados intentos fallidos",
             [{ text: "OK", onPress: handleLogout }]
           );
@@ -246,10 +247,10 @@ function AuthHandler() {
   const handleBiometricAuth = async () => {
     setLocalAuthStep('authenticatingBiometric');
     setAuthError(null);
-    
+
     try {
       const result = await authenticateWithBiometric();
-      
+
       if (result.success) {
         if (Platform.OS === 'ios') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -260,9 +261,9 @@ function AuthHandler() {
         if (Platform.OS === 'ios') {
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         }
-        
+
         setAuthError(result.error || "Autenticación biométrica fallida");
-        
+
         if (result.requiresManualLogin) {
           if (hasPin) {
             setLocalAuthStep('pinInputRequired');
@@ -276,7 +277,7 @@ function AuthHandler() {
     } catch (e) {
       console.error('[AuthHandler] Biometric auth error:', e);
       setAuthError("Error en autenticación biométrica");
-      
+
       if (hasPin) {
         setLocalAuthStep('pinInputRequired');
       } else {
@@ -307,7 +308,7 @@ function AuthHandler() {
   if (currentLocalAuthStepVal === 'localAuthFailed') {
     return <Slot />; // Render current route, navigation will handle redirect
   }
-  
+
   // PIN Input
   if (currentLocalAuthStepVal === 'pinInputRequired' || currentLocalAuthStepVal === 'authenticatingPin') {
     return (
@@ -317,7 +318,7 @@ function AuthHandler() {
           <Ionicons name="keypad-outline" size={60} color="#00DC5A" style={styles.authIcon} />
           <Text style={styles.authTitle}>Ingresa tu PIN</Text>
           <Text style={styles.authSubtitle}>Usa tu PIN para acceder de forma segura</Text>
-          
+
           <PinInput
             title=""
             maxLength={6}
@@ -326,10 +327,7 @@ function AuthHandler() {
             hasError={!!authError}
             errorMessage={undefined}
           />
-          
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-          </TouchableOpacity>
+
         </View>
       </SafeAreaView>
     );
@@ -344,10 +342,10 @@ function AuthHandler() {
           <Ionicons name="scan-circle-outline" size={80} color="#00DC5A" style={styles.authIcon} />
           <Text style={styles.authTitle}>Autenticación Requerida</Text>
           <Text style={styles.authSubtitle}>Usa Face ID para continuar</Text>
-          
-          <TouchableOpacity 
-            style={[styles.biometricButton, currentLocalAuthStepVal === 'authenticatingBiometric' && styles.buttonDisabled]} 
-            onPress={handleBiometricAuth} 
+
+          <TouchableOpacity
+            style={[styles.biometricButton, currentLocalAuthStepVal === 'authenticatingBiometric' && styles.buttonDisabled]}
+            onPress={handleBiometricAuth}
             disabled={currentLocalAuthStepVal === 'authenticatingBiometric'}
           >
             {currentLocalAuthStepVal === 'authenticatingBiometric' ? (
@@ -356,13 +354,11 @@ function AuthHandler() {
               <Text style={styles.biometricButtonText}>Usar Face ID</Text>
             )}
           </TouchableOpacity>
-          
+
           {authError && <Text style={styles.errorText}>{authError}</Text>}
-          
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-            <Text style={styles.logoutButtonText}>Cerrar Sesión</Text>
-          </TouchableOpacity>
-          
+
+
+
           {hasPin && currentLocalAuthStepVal !== 'authenticatingBiometric' && (
             <TouchableOpacity onPress={() => setLocalAuthStep('pinInputRequired')} style={styles.switchAuthButton}>
               <Text style={styles.switchAuthButtonText}>Usar PIN</Text>
@@ -395,15 +391,13 @@ function MainLayout() {
     Outfit_500Medium,
     Outfit_300Light,
   });
-  
-  if (!fontsLoaded || backendLoading) { 
+
+  if (!fontsLoaded || backendLoading) {
     return (
-      <View style={styles.fullScreenLoader}> 
-        <StatusBar style="light" />
-        <ActivityIndicator size="large" color="#00DC5A" />
-        <Text style={styles.loadingText}>Cargando recursos...</Text>
+      <View style={styles.fullScreenLoader}>
+        <LoadingDots />
       </View>
-    ); 
+    );
   }
 
   if (!isBackendActive) {
@@ -415,7 +409,7 @@ function MainLayout() {
     colors: {
       ...(colorScheme === "dark" ? DarkTheme.colors : DefaultTheme.colors),
       primary: "#00DC5A",
-      background: "#F5F5F5", 
+      background: "#F5F5F5",
     },
   };
 
@@ -428,7 +422,7 @@ function MainLayout() {
 
 export default function RootLayout() {
   return (
-    <SafeAreaProvider style={{ backgroundColor: "#000" }}> 
+    <SafeAreaProvider style={{ backgroundColor: "#000" }}>
       <ApolloProvider client={client}>
         <FontProvider>
           <ToastProvider>
@@ -445,7 +439,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#000', 
+    backgroundColor: '#000',
   },
   loadingText: {
     color: '#fff',
@@ -464,7 +458,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   authIcon: {
-    marginBottom: 30,
+    marginBottom: 20,
   },
   authTitle: {
     fontSize: 28,
@@ -477,7 +471,7 @@ const styles = StyleSheet.create({
   authSubtitle: {
     fontSize: 16,
     color: '#666',
-    marginBottom: 40,
+    marginBottom: 1,
     textAlign: 'center',
     fontFamily: "Outfit_400Regular",
   },

@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCameraPermissions } from '@/app/hooks/useCamaraPermissions';
 import { ExtractedReceiptData, integratedOCRService } from '@/app/services/integratedOCRService';
 import { LoadingDots } from './LoadingDots';
+import { useCustomToast } from '@/app/hooks/useCustomToast';
 
 const { width, height } = Dimensions.get('window');
 
@@ -40,6 +41,8 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
   const cameraRef = useRef<CameraView>(null);
   const [selectedLens, setSelectedLens] = useState<string | undefined>("builtInWideAngleCamera");
   const [capturedImageUri, setCapturedImageUri] = useState<string | null>(null);
+
+  const { showError } = useCustomToast();
 
   const {
     permissions,
@@ -174,7 +177,7 @@ const ReceiptScanner: React.FC<ReceiptScannerProps> = ({
       }
     } catch (error) {
       console.error('💥 [Scanner] Error seleccionando imagen:', error);
-      Alert.alert('Error', 'Error al seleccionar imagen de la galería');
+      showError('Error', 'Error al seleccionar imagen de la galería');
     }
   };
 

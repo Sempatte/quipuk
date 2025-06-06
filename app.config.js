@@ -89,6 +89,9 @@ export default ({ config }) => {
     },
     ios: {
       ...(config.ios || {}),
+      infoPlist: {
+        NSFaceIDUsageDescription: "Esta aplicación utiliza Face ID para permitirte un acceso rápido y seguro a tu cuenta."
+      }
     },
   };
 };

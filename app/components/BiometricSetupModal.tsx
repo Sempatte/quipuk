@@ -1,7 +1,8 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Alert } from 'react-native';
-import { useBiometricAuth } from '../hooks/useBiometricAuth';
+import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { useBiometricAuthManager } from '../hooks/useBiometricAuth';
 import { User } from '@/app/interfaces/auth.interface';
+import { useCustomToast } from '../hooks/useCustomToast';
 
 interface BiometricSetupModalProps {
   visible: boolean;
@@ -14,14 +15,16 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
   user,
   onComplete,
 }) => {
-  const { setupBiometric, isLoading, isAvailable } = useBiometricAuth();
+  const { toggleBiometrics, isLoading, isAvailable } = useBiometricAuthManager(user);
+  const { showError } = useCustomToast();
 
   const handleSetup = async () => {
     try {
-      const success = await setupBiometric(user);
-      onComplete(success);
+      await toggleBiometrics();
+      onComplete(true);
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo configurar Face ID');
+      showError('Error', error.message || 'No se pudo configurar Face ID');
+      onComplete(false);
     }
   };
 
@@ -30,6 +33,8 @@ export const BiometricSetupModal: React.FC<BiometricSetupModalProps> = ({
   };
 
   if (!isAvailable) {
+    // Should not be rendered by parent if not available.
+    // Returning null to prevent rendering, but the parent should handle this.
     return null;
   }
 

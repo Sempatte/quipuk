@@ -31,7 +31,7 @@ const dotStyles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 25,
   },
   dot: {
     width: 16,

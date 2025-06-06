@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
 import { useProfilePicture } from "@/app/hooks/useProfilePicture";
@@ -27,7 +28,7 @@ interface UserProfile {
 }
 
 export default function EnhancedProfile() {
-
+  const router = useRouter();
 
   // Query del perfil
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
@@ -172,7 +173,7 @@ export default function EnhancedProfile() {
 
                 {/* Opciones generales */}
                 <View style={styles.optionsCard}>
-                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7} onPress={() => router.push('/settings')}>
                     <View style={styles.optionIconContainer}>
                       <Ionicons name="settings-outline" size={22} color="#333" />
                     </View>

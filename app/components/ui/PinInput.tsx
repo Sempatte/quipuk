@@ -104,13 +104,13 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 0,
   },
   title: {
     fontSize: 24,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 0,
     color: '#333',
   },
   subtitle: {

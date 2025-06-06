@@ -251,13 +251,16 @@ export default function LoginScreen() {
     linkedUserId,
     canUseBiometric,
     isHardwareBiometricAvailable,
+    hasBiometric,
     hasPin,
     pinConfig,
-    linkDevice,
+    loadAuthState,
+    setupBiometric,
     authenticateWithBiometric,
+    createPin,
     verifyPin,
-    canUserAccessDevice,
-    loadAuthState
+    linkDevice,
+    canUserAccessDevice
   } = useAuth();
 
   // Callbacks memorizados
@@ -805,16 +808,18 @@ export default function LoginScreen() {
       {authState.userProfile && (
         <>
           <PinSetup
+            visible={showPinSetup}
             onComplete={handlePinSetupComplete}
             onSkip={() => handlePinSetupComplete(false)}
-            visible={showPinSetup}
           />
 
-          <BiometricSetupModal
-            visible={showBiometricSetup}
-            user={authState.userProfile}
-            onComplete={handleBiometricSetupComplete}
-          />
+          {isHardwareBiometricAvailable && authState.userProfile && (
+            <BiometricSetupModal
+              visible={showBiometricSetup}
+              user={authState.userProfile}
+              onComplete={handleBiometricSetupComplete}
+            />
+          )}
         </>
       )}
 
