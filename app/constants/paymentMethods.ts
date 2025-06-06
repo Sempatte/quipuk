@@ -2,9 +2,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, ImageSourcePropType, ImageStyle } from 'react-native';
 import { SvgProps } from 'react-native-svg';
-import FluentMoneyIcon from "@/assets/images/icons/payment_methods/fluent_money.svg";
-import CardIcon from "@/assets/images/icons/payment_methods/card.svg";
-import YapeIcon from "@/assets/images/icons/yape_bn.png";
+import FluentMoneyIcon from "../../assets/images/icons/payment_methods/fluent_money.svg";
+import CardIcon from "../../assets/images/icons/payment_methods/card.svg";
+import YapeIcon from "../../assets/images/icons/yape_bn.png";
 import React from 'react';
 
 // Enum tipado para métodos de pago

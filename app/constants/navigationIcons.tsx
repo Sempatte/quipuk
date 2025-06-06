@@ -1,7 +1,7 @@
-import GraphicIcon from "@/components/ui/icons/Graphics";
-import HomeIcon from "@/components/ui/icons/Home";
-import MovementsIcon from "@/components/ui/icons/Movements";
-import ProfileIcon from "@/components/ui/icons/Profile";
+import GraphicIcon from "@/app/components/ui/icons/Graphics";
+import HomeIcon from "@/app/components/ui/icons/Home";
+import MovementsIcon from "@/app/components/ui/icons/Movements";
+import ProfileIcon from "@/app/components/ui/icons/Profile";
 import { Path, Svg, SvgProps } from "react-native-svg";
 
 interface SvgProps_ extends SvgProps {

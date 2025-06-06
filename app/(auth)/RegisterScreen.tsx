@@ -20,9 +20,9 @@ import { LinearGradient } from "expo-linear-gradient";
 
 import { emailVerificationService } from "@/app/services/emailVerificationService";
 import { useToast } from "@/app/providers/ToastProvider";
-import { useRegisterForm } from "@/hooks/useRegisterForm";
-import { PhoneInput } from "@/components/ui/PhoneInput";
-import QuipukLogo from "@/assets/images/Logo.svg";
+import { useRegisterForm } from "@/app/hooks/useRegisterForm";
+import { PhoneInput } from "@/app/components/ui/PhoneInput";
+import QuipukLogo from "../../assets/images/Logo.svg";
 import { defaultCountry, getCountryByCode } from "@/app/constants/countries";
 
 const { width, height } = Dimensions.get("window");

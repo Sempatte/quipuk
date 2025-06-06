@@ -4,26 +4,26 @@ import { Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
 // 🎯 IMPORTACIONES DE ICONOS SVG
-import AlquilerIcon from "@/assets/images/icons/categories/gastos/alquiler.svg";
-import BusIcon from "@/assets/images/icons/categories/gastos/bus.svg";
-import TijeraIcon from "@/assets/images/icons/categories/gastos/tijera.svg";
-import GraficaAbajoIcon from "@/assets/images/icons/categories/gastos/graficaabajo.svg";
-import HogarIcon from "@/assets/images/icons/categories/gastos/hogar.svg";
-import EnsaladaIcon from "@/assets/images/icons/categories/gastos/ensalada.svg";
-import SaludIcon from "@/assets/images/icons/categories/gastos/salud.svg";
-import SuperIcon from "@/assets/images/icons/categories/gastos/super.svg";
-import TelefonoIcon from "@/assets/images/icons/categories/gastos/telefono.svg";
-import EmpleoIcon from "@/assets/images/icons/categories/ingresos/empleo.svg";
-import TrabajoIndepIcon from "@/assets/images/icons/categories/ingresos/trabajoindependiente.svg";
-import DirectorIcon from "@/assets/images/icons/categories/ingresos/director.svg";
-import AirbnbIcon from "@/assets/images/icons/categories/ingresos/airbnb.svg";
-import BolsaIcon from "@/assets/images/icons/categories/ingresos/bolsa.svg";
-import OtrosIngresosIcon from "@/assets/images/icons/categories/ingresos/otrosingresos.svg";
-import SavingMoneyIcon from "@/assets/images/icons/categories/ingresos/savingmoney.svg";
-import AddIcon from "@/assets/images/icons/Add.svg";
-import FluentMoneyIcon from "@/assets/images/icons/payment_methods/fluent_money.svg";
-import CardIcon from "@/assets/images/icons/payment_methods/card.svg";
-import YapeIcon from "@/assets/images/icons/yape_bn.png";
+import AlquilerIcon from "../../assets/images/icons/categories/gastos/alquiler.svg";
+import BusIcon from "../../assets/images/icons/categories/gastos/bus.svg";
+import TijeraIcon from "../../assets/images/icons/categories/gastos/tijera.svg";
+import GraficaAbajoIcon from "../../assets/images/icons/categories/gastos/graficaabajo.svg";
+import HogarIcon from "../../assets/images/icons/categories/gastos/hogar.svg";
+import EnsaladaIcon from "../../assets/images/icons/categories/gastos/ensalada.svg";
+import SaludIcon from "../../assets/images/icons/categories/gastos/salud.svg";
+import SuperIcon from "../../assets/images/icons/categories/gastos/super.svg";
+import TelefonoIcon from "../../assets/images/icons/categories/gastos/telefono.svg";
+import EmpleoIcon from "../../assets/images/icons/categories/ingresos/empleo.svg";
+import TrabajoIndepIcon from "../../assets/images/icons/categories/ingresos/trabajoindependiente.svg";
+import DirectorIcon from "../../assets/images/icons/categories/ingresos/director.svg";
+import AirbnbIcon from "../../assets/images/icons/categories/ingresos/airbnb.svg";
+import BolsaIcon from "../../assets/images/icons/categories/ingresos/bolsa.svg";
+import OtrosIngresosIcon from "../../assets/images/icons/categories/ingresos/otrosingresos.svg";
+import SavingMoneyIcon from "../../assets/images/icons/categories/ingresos/savingmoney.svg";
+import AddIcon from "../../assets/images/icons/Add.svg";
+import FluentMoneyIcon from "../../assets/images/icons/payment_methods/fluent_money.svg";
+import CardIcon from "../../assets/images/icons/payment_methods/card.svg";
+import YapeIcon from "../../assets/images/icons/yape_bn.png";
 
 // 🎯 INTERFACES PARA MEJOR TIPADO
 interface IconProps {

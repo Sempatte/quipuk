@@ -16,7 +16,7 @@ import {
 import { useRoute, RouteProp } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import QuipukLogo from '@/assets/images/Logo.svg';
+import QuipukLogo from '../../assets/images/Logo.svg';
 import { emailVerificationService } from '../services/emailVerificationService';
 import { useToast } from '../providers/ToastProvider';
 

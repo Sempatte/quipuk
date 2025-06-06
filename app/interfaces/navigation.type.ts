@@ -24,7 +24,7 @@ export type RootStackParamList = {
   "(tabs)/profile": undefined;
   
   // Rutas individuales de tabs (para compatibilidad)
-  "movements": undefined;
+  "movements": { shouldRefresh?: boolean } | undefined;
   "index": undefined;
   "board": undefined;
   "add": {

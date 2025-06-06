@@ -1,7 +1,7 @@
 // app/(tabs)/_layout.tsx - LIMPIO SIN CONFIGURACIÓN STATUSBAR
 import { Tabs } from "expo-router";
 import React from "react";
-import { TabBar } from "@/components/TabBar";
+import { TabBar } from "@/app/components/TabBar";
 
 export default function TabLayout() {
   return (
@@ -9,7 +9,7 @@ export default function TabLayout() {
       tabBar={(props) => <TabBar {...props} />}
       screenOptions={{
         headerShown: false,
-        lazy: false,
+        lazy: true,
       }}
     >
       <Tabs.Screen

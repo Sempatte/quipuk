@@ -8,18 +8,18 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import client from "./apolloClient";
 import { FontProvider } from "./providers/FontProvider";
-import { useColorScheme } from "@/hooks/useColorScheme";
+import { useColorScheme } from "@/app/hooks/useColorScheme";
 import { useFonts, Outfit_100Thin, Outfit_200ExtraLight, Outfit_400Regular, Outfit_600SemiBold, Outfit_700Bold, Outfit_500Medium, Outfit_300Light } from "@expo-google-fonts/outfit";
 import { ToastProvider } from "./providers/ToastProvider";
-import { useBackendHealth } from "@/hooks/useBackendHealth";
-import { OfflineMessage } from "@/components/OfflineMessage";
-import { useAuth } from "@/hooks/useAuth";
-import { PinInput } from "@/components/ui/PinInput";
+import { useBackendHealth } from "@/app/hooks/useBackendHealth";
+import { OfflineMessage } from "@/app/components/OfflineMessage";
+import { useAuth } from "@/app/hooks/useAuth";
+import { PinInput } from "@/app/components/ui/PinInput";
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from "@expo/vector-icons";
 import { pinService } from "@/app/services/pinService";
 import { StatusBar } from 'expo-status-bar';
-import { useCustomToast } from "@/hooks/useCustomToast";
+import { useCustomToast } from "@/app/hooks/useCustomToast";
 
 SplashScreen.preventAutoHideAsync();
 

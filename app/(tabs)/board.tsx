@@ -3,21 +3,23 @@ import React, { useCallback, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@apollo/client';
-import { ThemedView } from "@/components/ThemedView";
-import QuipuBoardLogo from '@/assets/images/QuipuBoard.svg';
+import { ThemedView } from "@/app/components/ThemedView";
+import QuipuBoardLogo from '../../assets/images/QuipuBoard.svg';
 import { globalStyles } from '@/app/styles/globalStyles';
 import { GET_TRANSACTIONS } from '@/app/graphql/transaction.graphql';
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // 🔧 REEMPLAZADO: StatusBar de expo-status-bar
-import { StatusBarManager, StatusBarPresets } from "@/components/ui/StatusBarManager";
+import { StatusBarManager, StatusBarPresets } from "@/app/components/ui/StatusBarManager";
 
 // Import all chart components
-import FinancialSituation from '@/components/ui/FinancialSituation';
-import UpcomingPayments from '@/components/ui/UpcomingPayments';
-import ExpensesByCategory from '@/components/ExpensesByCategory';
-import SpendingHeatmap from '@/components/SpendingHeatmap';
-import SpendingHistory from '@/components/SpendingHistory';
+import FinancialSituation from '@/app/components/ui/FinancialSituation';
+import UpcomingPayments from '@/app/components/ui/UpcomingPayments';
+import ExpensesByCategory from '@/app/components/ExpensesByCategory';
+import SpendingHeatmap from '@/app/components/SpendingHeatmap';
+import SpendingHistory from '@/app/components/SpendingHistory';
+
+import styles from "../styles/boardScreen.styles";
 
 export default function Board() {
   const [refreshing, setRefreshing] = useState(false);
@@ -25,7 +27,7 @@ export default function Board() {
   const hasRefreshedRef = useRef(false);
 
   const { refetch, loading } = useQuery(GET_TRANSACTIONS, {
-    fetchPolicy: 'network-only',
+    fetchPolicy: 'cache-first',
     notifyOnNetworkStatusChange: true,
   });
 
@@ -41,32 +43,6 @@ export default function Board() {
       setRefreshing(false);
     }
   }, [refetch]);
-
-  // 🔧 MEJORAR useFocusEffect con mejor cleanup
-  useFocusEffect(
-    useCallback(() => {
-      let isCancelled = false;
-      
-      if (!hasRefreshedRef.current) {
-        hasRefreshedRef.current = true;
-        
-        refetch().then(() => {
-          if (!isCancelled) {
-            setRefreshTrigger(prev => prev + 1);
-          }
-        }).catch(error => {
-          if (!isCancelled) {
-            console.error('Error durante el refresco inicial:', error);
-          }
-        });
-      }
-      
-      return () => {
-        isCancelled = true;
-        hasRefreshedRef.current = false;
-      };
-    }, [refetch])
-  );
 
   return (
     <ThemedView style={styles.mainContainer}>
@@ -102,15 +78,3 @@ export default function Board() {
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  mainContainer: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  contentContainer: {
-    flex: 1,
-    paddingTop: 10,
-    paddingBottom: 50,
-  },
-});

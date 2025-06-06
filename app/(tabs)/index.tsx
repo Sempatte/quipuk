@@ -7,20 +7,21 @@ import {
   ScrollView,
 } from "react-native";
 import { useQuery } from "@apollo/client";
-import BellIcon from "@/assets/images/icons/mdi_bell.svg";
-import SettingsIcon from "@/assets/images/icons/settings.svg";
+import BellIcon from "../../assets/images/icons/mdi_bell.svg";
+import SettingsIcon from "../../assets/images/icons/settings.svg";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import QuipukLogo from "@/assets/images/LogoV2.svg";
+import QuipukLogo from "../../assets/images/LogoV2.svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { RootStackParamList } from "../interfaces/navigation.type";
-import Loader from "@/components/ui/Loader";
-import RecentTransactions from "@/components/ui/RecentTransactions"; // Importamos el nuevo componente
-import UpcomingPayments from "@/components/ui/UpcomingPayments";
-import QuipuTip from "@/components/ui/QuipuTip";
+import Loader from "@/app/components/ui/Loader";
+import RecentTransactions from "@/app/components/ui/RecentTransactions"; // Importamos el nuevo componente
+import UpcomingPayments from "@/app/components/ui/UpcomingPayments";
+import QuipuTip from "@/app/components/ui/QuipuTip";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "react-native";
+import styles from "../styles/indexScreen.styles";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -29,7 +30,9 @@ type LoginScreenNavigationProp = NativeStackNavigationProp<
 >;
 
 export default function Index() {
-  const { data, loading, error } = useQuery(GET_USER_PROFILE);
+  const { data, loading, error } = useQuery(GET_USER_PROFILE, {
+    fetchPolicy: 'cache-first',
+  });
   const navigation = useNavigation<LoginScreenNavigationProp>();
 
   useFocusEffect(
@@ -86,58 +89,3 @@ export default function Index() {
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-  },
-  container: {
-    backgroundColor: "#000",
-    paddingBottom: 30,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-  },
-  contentContainer: {
-    flex: 1,
-    paddingTop: 15,
-    paddingBottom: 30,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20
-  },
-  logoContainer: {
-    flex: 1,
-  },
-  iconContainer: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-  },
-  iconButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: "#00DC5A",
-    borderRadius: 25,
-    justifyContent: "center",
-    alignItems: "center",
-    marginLeft: 10,
-  },
-  welcomeContainer: {
-    paddingHorizontal: 20,
-    marginTop: 20,
-  },
-  welcome: {
-    fontSize: 32,
-    color: "#FFFFFF",
-    fontFamily: "Outfit_400Regular",
-  },
-  username: {
-    color: "#00DC5A",
-    fontFamily: "Outfit_700Bold",
-    fontSize: 32,
-  },
-});

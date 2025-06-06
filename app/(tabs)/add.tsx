@@ -25,16 +25,16 @@ import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from 'expo-haptics';
 
 // Importaciones de componentes
-import AgregarSlides from "@/components/ui/AddSlider";
-import Carousel from "@/components/ui/Carousel";
-import AmountInput from "@/components/ui/AmountInput";
-import DescriptionInput from "@/components/ui/DescriptionInput";
-import TransactionOptions from "@/components/ui/TransactionOptions";
-import CategorySelector from "@/components/ui/CategorySelector";
-import PaymentMethodSelector from "@/components/ui/PaymentMethodSelector";
-import DateTimeSelector from "@/components/ui/DateTimeSelector";
-import ReceiptScanner from "@/components/ui/ReceiptScanner";
-import OCRStatusIndicator from "@/components/ui/OCRStatusIndicator";
+import AgregarSlides from "@/app/components/ui/AddSlider";
+import Carousel from "@/app/components/ui/Carousel";
+import AmountInput from "@/app/components/ui/AmountInput";
+import DescriptionInput from "@/app/components/ui/DescriptionInput";
+import TransactionOptions from "@/app/components/ui/TransactionOptions";
+import CategorySelector from "@/app/components/ui/CategorySelector";
+import PaymentMethodSelector from "@/app/components/ui/PaymentMethodSelector";
+import DateTimeSelector from "@/app/components/ui/DateTimeSelector";
+import ReceiptScanner from "@/app/components/ui/ReceiptScanner";
+import OCRStatusIndicator from "@/app/components/ui/OCRStatusIndicator";
 
 // Importaciones de GraphQL
 import {
@@ -49,13 +49,14 @@ import {
   TRANSACTION_COLORS,
   FrequentTransactionsData,
 } from "../interfaces/transaction.interface";
-import { useTransactionForm } from "@/hooks/useTransactionForm";
+import { useTransactionForm } from "@/app/hooks/useTransactionForm";
 import { getCategoryIcon } from "../constants/categoryIcons";
 import { RootStackParamList } from "../interfaces/navigation.type";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
 import { useToast } from "../providers/ToastProvider";
-import { StatusBarManager } from "@/components/ui/StatusBarManager";
+import { StatusBarManager } from "@/app/components/ui/StatusBarManager";
+import styles from "../styles/addScreen.styles";
 
 // 🎯 INTERFACES
 interface AddTransactionRouteParams {
@@ -155,7 +156,7 @@ export default function AddTransactionWithHook() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
       
-      navigation.navigate("movements");
+      navigation.navigate("movements", { shouldRefresh: true });
       showToast("success", "¡Éxito!", "Transacción agregada correctamente");
     },
     onError: (error) => {
@@ -439,117 +440,5 @@ export default function AddTransactionWithHook() {
     </SafeAreaView>
   );
 }
-
-// 🎯 ESTILOS OPTIMIZADOS
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#000",
-  },
-  keyboardAvoid: {
-    flex: 1,
-  },
-  scrollView: {
-    flex: 1,
-    backgroundColor: "#FFF",
-  },
-  scrollContent: {
-    backgroundColor: "#FFF",
-  },
-  headerContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
-  },
-  title: {
-    fontSize: 32,
-    fontFamily: "Outfit_700Bold",
-    color: "#FFFFFF",
-    textAlign: "center",
-    marginBottom: 16,
-  },
-  sliderContainer: {
-    marginBottom: 16,
-  },
-  scanButtonContainer: {
-    marginVertical: 16,
-    alignItems: "center",
-    position: "relative",
-  },
-  scanButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  scanButtonText: {
-    color: "#FFF",
-    fontSize: 16,
-    fontFamily: "Outfit_600SemiBold",
-    marginLeft: 8,
-  },
-  ocrStatusContainer: {
-    position: "absolute",
-    top: -8,
-    right: -8,
-    zIndex: 10,
-  },
-  carouselContainer: {
-    marginTop: 8,
-    overflow: "visible",
-  },
-  formContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 24,
-    paddingBottom: 40,
-  },
-  inputSection: {
-    marginBottom: 20,
-  },
-  addButtonContainer: {
-    marginTop: 32,
-    alignItems: "center",
-  },
-  addButton: {
-    width: "100%",
-    height: 56,
-    borderRadius: 28,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  addButtonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  addIconContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255, 255, 255, 0.2)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  addButtonText: {
-    fontSize: 18,
-    fontFamily: "Outfit_600SemiBold",
-    color: "#FFF",
-  },
-});
 
 // TODO: 1. Si la categoria se detecta en automatico, mostrar el icono de la categoria automaticamente (ya scrolleado). 2. Salga punto indicador de la categoria. 3. En ingresos, cuando se quiera escanear comprobante,debe permitir escanear documentos pdf, por si es un recibo de honorario u otro.

@@ -24,15 +24,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from 'expo-haptics';
 
-import { PinInput } from "@/components/ui/PinInput";
-import { BiometricSetupModal } from "@/components/BiometricSetupModal";
-import { PinSetup } from "@/components/ui/PinSetup";
+import { PinInput } from "@/app/components/ui/PinInput";
+import { BiometricSetupModal } from "@/app/components/BiometricSetupModal";
+import { PinSetup } from "@/app/components/ui/PinSetup";
 
-import QuipukLogo from "@/assets/images/Logo.svg";
+import QuipukLogo from "../../assets/images/Logo.svg";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/app/hooks/useAuth";
 
 const { width, height } = Dimensions.get("window");
 
@@ -92,28 +92,26 @@ UserProfileHeader.displayName = 'UserProfileHeader';
 
 // Extraer el formulario tradicional como componente separado
 const TraditionalLoginForm = React.memo(({
-  email,
-  password,
-  showPassword,
   loginLoading,
   isLinkedDevice,
-  onEmailChange,
-  onPasswordChange,
-  onTogglePassword,
   onSubmit,
-  onRegister
+  onRegister,
+  initialEmail = '' // Aceptamos un email inicial
 }: {
-  email: string;
-  password: string;
-  showPassword: boolean;
   loginLoading: boolean;
   isLinkedDevice: boolean;
-  onEmailChange: (text: string) => void;
-  onPasswordChange: (text: string) => void;
-  onTogglePassword: () => void;
-  onSubmit: () => void;
+  onSubmit: (email: string, password: string) => void;
   onRegister: () => void;
+  initialEmail?: string;
 }) => {
+  const [email, setEmail] = useState(initialEmail);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const handleSubmit = () => {
+    onSubmit(email, password);
+  };
+  
   return (
     <View style={styles.formContainer}>
       <Text style={styles.welcomeTitle}>
@@ -149,7 +147,7 @@ const TraditionalLoginForm = React.memo(({
             autoCapitalize="none"
             autoCorrect={false}
             value={email}
-            onChangeText={onEmailChange}
+            onChangeText={setEmail}
             editable={!loginLoading}
             autoComplete="email"
             textContentType="emailAddress"
@@ -172,14 +170,14 @@ const TraditionalLoginForm = React.memo(({
             placeholderTextColor="#999"
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={onPasswordChange}
+            onChangeText={setPassword}
             editable={!loginLoading}
             autoComplete="password"
             textContentType="password"
           />
           <TouchableOpacity
             style={styles.passwordToggle}
-            onPress={onTogglePassword}
+            onPress={() => setShowPassword(prev => !prev)}
             disabled={loginLoading}
           >
             <Ionicons
@@ -193,7 +191,7 @@ const TraditionalLoginForm = React.memo(({
 
       <TouchableOpacity
         style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
-        onPress={onSubmit}
+        onPress={handleSubmit}
         disabled={loginLoading}
         activeOpacity={0.8}
       >
@@ -231,15 +229,11 @@ const TraditionalLoginForm = React.memo(({
 TraditionalLoginForm.displayName = 'TraditionalLoginForm';
 
 export default function LoginScreen() {
-  console.log('[LoginScreen] Component rendered'); // Solo un log al inicio
-  
   const router = useRouter();
   const { showToast } = useToast();
 
   // Estados del formulario tradicional
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
+  const [lastUsedEmail, setLastUsedEmail] = useState(""); // Solo para recordar el último email
 
   // Estado principal de autenticación
   const [authState, setAuthState] = useState<AuthState>({
@@ -271,13 +265,11 @@ export default function LoginScreen() {
 
   // Callbacks memorizados
   const navigateToApp = useCallback(() => {
-    console.log("[LoginScreen] Navigating to app");
     setLocalAuthCompleted(true);
     router.replace("/(tabs)");
   }, [router]);
 
   const forceTraditionalLogin = useCallback(async (reason?: string) => {
-    console.log(`[LoginScreen] Forcing traditional login: ${reason}`);
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("userId");
     setAuthState(prev => ({
@@ -292,12 +284,10 @@ export default function LoginScreen() {
   }, [loadAuthState]);
 
   const handleTokenExpired = useCallback(() => {
-    console.log("[LoginScreen] Token expired");
     forceTraditionalLogin("Tu sesión ha expirado. Por favor, inicia sesión de nuevo.");
   }, [forceTraditionalLogin]);
 
   const handleBiometricAuth = useCallback(async () => {
-    console.log("[LoginScreen] Biometric auth attempt");
     try {
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -311,7 +301,7 @@ export default function LoginScreen() {
           setAuthState(prev => ({ ...prev, step: "pin" }));
           showToast("info", "Face ID falló", "Usa tu PIN para acceder");
         } else {
-          forceTraditionalLogin("Falló Face ID y no hay PIN configurado.");
+          forceTraditionalLogin("Fallback desde biométrico");
         }
       } else {
         Alert.alert(
@@ -333,7 +323,6 @@ export default function LoginScreen() {
         );
       }
     } catch (error) {
-      console.error("[LoginScreen] Biometric auth error:", error);
       if (hasPin) {
         setAuthState(prev => ({ ...prev, step: "pin", error: "Error en autenticación biométrica." }));
       } else {
@@ -364,7 +353,6 @@ export default function LoginScreen() {
         }
       },
       onError: (error) => {
-        console.warn("Error loading user profile:", error);
         if (error.message.includes("token") || error.message.includes("unauthorized")) {
           handleTokenExpired();
         }
@@ -394,7 +382,6 @@ export default function LoginScreen() {
           setAuthState(prev => ({ ...prev, userProfile: profile }));
           await handleSuccessfulLogin(profile);
         } catch (error) {
-          console.error("Error storing auth data:", error);
           showToast("error", "Error", "No se pudieron guardar los datos de sesión");
         }
       }
@@ -455,7 +442,6 @@ export default function LoginScreen() {
       setShowPinSetup(true);
 
     } catch (error) {
-      console.error("[LoginScreen] determineAuthStep error:", error);
       setAuthState(prev => ({ 
         ...prev, 
         step: "traditional",
@@ -531,7 +517,6 @@ export default function LoginScreen() {
         }
       }
     } catch (error) {
-      console.error("PIN verification error:", error);
       setAuthState(prev => ({ 
         ...prev, 
         error: "Error al verificar PIN" 
@@ -539,7 +524,7 @@ export default function LoginScreen() {
     }
   }, [verifyPin, loadAuthState, navigateToApp]);
 
-  const handleTraditionalLogin = useCallback(() => {
+  const handleTraditionalLogin = useCallback((email: string, password: string) => {
     if (!email || !password) {
       showToast("error", "Error", "Todos los campos son obligatorios");
       return;
@@ -550,9 +535,10 @@ export default function LoginScreen() {
       showToast("error", "Error", "Ingresa un email válido");
       return;
     }
-
+    
+    setLastUsedEmail(email); // Guardar el email en caso de error de verificación
     login({ variables: { email: email.toLowerCase().trim(), password } });
-  }, [email, password, login, showToast]);
+  }, [login, showToast]);
 
   const handleSuccessfulLogin = useCallback(async (profile: UserProfile) => {
     try {
@@ -580,14 +566,11 @@ export default function LoginScreen() {
       navigateToApp();
       
     } catch (error) {
-      console.error("Error handling successful login:", error);
       showToast("error", "Error", "Hubo un problema procesando el login");
     }
   }, [isLinkedDevice, linkDevice, canUserAccessDevice, navigateToApp, showToast]);
 
   const handleLoginError = useCallback((errorMessage: string) => {
-    setPassword("");
-    
     if (errorMessage.includes("EMAIL_NOT_VERIFIED")) {
       try {
         const errorData = JSON.parse(errorMessage);
@@ -596,7 +579,7 @@ export default function LoginScreen() {
         router.push({
           pathname: "/EmailVerificationScreen",
           params: {
-            email: email,
+            email: lastUsedEmail,
             userId: errorData.userId?.toString(),
             fromRegistration: "false",
           },
@@ -609,7 +592,7 @@ export default function LoginScreen() {
     } else {
       showToast("error", "Error de login", errorMessage);
     }
-  }, [email, router, showToast]);
+  }, [lastUsedEmail, router, showToast]);
 
   const handlePinSetupComplete = useCallback(async (success: boolean) => {
     setShowPinSetup(false);
@@ -753,14 +736,9 @@ export default function LoginScreen() {
       case "traditional":
         return (
           <TraditionalLoginForm
-            email={email}
-            password={password}
-            showPassword={showPassword}
+            initialEmail={lastUsedEmail}
             loginLoading={loginLoading}
             isLinkedDevice={isLinkedDevice}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            onTogglePassword={() => setShowPassword(!showPassword)}
             onSubmit={handleTraditionalLogin}
             onRegister={() => router.push("/RegisterScreen")}
           />
@@ -769,14 +747,9 @@ export default function LoginScreen() {
       default:
         return (
           <TraditionalLoginForm
-            email={email}
-            password={password}
-            showPassword={showPassword}
+            initialEmail={lastUsedEmail}
             loginLoading={loginLoading}
             isLinkedDevice={isLinkedDevice}
-            onEmailChange={setEmail}
-            onPasswordChange={setPassword}
-            onTogglePassword={() => setShowPassword(!showPassword)}
             onSubmit={handleTraditionalLogin}
             onRegister={() => router.push("/RegisterScreen")}
           />
@@ -786,9 +759,7 @@ export default function LoginScreen() {
     authState,
     authLoading,
     pinConfig.lockedUntil,
-    email,
-    password,
-    showPassword,
+    lastUsedEmail,
     loginLoading,
     isLinkedDevice,
     handlePinAuth,
