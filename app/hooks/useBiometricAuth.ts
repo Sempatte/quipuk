@@ -8,8 +8,11 @@ export const useBiometricAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    checkAvailability();
-    checkIfEnabled();
+    const initializeAuth = async () => {
+      await checkAvailability();
+      await checkIfEnabled();
+    };
+    initializeAuth();
   }, []);
 
   const checkAvailability = async () => {
@@ -42,6 +45,9 @@ export const useBiometricAuth = () => {
     setIsLoading(true);
     try {
       return await biometricService.authenticateWithBiometric();
+    } catch (error) {
+      console.error('Authentication error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -52,6 +58,9 @@ export const useBiometricAuth = () => {
     try {
       await biometricService.disableBiometric();
       setIsEnabled(false);
+    } catch (error) {
+      console.error('Disable biometric error:', error);
+      throw error;
     } finally {
       setIsLoading(false);
     }
@@ -65,8 +74,15 @@ export const useBiometricAuth = () => {
     authenticate,
     disable,
     refresh: () => {
-      checkAvailability();
-      checkIfEnabled();
+      const refreshAuth = async () => {
+        try {
+          await checkAvailability();
+          await checkIfEnabled();
+        } catch (error) {
+          console.error('Refresh error:', error);
+        }
+      };
+      refreshAuth();
     }
   };
 };

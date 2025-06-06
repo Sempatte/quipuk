@@ -132,10 +132,14 @@ const UpcomingPayments: React.FC<UpcomingPaymentsProps> = ({ refreshTrigger }) =
     if (!data?.getTransactions) return [];
 
     // Hacer una copia para no mutar los datos originales
-    return [...data.getTransactions].sort((a, b) => {
-      // Primero los vencidos (días negativos)
-      const daysLeftA = calculateDaysLeft(a.dueDate);
-      const daysLeftB = calculateDaysLeft(b.dueDate);
+return [...data.getTransactions].sort((a, b) => {
+   const daysLeftA = calculateDaysLeft(a.dueDate);
+   const daysLeftB = calculateDaysLeft(b.dueDate);
+
+  // Handle non-finite values deterministically
+  if (!isFinite(daysLeftA) && !isFinite(daysLeftB)) return 0;
+  if (!isFinite(daysLeftA)) return 1;
+  if (!isFinite(daysLeftB)) return -1;
 
       // Si uno está vencido y el otro no
       const aIsOverdue = daysLeftA < 0;

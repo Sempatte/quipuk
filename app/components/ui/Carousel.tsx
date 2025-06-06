@@ -96,8 +96,8 @@ const Carousel: React.FC<CarouselProps> = ({
   // Computar los elementos del carrusel (con botón agregar al final)
   const carouselItems =
     items.length > 0
-      ? [...items, { id: "add_button", isAddButton: true }]
-      : [{ id: "add_button", isAddButton: true }];
+      ? [...items, { id: "__internal_add_button__", isAddButton: true }]
+      : [{ id: "__internal_add_button__", isAddButton: true }];
 
   // Renderizar mensaje vacío si no hay elementos (y no está configurado para ocultarse)
   if (items.length === 0) {

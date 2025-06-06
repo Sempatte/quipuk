@@ -23,7 +23,7 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
 }) => {
   const logoOpacity = useSharedValue(0);
 
-  useEffect(() => {
+useEffect(() => {
     // Solo fade in simple del logo
     logoOpacity.value = withTiming(1, { 
       duration: 600, 
@@ -31,9 +31,13 @@ export const SplashScreen: React.FC<SplashScreenProps> = ({
     });
 
     // Auto-hide después de 3 segundos
-    setTimeout(() => {
+   const timeoutId = setTimeout(() => {
       runOnJS(onFinish)();
     }, 3000);
+
+   return () => {
+     clearTimeout(timeoutId);
+   };
   }, [onFinish]);
 
   const logoAnimatedStyle = useAnimatedStyle(() => ({

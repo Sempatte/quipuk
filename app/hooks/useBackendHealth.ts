@@ -38,6 +38,15 @@ export const useBackendHealth = (options: UseBackendHealthOptions = {}) => {
       return isActive;
     } catch (error) {
       setIsBackendActive(false);
+      
+      if (showErrorToast) {
+        showToast(
+          'error',
+          'Error de conexión',
+          'Error al verificar el estado del servidor.'
+        );
+      }
+      
       return false;
     } finally {
       setIsLoading(false);

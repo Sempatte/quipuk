@@ -1,5 +1,5 @@
 // hooks/useRegisterForm.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { registerSchema, RegisterFormData } from '@/app/schemas/registerSchema';
 import { ZodError, z } from 'zod';
 
@@ -34,21 +34,22 @@ export const useRegisterForm = (): UseRegisterFormReturn => {
   const [errors, setErrors] = useState<FormErrors>({});
 
   // Actualizar campo individual
-  const updateField = useCallback((field: keyof RegisterFormData, value: string | boolean) => {
+const updateField = useCallback((field: keyof RegisterFormData, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
 
     // Limpiar error del campo cuando el usuario empieza a escribir
-    if (errors[field]) {
       setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[field];
-        return newErrors;
+       if (prev[field]) {
+          const newErrors = { ...prev };
+          delete newErrors[field];
+          return newErrors;
+       }
+       return prev;
       });
-    }
-  }, [errors]);
+ }, []);
 
   // Validar campo individual
   const validateField = useCallback((field: keyof RegisterFormData) => {

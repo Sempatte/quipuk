@@ -64,7 +64,7 @@ const SpendingHistoryChart: React.FC<SpendingHistoryChartProps> = ({
   const chartAreaHeight = chartHeight - paddingTop - paddingBottom;
 
   // Calculate max value for Y axis with some extra space at the top
-  const maxValue = Math.max(...data, 1) * 1.2;
+  const maxValue = (data.length ? Math.max(...data.slice(0, 1000)) : 1) * 1.2; // Limit to first 1000 items for safety
   
   // Define Y axis values with 5 steps
   const ySteps = 5;

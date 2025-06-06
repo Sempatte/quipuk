@@ -1,5 +1,5 @@
 import React from "react";
-import { View, TouchableOpacity, Text } from "react-native";
+import { View, TouchableOpacity, Text, ViewStyle, TextStyle } from "react-native";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -10,7 +10,20 @@ interface DayButtonProps {
   isFuture: (day: Date) => boolean;
   hasTransactions: (day: Date) => boolean;
   onPress: (day: Date) => void;
-  styles: any;
+  styles: {
+    dayContainer: ViewStyle;
+    dayButton: ViewStyle;
+    dayActive: ViewStyle;
+    dayWithTx: ViewStyle;
+    dayEmpty: ViewStyle;
+    dayFuture: ViewStyle;
+    dayNumber: TextStyle;
+    dayLabel: TextStyle;
+    futureText: TextStyle;
+    dot: ViewStyle;
+    dotActive: ViewStyle;
+    todayText: TextStyle;
+  };
   DAY_WIDTH: number;
   DAY_MARGIN: number;
 }

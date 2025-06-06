@@ -176,7 +176,7 @@ const SpendingHistory: React.FC<SpendingHistoryProps> = ({ refreshTrigger }) => 
   }
 
   if (loading) {
-    <SpendingHistorySkeleton />
+    return <SpendingHistorySkeleton />
   }
 
   // Determinar si está cargando, ya sea por carga inicial o refresco

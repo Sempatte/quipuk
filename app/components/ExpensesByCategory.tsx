@@ -26,7 +26,6 @@ const ExpensesByCategory: React.FC<ExpensesByCategoryProps> = ({ refreshTrigger 
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodFilter>("Este mes");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const currentYear = new Date().getFullYear().toString();
   
   // Consulta para obtener las transacciones con tipo adecuado
   const { data, loading, error, refetch } = useQuery<{ transactions: Transaction[] }>(GET_TRANSACTIONS, {
@@ -93,7 +92,8 @@ const ExpensesByCategory: React.FC<ExpensesByCategoryProps> = ({ refreshTrigger 
   }
 
   // Crear array tipado para los filtros
-  const periodFilters: PeriodFilter[] = ["Este mes", "3 Meses", "6 Meses", currentYear as PeriodFilter];
+  const currentYear = new Date().getFullYear();
+  const periodFilters: PeriodFilter[] = ["Este mes", "3 Meses", "6 Meses", currentYear.toString() as PeriodFilter];
 
   return (
     <View>

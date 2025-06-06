@@ -35,6 +35,32 @@ export const useGlobalStatusBar = () => {
 };
 
 /**
+ * Hook para configurar la barra de estado para fondos blancos (texto oscuro).
+ */
+export const useWhiteStatusBar = () => {
+  const configureStatusBar = useCallback(() => {
+    try {
+      if (Platform.OS === 'ios') {
+        StatusBar.setBarStyle('dark-content', true);
+        StatusBar.setHidden(false, 'fade');
+      } else if (Platform.OS === 'android') {
+        StatusBar.setBarStyle('dark-content', true);
+        StatusBar.setBackgroundColor('#FFFFFF', true);
+        StatusBar.setTranslucent(false);
+      }
+    } catch (error) {
+      console.warn('StatusBar config failed - check Info.plist UIViewControllerBasedStatusBarAppearance');
+    }
+  }, []);
+
+  useEffect(() => {
+    configureStatusBar();
+    const timer = setTimeout(configureStatusBar, 100);
+    return () => clearTimeout(timer);
+  }, [configureStatusBar]);
+};
+
+/**
  * Hook alternativo usando solo expo-status-bar (NO requiere cambios en Info.plist)
  */
 export const useExpoStatusBar = () => {

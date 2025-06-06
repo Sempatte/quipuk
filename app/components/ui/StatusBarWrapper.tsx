@@ -1,7 +1,7 @@
 // components/ui/StatusBarWrapper.tsx - Wrapper para StatusBar consistente
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { useBlackStatusBar } from '@/app/hooks/useStatusBar';
+import useGlobalStatusBar, { useWhiteStatusBar } from '@/app/hooks/useStatusBar';
 
 interface StatusBarWrapperProps {
   style?: 'light' | 'dark' | 'auto';
@@ -21,7 +21,7 @@ export const StatusBarWrapper: React.FC<StatusBarWrapperProps> = ({
   hidden = false,
 }) => {
   // Usar el hook para garantizar configuración nativa
-  useBlackStatusBar();
+  useGlobalStatusBar();
 
   return (
     <StatusBar 
@@ -37,7 +37,7 @@ export const StatusBarWrapper: React.FC<StatusBarWrapperProps> = ({
  * StatusBar específico para pantallas con fondo negro
  */
 export const BlackStatusBar: React.FC = () => {
-  useBlackStatusBar();
+  useGlobalStatusBar();
   
   return (
     <StatusBar 
@@ -53,6 +53,8 @@ export const BlackStatusBar: React.FC = () => {
  * StatusBar para casos excepcionales con fondo blanco
  */
 export const WhiteStatusBar: React.FC = () => {
+  useWhiteStatusBar();
+
   return (
     <StatusBar 
       style="dark"

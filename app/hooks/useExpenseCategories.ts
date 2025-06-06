@@ -17,7 +17,7 @@ export interface CategoryData {
 // Colores para las categorías
 export const CATEGORY_COLORS: Record<string, string> = {
   "Comida": "#92EF4A",
-  "Servicios Básicos": "#01A081", 
+  "Servicios Básicos": "#01A081",
   "Transporte": "#00DC5A",
   "Compras": "#0B4550",
   "Otros": "#33CCCC",
@@ -27,7 +27,7 @@ export const CATEGORY_COLORS: Record<string, string> = {
   "Teléfono": "#9C9C9C",
   "Super": "#D9D9D9",
   "Hogar": "#6511B4",
-  "Deducibles": "#FFFFFF"
+  "Deducibles": "#6B6B6B"
 };
 
 // Interface para el resultado del hook
@@ -45,7 +45,7 @@ export const useExpenseCategories = (
   transactions: Transaction[] = [],
   selectedPeriod: PeriodFilter
 ): ExpenseCategoryResult => {
-  
+
   // Función para calcular el rango de fechas según el período seleccionado
   const getDateRange = useCallback(() => {
     const now = new Date();
@@ -65,10 +65,17 @@ export const useExpenseCategories = (
       default:
         // Si es un año (verificamos si es un número de 4 dígitos)
         if (/^\d{4}$/.test(selectedPeriod)) {
-          startDate = new Date(parseInt(selectedPeriod), 0, 1); // 1 de enero del año
-        } else {
-          startDate = startOfMonth(now); // Default a este mes
-        }
+          const year = parseInt(selectedPeriod);
+          const currentYear = new Date().getFullYear();
+          // Allow years from 2000 to 10 years in the future
+          if (year >= 2000 && year <= currentYear + 10) {
+            startDate = new Date(year, 0, 1); // 1 de enero del año
+          } else {
+            startDate = startOfMonth(now); // Default a este mes si el año es inválido
+          }
+         } else {
+           startDate = startOfMonth(now); // Default a este mes
+         }
     }
 
     return { startDate, endDate };
@@ -78,10 +85,10 @@ export const useExpenseCategories = (
   const getPeriodLabel = useCallback(() => {
     const now = new Date();
     const currentMonth = format(now, "MMM", { locale: es });
-    
+
     // Capitalizar la primera letra
     const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-    
+
     switch (selectedPeriod) {
       case "Este mes":
         return capitalize(currentMonth);
@@ -106,17 +113,17 @@ export const useExpenseCategories = (
   // Procesar datos para obtener gastos por categoría
   return useMemo(() => {
     if (!transactions.length) {
-      return { 
-        categories: [], 
-        totalExpense: 0, 
+      return {
+        categories: [],
+        totalExpense: 0,
         month: format(new Date(), "MMMM", { locale: es }),
-        periodLabel: getPeriodLabel() 
+        periodLabel: getPeriodLabel()
       };
     }
 
     const { startDate, endDate } = getDateRange();
     const currentMonth = format(new Date(), "MMMM", { locale: es });
-    
+
     // Filtrar transacciones: solo gastos completados dentro del rango de fechas
     const filteredTransactions = transactions.filter((tx: Transaction) => {
       const txDate = new Date(tx.createdAt);
@@ -130,9 +137,9 @@ export const useExpenseCategories = (
 
     // Si no hay transacciones filtradas, devolver datos vacíos
     if (filteredTransactions.length === 0) {
-      return { 
-        categories: [], 
-        totalExpense: 0, 
+      return {
+        categories: [],
+        totalExpense: 0,
         month: currentMonth,
         periodLabel: getPeriodLabel()
       };
@@ -163,14 +170,14 @@ export const useExpenseCategories = (
       .sort((a, b) => b.amount - a.amount); // Ordenar de mayor a menor
 
     // Calcular porcentajes redondeados
-    const initialPercentages = categories.map(category => 
+    const initialPercentages = categories.map(category =>
       Math.floor(category.exactPercentage) // Redondeamos hacia abajo para evitar superar el 100%
     );
-    
+
     // Calculamos cuánto nos falta para llegar al 100%
     const sumInitialPercentages = initialPercentages.reduce((sum, p) => sum + p, 0);
     const remaining = 100 - sumInitialPercentages;
-    
+
     // Distribuir el porcentaje restante entre las categorías
     if (remaining > 0) {
       // Ordenar por la parte decimal más alta (mayor a menor)
@@ -180,14 +187,14 @@ export const useExpenseCategories = (
           decimal: category.exactPercentage - Math.floor(category.exactPercentage)
         }))
         .sort((a, b) => b.decimal - a.decimal);
-      
+
       // Distribuir los puntos porcentuales restantes
       for (let i = 0; i < remaining; i++) {
         const categoryIndex = sortedByDecimal[i % sortedByDecimal.length].index;
         initialPercentages[categoryIndex]++;
       }
     }
-    
+
     // Asignar los porcentajes ajustados
     categories = categories.map((category, index) => ({
       ...category,

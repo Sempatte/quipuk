@@ -1,5 +1,5 @@
 // components/ui/FinancialSituationSkeleton.tsx
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, StyleSheet, Dimensions } from 'react-native';
 import SkeletonLoader from './SkeletonLoader';
 import { globalStyles } from '@/app/styles/globalStyles';
@@ -11,6 +11,12 @@ const FinancialSituationSkeleton: React.FC = () => {
   const leftLegendItems: number[] = [1, 2, 3];
   const rightLegendItems: number[] = [1, 2, 3];
 
+  const barHeights = useMemo(() => [
+    [60, 80],
+    [40, 100],
+    [80, 60]
+  ], []);
+
   return (
     <View style={globalStyles.sectionContainer}>
       {/* Filtros de período */}
@@ -21,7 +27,7 @@ const FinancialSituationSkeleton: React.FC = () => {
             width={80}
             height={36}
             borderRadius={20}
-            style={[
+            style={[  
               styles.filterSkeleton,
               index === 0 && { opacity: 0.8 }
             ]}
@@ -81,13 +87,13 @@ const FinancialSituationSkeleton: React.FC = () => {
             <View key={`bar-group-${index}`} style={styles.barGroup}>
               <SkeletonLoader
                 width={20}
-                height={60 + Math.random() * 60}
+                height={barHeights[index][0]}
                 borderRadius={4}
                 style={styles.bar}
               />
               <SkeletonLoader
                 width={20}
-                height={40 + Math.random() * 80}
+                height={barHeights[index][1]}
                 borderRadius={4}
                 style={styles.bar}
               />

@@ -31,16 +31,18 @@ export const PinInput: React.FC<PinInputProps> = ({
   const [pin, setPin] = useState('');
   const [showError, setShowError] = useState(false);
 
-  useEffect(() => {
+useEffect(() => {
     if (hasError) {
       setShowError(true);
       Vibration.vibrate([0, 100, 50, 100]); // Patrón de vibración para error
       
       // Limpiar PIN después de error
-      setTimeout(() => {
-        setPin('');
-        setShowError(false);
-      }, 1000);
+     const timeoutId = setTimeout(() => {
+       setPin('');
+       setShowError(false);
+     }, 1000);
+
+     return () => clearTimeout(timeoutId);
     }
   }, [hasError]);
 

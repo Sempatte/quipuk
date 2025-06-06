@@ -46,11 +46,8 @@ export default function DateTimeSelector({
 
   // Convertir string ISO a objeto Date
   const currentDate = useMemo(() => {
-    try {
-      return new Date(selectedDate);
-    } catch (error) {
-      return new Date();
-    }
+    const d = selectedDate ? new Date(selectedDate) : undefined;
+    return d && !isNaN(d.getTime()) ? d : new Date();
   }, [selectedDate]);
 
   // Formatear fecha para mostrar

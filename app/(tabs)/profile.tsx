@@ -13,7 +13,7 @@ import { useQuery } from "@apollo/client";
 import { Ionicons } from '@expo/vector-icons';
 
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import { useProfilePicture } from "@/app/hooks/useProfilePicture";;
+import { useProfilePicture } from "@/app/hooks/useProfilePicture";
 import Avatar from "@/app/components/ui/Avatar";
 import {  useDeviceUnlink } from "@/app/components/DeviceUnlinkModal";
 import { StatusBarManager, StatusBarPresets } from "@/app/components/ui/StatusBarManager";

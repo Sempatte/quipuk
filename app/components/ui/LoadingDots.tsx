@@ -20,7 +20,7 @@ const LoadingDot: React.FC<LoadingDotProps> = ({ delay }) => {
   const dotOpacity = useSharedValue(0.4);
 
   useEffect(() => {
-    setTimeout(() => {
+    const timeoutId = setTimeout(() => {
       dotScale.value = withRepeat(
         withSequence(
           withTiming(1.3, { duration: 500, easing: Easing.inOut(Easing.sin) }),
@@ -38,6 +38,8 @@ const LoadingDot: React.FC<LoadingDotProps> = ({ delay }) => {
         false
       );
     }, delay);
+    
+    return () => clearTimeout(timeoutId);
   }, [delay]);
 
   const dotAnimatedStyle = useAnimatedStyle(() => ({

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { integratedOCRService } from '@/app/services/integratedOCRService';
+import { integratedOCRService, OCRServiceStatus, OCRDebugInfo } from '@/app/services/integratedOCRService';
 
 interface OCRStatusIndicatorProps {
   showDetails?: boolean;
@@ -14,8 +14,24 @@ interface OCRStatusIndicatorProps {
 const OCRStatusIndicator: React.FC<OCRStatusIndicatorProps> = ({ 
   showDetails = false 
 }) => {
-  const status = integratedOCRService.getOCRServiceStatus();
-  const debugInfo = integratedOCRService.getDebugInfo();
+  const [status, setStatus] = useState<OCRServiceStatus | null>(null);
+  const [debugInfo, setDebugInfo] = useState<OCRDebugInfo | null>(null);
+
+  useEffect(() => {
+    try {
+      setStatus(integratedOCRService.getOCRServiceStatus());
+      setDebugInfo(integratedOCRService.getDebugInfo());
+    } catch (error) {
+      console.error('Error getting OCR service status:', error);
+      // Set fallback values
+      setStatus({ activeService: 'unknown', googleVisionConfigured: false, ocrEnabled: false });
+      setDebugInfo({ environment: 'unknown', hasApiKey: false, apiKeyLength: 0 });
+    }
+  }, []);
+
+  if (!status || !debugInfo) {
+    return null; // or a loading indicator
+  }
 
   const getStatusColor = (): string => {
     if (status.activeService === 'google-vision') return '#4CAF50';

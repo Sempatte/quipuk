@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Modal,
   View,
@@ -11,6 +11,14 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 
 const { width } = Dimensions.get('window');
+
+const confirmationMessages = [
+  '¡A un paso de la libertad financiera!',
+  '¡Adiós deuda, hola tranquilidad!',
+  '¡Tu billetera te lo agradecerá!',
+  '¡Un pago menos, un logro más!',
+  '¡Finanzas saludables, vida feliz!',
+];
 
 interface PaymentConfirmationModalProps {
   visible: boolean;
@@ -27,17 +35,12 @@ const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> = ({
   amount,
   title,
 }) => {
-  // Mensajes creativos para la confirmación
-  const confirmationMessages = [
-    '¡A un paso de la libertad financiera!',
-    '¡Adiós deuda, hola tranquilidad!',
-    '¡Tu billetera te lo agradecerá!',
-    '¡Un pago menos, un logro más!',
-    '¡Finanzas saludables, vida feliz!',
-  ];
-
-  // Seleccionar aleatoriamente un mensaje
-  const randomMessage = confirmationMessages[Math.floor(Math.random() * confirmationMessages.length)];
+  const randomMessage = useMemo(() => {
+    // Seleccionar aleatoriamente un mensaje
+    return confirmationMessages[
+      Math.floor(Math.random() * confirmationMessages.length)
+    ];
+  }, [visible]); // Recalcular solo cuando el modal se hace visible
 
   return (
     <Modal

@@ -44,7 +44,7 @@ export const OfflineMessage: React.FC<OfflineMessageProps> = ({
       <View style={styles.container}>
         <View style={styles.logoContainer}>
           <Image 
-            source={require('../../assets/images/Logo2048x2048.png')} 
+            source={require('@/assets/images/Logo2048x2048.png')} 
             style={styles.logo}
           />
         </View>

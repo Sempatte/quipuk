@@ -21,6 +21,10 @@ const NewPaymentCard: React.FC<NewPaymentCardProps> = ({ onPress }) => {
       style={styles.container}
       onPress={onPress}
       activeOpacity={0.8}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel="Programar nuevo pago"
+      accessibilityHint="Toca para crear un nuevo pago programado"
     >
       <View style={styles.contentContainer}>
         <View style={styles.iconContainer}>

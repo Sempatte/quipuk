@@ -51,18 +51,19 @@ const QuipuTip: React.FC<QuipuTipProps> = ({ onPress }) => {
   }, [data]);
 
   // Función para resaltar el título dentro de la descripción
-  const highlightTitle = (description: string, title: string) => {
+const highlightTitle = (description: string, title: string) => {
     if (!title || !description) return <Text style={styles.tipDescription}>{description}</Text>;
     
-    // Crear una expresión regular insensible a mayúsculas y minúsculas para encontrar todas las ocurrencias
-    const regex = new RegExp(`(${title})`, 'gi');
+   // Escapar caracteres especiales de regex y crear expresión regular insensible a mayúsculas
+   const escapedTitle = title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+   const regex = new RegExp(`(${escapedTitle})`, 'gi');
     
     // Dividir la descripción en partes basadas en la coincidencia del título
     const parts = description.split(regex);
     
     return (
       <Text style={styles.tipDescription}>
-        {parts.map((part, index) => {
+       {parts.filter(part => part.length > 0).map((part, index) => {
           // Si la parte coincide con el título (ignorando mayúsculas/minúsculas), destacarla
           if (part.toLowerCase() === title.toLowerCase()) {
             return <Text key={index} style={styles.highlighted}>{part}</Text>;

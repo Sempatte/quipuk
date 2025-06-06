@@ -35,7 +35,7 @@ const slideOptions: SlideOption[] = [
 const { width } = Dimensions.get("window");
 const SLIDE_WIDTH = (width - 40) / slideOptions.length; // Ancho de cada opción del slider
 
-const AgregarSlides: React.FC<AgregarSlidesProps> = ({ colors, onChange }) => {
+const AddSlider: React.FC<AgregarSlidesProps> = ({ colors, onChange }) => {
   const [selected, setSelected] = useState<SlideOption["value"]>("Gastos");
 
   // Animación de la posición del slider
@@ -125,4 +125,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default AgregarSlides;
+export default AddSlider;

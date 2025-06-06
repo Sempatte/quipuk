@@ -6,6 +6,9 @@ import {
   TextInput,
   StyleSheet,
   TextInputProps,
+  StyleProp,
+  TextStyle,
+  ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { CountryPicker } from './CountryPicker';
@@ -16,8 +19,8 @@ interface PhoneInputProps extends Omit<TextInputProps, 'style'> {
   error?: string;
   selectedCountry: Country;
   onCountryChange: (country: Country) => void;
-  containerStyle?: object;
-  inputStyle?: object;
+  containerStyle?: StyleProp<ViewStyle>;
+  inputStyle?: StyleProp<TextStyle>;
 }
 
 export const PhoneInput: React.FC<PhoneInputProps> = ({
@@ -39,7 +42,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   const handlePhoneChange = (text: string) => {
     // Solo permitir números, espacios, guiones y paréntesis
-    const cleanText = text.replace(/[^0-9\s\-\(\)]/g, '');
+    const cleanText = text.replace(/[^0-9+\s\-\(\)]/g, '');
     onChangeText?.(cleanText);
   };
 

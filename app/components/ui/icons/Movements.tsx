@@ -1,4 +1,4 @@
-// HomeIcon.tsx
+
 import React from "react";
 import Svg, { Defs, FeBlend, FeColorMatrix, FeComposite, FeFlood, FeGaussianBlur, FeOffset, Filter, G, Path } from "react-native-svg";
 import { SvgProps } from "react-native-svg";

@@ -1,5 +1,6 @@
 // hooks/useAuth.ts - CORREGIDO Y MEJORADO
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as LocalAuthentication from 'expo-local-authentication';
 import { deviceManagementService } from '@/app/services/deviceManagementService';
 import { biometricService } from '@/app/services/biometricService';
 import { pinService } from '@/app/services/pinService';
@@ -13,6 +14,7 @@ export interface AuthState {
   hasBiometric: boolean;
   hasPin: boolean;
   canUseBiometric: boolean;
+  isHardwareBiometricAvailable: boolean;
   pinConfig: PinConfig;
 }
 
@@ -24,6 +26,7 @@ const INITIAL_AUTH_STATE: AuthState = {
   hasBiometric: false,
   hasPin: false,
   canUseBiometric: false,
+  isHardwareBiometricAvailable: false,
   pinConfig: {
     hasPin: false,
     attempts: 0,
@@ -68,6 +71,11 @@ export const useAuth = () => {
       safeSetAuthState(prev => ({ ...prev, isLoading: true }));
       console.log('[useAuth] loadAuthState: Set isLoading to true');
 
+      // Verificar hardware biométrico primero
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
+      const isHardwareAvailable = hasHardware && supportedTypes.length > 0;
+
       console.log('[useAuth] loadAuthState: Calling Promise.all for device/auth services...');
       const [
         linkedUserId,
@@ -98,6 +106,7 @@ export const useAuth = () => {
         hasBiometric: isBiometricEnabled,
         hasPin: pinConfig.hasPin,
         canUseBiometric: isBiometricAvailable && isBiometricEnabled,
+        isHardwareBiometricAvailable: isHardwareAvailable,
         pinConfig
       }));
       console.log('[useAuth] loadAuthState: Set final auth state, isLoading should be false.');

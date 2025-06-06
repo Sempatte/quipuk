@@ -27,6 +27,7 @@ import * as Haptics from 'expo-haptics';
 import { PinInput } from "@/app/components/ui/PinInput";
 import { BiometricSetupModal } from "@/app/components/BiometricSetupModal";
 import { PinSetup } from "@/app/components/ui/PinSetup";
+import { LoadingDots } from "@/app/components/ui/LoadingDots";
 
 import QuipukLogo from "../../assets/images/Logo.svg";
 import { useToast } from "../providers/ToastProvider";
@@ -50,6 +51,7 @@ type AuthStep =
   | "biometric"
   | "pin"
   | "setup"
+  | "post_setup"
   | "blocked"
   | "traditional"
   | "registration";
@@ -199,14 +201,7 @@ const TraditionalLoginForm = React.memo(({
           colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
           style={styles.loginGradient}
         >
-          {loginLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#FFF" size="small" />
-              <Text style={styles.loginButtonText}>Ingresando...</Text>
-            </View>
-          ) : (
-            <Text style={styles.loginButtonText}>Ingresar</Text>
-          )}
+          <Text style={styles.loginButtonText}>Ingresar</Text>
         </LinearGradient>
       </TouchableOpacity>
 
@@ -247,6 +242,7 @@ export default function LoginScreen() {
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [localAuthCompleted, setLocalAuthCompleted] = useState(false);
+  const [pinSetupJustCompleted, setPinSetupJustCompleted] = useState(false);
 
   // Hook de autenticación
   const {
@@ -254,6 +250,7 @@ export default function LoginScreen() {
     isLinkedDevice,
     linkedUserId,
     canUseBiometric,
+    isHardwareBiometricAvailable,
     hasPin,
     pinConfig,
     linkDevice,
@@ -301,7 +298,7 @@ export default function LoginScreen() {
           setAuthState(prev => ({ ...prev, step: "pin" }));
           showToast("info", "Face ID falló", "Usa tu PIN para acceder");
         } else {
-          forceTraditionalLogin("Fallback desde biométrico");
+          forceTraditionalLogin("La autenticación biométrica falló. Por favor, inicia sesión con tu contraseña.");
         }
       } else {
         Alert.alert(
@@ -393,7 +390,7 @@ export default function LoginScreen() {
 
   // Determinar paso de autenticación
   const determineAuthStep = useCallback(async () => {
-    if (localAuthCompleted) return;
+    if (localAuthCompleted || authState.step === 'post_setup') return;
     
     try {
       if (authLoading || profileLoading) {
@@ -450,6 +447,7 @@ export default function LoginScreen() {
     }
   }, [
     localAuthCompleted, 
+    authState.step,
     authLoading, 
     profileLoading, 
     isLinkedDevice, 
@@ -598,26 +596,34 @@ export default function LoginScreen() {
     setShowPinSetup(false);
 
     if (success) {
-      if (canUseBiometric) {
+      setPinSetupJustCompleted(true);
+      setAuthState(prev => ({ ...prev, step: 'post_setup' }));
+    } else {
+      navigateToApp();
+    }
+  }, [navigateToApp]);
+
+  useEffect(() => {
+    if (authState.step === 'post_setup' && pinSetupJustCompleted) {
+      setPinSetupJustCompleted(false);
+
+      if (isHardwareBiometricAvailable) {
         setShowBiometricSetup(true);
       } else {
         navigateToApp();
       }
-    } else {
-      navigateToApp();
     }
-  }, [canUseBiometric, navigateToApp]);
+  }, [
+    authState.step,
+    pinSetupJustCompleted,
+    isHardwareBiometricAvailable,
+    navigateToApp,
+  ]);
 
   const handleBiometricSetupComplete = useCallback((enabled: boolean) => {
     setShowBiometricSetup(false);
-
-    if (enabled) {
-      setAuthState(prev => ({ ...prev, step: "biometric" }));
-      setTimeout(() => handleBiometricAuth(), 500);
-    } else {
-      navigateToApp();
-    }
-  }, [handleBiometricAuth, navigateToApp]);
+    navigateToApp();
+  }, [navigateToApp]);
 
   // Memoizar el contenido renderizado
   const renderContent = useMemo(() => {
@@ -654,13 +660,11 @@ export default function LoginScreen() {
         );
 
       case "setup":
+      case "post_setup":
         return (
           <View style={styles.centeredContainer}>
-            <Ionicons name="settings-outline" size={64} color="#00c450" />
-            <Text style={styles.setupTitle}>Configuración Inicial</Text>
-            <Text style={styles.setupMessage}>
-              Configura un PIN para acceder rápidamente a tu cuenta en este dispositivo.
-            </Text>
+            <ActivityIndicator size="large" color="#00c450" />
+            <Text style={styles.loadingText}>Finalizando configuración...</Text>
           </View>
         );
 
@@ -788,7 +792,7 @@ export default function LoginScreen() {
               colors={["#000000", "#1a1a1a"]}
               style={styles.logoContainer}
             >
-              <QuipukLogo width={120} height={60} />
+              <QuipukLogo  height={130} />
             </LinearGradient>
 
             <View style={styles.contentContainer}>
@@ -801,7 +805,6 @@ export default function LoginScreen() {
       {authState.userProfile && (
         <>
           <PinSetup
-            userId={authState.userProfile.id}
             onComplete={handlePinSetupComplete}
             onSkip={() => handlePinSetupComplete(false)}
             visible={showPinSetup}
@@ -813,6 +816,13 @@ export default function LoginScreen() {
             onComplete={handleBiometricSetupComplete}
           />
         </>
+      )}
+
+      {loginLoading && (
+        <View style={styles.loadingOverlay}>
+          <LoadingDots />
+          <Text style={styles.loadingOverlayText}>Ingresando...</Text>
+        </View>
       )}
     </SafeAreaView>
   );
@@ -1136,5 +1146,18 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     opacity: 0.5,
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(248, 249, 250, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  loadingOverlayText: {
+    marginTop: 20,
+    fontSize: 18,
+    fontFamily: "Outfit_600SemiBold",
+    color: '#333',
   },
 });

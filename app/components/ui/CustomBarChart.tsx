@@ -23,12 +23,18 @@ const CustomBarChart: React.FC<CustomBarChartProps> = ({ data, maxValue }) => {
   const barPadding = 2; // Espacio entre barras del mismo grupo
   const singleBarWidth = (barWidth - barPadding) / 2; // Ancho de cada barra individual
   
-  const yAxisLabels = ['S/ 0', 'S/ 1,000', 'S/ 2,000', 'S/ 3,000'];
-  
-  // Función para convertir valor a posición en el eje Y
-  const getYPosition = (value: number) => {
-    return chartHeight * (1 - (value / maxValue));
+  const generateYAxisLabels = (max: number, steps: number = 4) => {
+    const labels = [];
+    for (let i = 0; i < steps; i++) {
+      const value = (max / (steps - 1)) * i;
+      labels.push(`S/ ${value.toLocaleString('es-PE')}`);
+    }
+    return labels;
   };
+  
+  const yAxisLabels = generateYAxisLabels(maxValue);
+  
+
 
   return (
     <View style={styles.container}>

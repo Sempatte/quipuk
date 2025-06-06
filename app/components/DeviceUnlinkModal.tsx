@@ -55,13 +55,18 @@ export const DeviceUnlinkModal: React.FC<DeviceUnlinkModalProps> = ({
     setIsProcessing(true);
     
     try {
-      // Limpiar todos los datos de autenticación
-      await Promise.all([
+      const results = await Promise.allSettled([
         biometricService.clearBiometricData(),
         pinService.clearPinData(),
         deviceManagementService.unlinkDevice(),
         AsyncStorage.multiRemove(["token", "userId"])
       ]);
+
+      const failures = results.filter(result => result.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn('Algunas operaciones de limpieza fallaron:', failures);
+        // Continuar de todos modos ya que el usuario solicitó la desvinculación
+      }
 
       showToast(
         "success",
@@ -283,33 +288,33 @@ export const useDeviceUnlink = () => {
   const hideUnlinkModal = () => setIsModalVisible(false);
 
   const quickUnlink = async () => {
-    Alert.alert(
-      "Desvincular Dispositivo",
-      "¿Estás seguro de que deseas desvincular este dispositivo? Se eliminarán todos los datos de autenticación.",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Desvincular",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await Promise.all([
-                biometricService.clearBiometricData(),
-                pinService.clearPinData(),
-                deviceManagementService.unlinkDevice(),
-                AsyncStorage.multiRemove(["token", "userId"])
-              ]);
+    console.log("Quick unlinking device...");
+    
+    try {
+      const results = await Promise.allSettled([
+        biometricService.clearBiometricData(),
+        pinService.clearPinData(),
+        deviceManagementService.unlinkDevice(),
+        AsyncStorage.multiRemove(["token", "userId"])
+      ]);
 
-              showToast("success", "Dispositivo desvinculado", "Sesión cerrada correctamente");
-              router.replace("/LoginScreen");
-            } catch (error) {
-              console.error("Error in quick unlink:", error);
-              showToast("error", "Error", "No se pudo desvincular el dispositivo");
-            }
-          },
-        },
-      ]
-    );
+      const failures = results.filter(result => result.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn('Algunas operaciones de limpieza fallaron durante el quickUnlink:', failures);
+      }
+      
+      showToast(
+        "success",
+        "Dispositivo desvinculado [DEV]",
+        "Se limpiaron los datos de autenticación."
+      );
+      
+      router.replace("/LoginScreen");
+      
+    } catch (error) {
+      console.error("Error during quick unlink:", error);
+      showToast("error", "Error", "No se pudo desvincular el dispositivo rápidamente.");
+    }
   };
 
   return {

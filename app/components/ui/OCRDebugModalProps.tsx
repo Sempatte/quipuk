@@ -147,7 +147,9 @@ const OCRDebugModal: React.FC<OCRDebugModalProps> = ({
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>📄 Texto Extraído</Text>
               <View style={styles.rawTextContainer}>
-                <Text style={styles.rawText}>{rawText}</Text>
+                <Text style={styles.rawText} numberOfLines={20} ellipsizeMode="tail">
+                  {rawText}
+                </Text>
               </View>
               
               {/* Estadísticas del texto */}

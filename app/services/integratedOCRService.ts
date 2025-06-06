@@ -3,6 +3,19 @@ import { ocrService } from './ocrService';
 import { googleVisionOCR } from './googleVisionOCR';
 import { ExtractedReceiptData, OCRResult } from './ocrService';
 
+// Tipos exportables para el estado y la información de debug
+export interface OCRServiceStatus {
+  googleVisionConfigured: boolean;
+  ocrEnabled: boolean;
+  activeService: 'google-vision' | 'simulator' | 'unknown';
+}
+
+export interface OCRDebugInfo {
+  environment: string;
+  hasApiKey: boolean;
+  apiKeyLength: number;
+}
+
 /**
  * Servicio OCR integrado que automáticamente usa Google Vision API 
  * cuando está configurado, o el simulador para desarrollo
@@ -189,44 +202,26 @@ class IntegratedOCRService {
   /**
    * Verifica qué servicio OCR está disponible
    */
-  public getOCRServiceStatus(): {
-    googleVisionConfigured: boolean;
-    ocrEnabled: boolean;
-    activeService: 'google-vision' | 'simulator';
-  } {
+  public getOCRServiceStatus(): OCRServiceStatus {
     const googleVisionConfigured = googleVisionOCR.isConfigured();
     const ocrEnabled = env.OCR_ENABLED;
     
-    const status = {
+    return {
       googleVisionConfigured,
       ocrEnabled,
-      activeService: (ocrEnabled && googleVisionConfigured) ? 'google-vision' as const : 'simulator' as const,
+      activeService: ocrEnabled && googleVisionConfigured ? 'google-vision' : 'simulator',
     };
-    
-    console.log('🔍 [OCR] getOCRServiceStatus:', status);
-    
-    return status;
   }
 
   /**
-   * Obtiene información de configuración para debugging
+   * Obtiene información de debug sobre el servicio
    */
-  public getDebugInfo(): Record<string, any> {
-    const status = this.getOCRServiceStatus();
-    
-    const debugInfo = {
-      ...status,
+  public getDebugInfo(): OCRDebugInfo {
+    return {
       environment: env.ENV,
-      isDevelopment: env.isDevelopment,
-      isProduction: env.isProduction,
-      hasApiKey: !!env.GOOGLE_VISION_API_KEY,
+      hasApiKey: !!(env.GOOGLE_VISION_API_KEY && env.GOOGLE_VISION_API_KEY.length > 0),
       apiKeyLength: env.GOOGLE_VISION_API_KEY?.length || 0,
-      timestamp: new Date().toISOString(),
     };
-    
-    console.log('🔍 [OCR] getDebugInfo:', debugInfo);
-    
-    return debugInfo;
   }
 
   /**

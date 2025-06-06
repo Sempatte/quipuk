@@ -28,11 +28,20 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
   });
 
   // Definir dimensiones
-  const chartHeight = 200; // Aumentado para dar más espacio al eje Y
-  const paddingTop = 25; // Aumentado para dar espacio a la etiqueta superior
-  const paddingBottom = 30;
-  const paddingLeft = 60;
-  const paddingRight = 20; // Aumentado ligeramente el padding derecho
+  // Chart configuration constants
+  const CHART_CONFIG = {
+    height: 200,
+    paddingTop: 25,
+    paddingBottom: 30,
+    paddingLeft: 60,
+    paddingRight: 20,
+  } as const;
+
+  const chartHeight = CHART_CONFIG.height;
+  const paddingTop = CHART_CONFIG.paddingTop;
+  const paddingBottom = CHART_CONFIG.paddingBottom;
+  const paddingLeft = CHART_CONFIG.paddingLeft;
+  const paddingRight = CHART_CONFIG.paddingRight;
   const graphHeight = chartHeight - paddingTop - paddingBottom;
   const graphWidth = containerWidth - paddingLeft - paddingRight;
 
@@ -44,8 +53,10 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
     if (data.length === 0) return 3000;
     
     // Hallar el máximo de gastos e ingresos
-    const maxExpense = Math.max(...data.map(item => item.expenses || 0));
-    const maxIncome = Math.max(...data.map(item => item.income || 0));
+    const expenseValues = data.map(item => Math.max(0, item.expenses || 0));
+    const incomeValues = data.map(item => Math.max(0, item.income || 0));
+    const maxExpense = Math.max(...expenseValues);
+    const maxIncome = Math.max(...incomeValues);
     
     // Usar el máximo entre ambos, con un mínimo de 3000 para evitar gráficas muy pequeñas
     return Math.max(maxExpense, maxIncome, 3000);
@@ -54,13 +65,13 @@ export const FinancialChart: React.FC<FinancialChartProps> = ({ data }) => {
   const maxValue = calculateMaxValue();
 
   // Formatear valores grandes (miles, millones)
-  const formatYAxisValue = (value: number) => {
+  const formatYAxisValue = (value: number, currency: string = 'S/') => {
     if (value >= 1000000) {
-      return `S/ ${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`;
+      return `${currency} ${(value / 1000000).toFixed(value % 1000000 === 0 ? 0 : 1)}M`;
     } else if (value >= 1000) {
-      return `S/ ${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}K`;
+      return `${currency} ${(value / 1000).toFixed(value % 1000 === 0 ? 0 : 1)}K`;
     }
-    return `S/ ${value}`;
+    return `${currency} ${value}`;
   };
 
   // Calcular valores dinámicos para el eje Y basados en el valor máximo

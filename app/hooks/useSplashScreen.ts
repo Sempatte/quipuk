@@ -28,14 +28,22 @@ export const useSplashScreen = (options: UseSplashScreenOptions = {}) => {
     if (canHide) {
       setIsVisible(false);
       if (autoHide) {
-        await SplashScreen.hideAsync();
+        try {
+          await SplashScreen.hideAsync();
+        } catch (error) {
+          console.warn('Failed to hide splash screen:', error);
+        }
       }
     }
   }, [canHide, autoHide]);
 
   const forceHide = useCallback(async () => {
     setIsVisible(false);
-    await SplashScreen.hideAsync();
+    try {
+      await SplashScreen.hideAsync();
+    } catch (error) {
+      console.warn('Failed to force hide splash screen:', error);
+    }
   }, []);
 
   return {

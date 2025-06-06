@@ -47,67 +47,62 @@ const UpcomingPaymentsSkeleton: React.FC<SkeletonProps> = ({ count = 1 }) => {
     backgroundColor: '#E0E0E0',
   };
 
-  const skeletonCards = [];
-  
-  // Crear el número de tarjetas skeleton según la prop count
-  for (let i = 0; i < count; i++) {
-    skeletonCards.push(
-      <View key={i} style={styles.paymentCard}>
-        <View style={styles.paymentHeader}>
-          {/* Skeleton para el icono de categoría */}
-          <Animated.View style={[styles.categoryIconContainer, skeletonStyle]} />
-          
-          <View style={styles.categoryDetails}>
-            {/* Skeleton para el título */}
-            <Animated.View 
-              style={[styles.titleSkeleton, skeletonStyle]} 
-            />
-            
-            {/* Skeleton para el subtítulo */}
-            <Animated.View 
-              style={[styles.subtitleSkeleton, skeletonStyle]} 
-            />
-          </View>
-        </View>
-        
-        {/* Skeleton para el monto */}
-        <Animated.View 
-          style={[styles.amountSkeleton, skeletonStyle]} 
-        />
-        
-        {/* Skeleton para la fecha de vencimiento */}
-        <View style={styles.dueDateContainer}>
-          <Animated.View 
-            style={[styles.dueDateDot, { backgroundColor: '#E0E0E0', opacity: opacityValue }]} 
-          />
-          <Animated.View 
-            style={[styles.dueDateSkeleton, skeletonStyle]} 
-          />
-        </View>
-        
-        {/* Skeleton para el texto de vencimiento */}
-        <Animated.View 
-          style={[styles.dueSubtextSkeleton, skeletonStyle]} 
-        />
-        
-        {/* Skeleton para los botones */}
-        <View style={styles.buttonsContainer}>
-          <Animated.View 
-            style={[styles.buttonSkeleton, skeletonStyle, { marginRight: 8 }]} 
-          />
-          <Animated.View 
-            style={[styles.buttonSkeleton, skeletonStyle]} 
-          />
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      {skeletonCards}
+  const renderSkeletonCard = (index: number) => (
+    <View key={`skeleton-${index}`} style={styles.paymentCard}>
+         <View style={styles.paymentHeader}>
+           {/* Skeleton para el icono de categoría */}
+           <Animated.View style={[styles.categoryIconContainer, skeletonStyle]} />
+           
+           <View style={styles.categoryDetails}>
+             {/* Skeleton para el título */}
+             <Animated.View 
+               style={[styles.titleSkeleton, skeletonStyle]} 
+             />
+             
+             {/* Skeleton para el subtítulo */}
+             <Animated.View 
+               style={[styles.subtitleSkeleton, skeletonStyle]} 
+             />
+           </View>
+         </View>
+         
+         {/* Skeleton para el monto */}
+         <Animated.View 
+           style={[styles.amountSkeleton, skeletonStyle]} 
+         />
+         
+         {/* Skeleton para la fecha de vencimiento */}
+         <View style={styles.dueDateContainer}>
+           <Animated.View 
+             style={[styles.dueDateDot, { backgroundColor: '#E0E0E0', opacity: opacityValue }]} 
+           />
+           <Animated.View 
+             style={[styles.dueDateSkeleton, skeletonStyle]} 
+           />
+         </View>
+         
+         {/* Skeleton para el texto de vencimiento */}
+         <Animated.View 
+           style={[styles.dueSubtextSkeleton, skeletonStyle]} 
+         />
+         
+         {/* Skeleton para los botones */}
+         <View style={styles.buttonsContainer}>
+           <Animated.View 
+             style={[styles.buttonSkeleton, skeletonStyle, { marginRight: 8 }]} 
+           />
+           <Animated.View 
+             style={[styles.buttonSkeleton, skeletonStyle]} 
+           />
+         </View>
     </View>
   );
+
+   return (
+     <View style={styles.container}>
+      {Array.from({ length: count }, (_, index) => renderSkeletonCard(index))}
+     </View>
+   );
 };
 
 const styles = StyleSheet.create({
