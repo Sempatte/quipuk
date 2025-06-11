@@ -43,11 +43,20 @@ const LoadingDot: React.FC<LoadingDotProps> = ({ delay }) => {
   }, [delay]);
 
   const dotAnimatedStyle = useAnimatedStyle(() => ({
+    width: splashStyles.dot.width,
+    height: splashStyles.dot.height,
+    borderRadius: splashStyles.dot.borderRadius,
+    backgroundColor: splashStyles.dot.backgroundColor,
+    shadowColor: splashStyles.dot.shadowColor,
+    shadowOffset: splashStyles.dot.shadowOffset,
+    shadowOpacity: splashStyles.dot.shadowOpacity,
+    shadowRadius: splashStyles.dot.shadowRadius,
+    elevation: splashStyles.dot.elevation,
     transform: [{ scale: dotScale.value }],
     opacity: dotOpacity.value,
   }));
 
-  return <Animated.View style={[splashStyles.dot, dotAnimatedStyle]} />;
+  return <Animated.View style={dotAnimatedStyle} />;
 };
 
 export const LoadingDots: React.FC = () => {

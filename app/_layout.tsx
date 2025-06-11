@@ -1,7 +1,7 @@
 import 'react-native-gesture-handler';
 import React, { useEffect, useState, useRef } from "react";
 import { DarkTheme, DefaultTheme, ThemeProvider } from "@react-navigation/native";
-import { Slot, useRouter, useSegments } from "expo-router";
+import { Slot, useRouter, useSegments, useRootNavigationState } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { View, Text, TouchableOpacity, ActivityIndicator, StyleSheet, Alert, Platform } from "react-native";
 import { ApolloProvider } from "@apollo/client";
@@ -61,6 +61,9 @@ function AuthHandler() {
   // Ref para prevenir múltiples navigaciones
   const navigationInProgressRef = useRef(false);
   const hasNavigatedRef = useRef(false);
+
+  // 🎯 Hook para saber si el navegador está listo
+  const navigationState = useRootNavigationState();
 
   const { showError } = useCustomToast();
 
@@ -128,7 +131,8 @@ function AuthHandler() {
 
   // Effect 4: Navigation
   useEffect(() => {
-    if (!splashHidden || !tokenCheckComplete || navigationInProgressRef.current) {
+    // 🔧 FIX: Esperar a que el navegador esté listo antes de actuar
+    if (!navigationState?.key || !splashHidden || !tokenCheckComplete || navigationInProgressRef.current) {
       return;
     }
 
@@ -159,7 +163,7 @@ function AuthHandler() {
       hasNavigatedRef.current = true;
       router.replace("/LoginScreen");
     }
-  }, [currentLocalAuthStepVal, splashHidden, tokenCheckComplete, segments, router]);
+  }, [currentLocalAuthStepVal, splashHidden, tokenCheckComplete, segments, router, navigationState]);
 
   // Effect 5: Auto-trigger biometric
   useEffect(() => {
@@ -374,64 +378,95 @@ function AuthHandler() {
   return <Slot />;
 }
 
-// MainLayout y RootLayout siguen igual...
+function useProtectedRoute() {
+  const segments = useSegments();
+  const router = useRouter();
+  const { isLinkedDevice, isLoading: authLoading } = useAuth();
+  const navigationState = useRootNavigationState();
 
-function MainLayout() {
+  useEffect(() => {
+    const isNavReady = navigationState?.key;
+    if (!isNavReady || authLoading) {
+      return;
+    }
+    
+    const inAuthGroup = segments[0] === '(auth)';
+
+    if (!isLinkedDevice && !inAuthGroup) {
+      router.replace('/LoginScreen');
+    } else if (isLinkedDevice && inAuthGroup) {
+      router.replace('/(tabs)');
+    }
+  }, [isLinkedDevice, segments, authLoading, navigationState]);
+}
+
+// 🎯 Componente "cerebro" que maneja la lógica de navegación y estado.
+function InitialLayout() {
+  const navigationState = useRootNavigationState();
+  const { isBackendActive, isLoading: healthCheckLoading } = useBackendHealth();
   const colorScheme = useColorScheme();
-  const { isBackendActive, isLoading: backendLoading } = useBackendHealth({
-    showErrorToast: false,
-    retryInterval: 60000,
-  });
 
-  const [fontsLoaded] = useFonts({
-    Outfit_100Thin,
-    Outfit_200ExtraLight,
-    Outfit_400Regular,
-    Outfit_600SemiBold,
-    Outfit_700Bold,
-    Outfit_500Medium,
-    Outfit_300Light,
-  });
+  useProtectedRoute(); // Hook de protección de rutas.
 
-  if (!fontsLoaded || backendLoading) {
+  // Si la navegación o el backend no están listos, muestra un loader.
+  if (!navigationState?.key || healthCheckLoading) {
     return (
-      <View style={styles.fullScreenLoader}>
-        <LoadingDots />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
 
-  if (!isBackendActive) {
-    return <OfflineMessage />;
-  }
-
-  const theme = {
-    ...(colorScheme === "dark" ? DarkTheme : DefaultTheme),
-    colors: {
-      ...(colorScheme === "dark" ? DarkTheme.colors : DefaultTheme.colors),
-      primary: "#00DC5A",
-      background: "#F5F5F5",
-    },
-  };
-
   return (
-    <ThemeProvider value={theme}>
-      <AuthHandler />
+    <ThemeProvider value={colorScheme === "dark" ? DarkTheme : DefaultTheme}>
+       <StatusBar style="light" />
+       {!isBackendActive && <OfflineMessage />}
+       <Slot />
     </ThemeProvider>
   );
 }
 
+// 👑 Componente raíz: Solo carga proveedores y assets.
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    Outfit_100Thin,
+    Outfit_200ExtraLight,
+    Outfit_300Light,
+    Outfit_400Regular,
+    Outfit_500Medium,
+    Outfit_600SemiBold,
+    Outfit_700Bold,
+  });
+  const { isLoading: authLoading, loadAuthState } = useAuth();
+
+  useEffect(() => {
+    loadAuthState();
+  }, []);
+
+  useEffect(() => {
+    if (fontError) throw fontError;
+  }, [fontError]);
+
+  useEffect(() => {
+    if (fontsLoaded && !authLoading) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded, authLoading]);
+
+  if (!fontsLoaded || authLoading) {
+    return null; // O un loader global muy simple si se prefiere.
+  }
+
   return (
-    <SafeAreaProvider style={{ backgroundColor: "#000" }}>
-      <ApolloProvider client={client}>
-        <FontProvider>
-          <ToastProvider>
-            <MainLayout />
-          </ToastProvider>
-        </FontProvider>
-      </ApolloProvider>
-    </SafeAreaProvider>
+    <ApolloProvider client={client}>
+      <FontProvider>
+        <ToastProvider>
+           <SafeAreaProvider>
+              <InitialLayout />
+           </SafeAreaProvider>
+        </ToastProvider>
+      </FontProvider>
+    </ApolloProvider>
   );
 }
 

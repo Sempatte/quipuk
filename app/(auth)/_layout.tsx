@@ -58,50 +58,38 @@ export default function AuthLayout() {
     <Stack
       screenOptions={{
         headerShown: false,
-        gestureEnabled: false, // Deshabilitar gestos de regreso en auth
-        animation: 'slide_from_right', // Animación suave
-        
-        // 🎯 OPCIONES ADICIONALES PARA MEJOR UX
-        animationDuration: 250, // Animación más rápida
-        presentation: 'card', // Presentación tipo tarjeta
-        orientation: 'portrait', // Forzar orientación vertical
-
+        gestureEnabled: false,
+        animation: 'slide_from_right',
+        animationDuration: 250,
+        presentation: 'card',
+        orientation: 'portrait',
+        statusBarStyle: 'light',
+        statusBarAnimation: 'fade',
       }}
     >
       <Stack.Screen 
         name="LoginScreen" 
         options={{
           title: 'Iniciar Sesión',
-          // 🔧 FIX: Remover 'href' - no es válido para Stack.Screen
-          gestureEnabled: false,
-          
-          // 🎯 OPCIONES ESPECÍFICAS PARA LOGIN
-          animation: 'fade', // Animación suave para login
+          animation: 'fade',
           animationDuration: 200,
         }} 
       />
-      
       <Stack.Screen 
         name="RegisterScreen" 
         options={{
           title: 'Registrarse',
-          // 🎯 TRANSICIÓN DESDE LOGIN
           animation: 'slide_from_right',
           animationDuration: 250,
         }} 
       />
-      
       <Stack.Screen 
         name="EmailVerificationScreen" 
         options={{
           title: 'Verificar Email',
-          gestureEnabled: false, // No permitir retroceso durante verificación
-          
-          // 🎯 PANTALLA CRÍTICA - Sin retroceso accidental
+          gestureEnabled: false,
           animation: 'slide_from_bottom',
           animationDuration: 300,
-          
-          // 🔒 PREVENCIÓN DE NAVEGACIÓN ACCIDENTAL
           headerBackVisible: false,
         }} 
       />

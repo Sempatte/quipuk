@@ -1,9 +1,22 @@
 // components/splash/splashStyles.ts
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, ViewStyle } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
 
-export const splashStyles = StyleSheet.create({
+interface SplashStyles {
+  container: ViewStyle;
+  backgroundContainer: ViewStyle;
+  gradient: ViewStyle;
+  logoContainer: ViewStyle;
+  logoWrapper: ViewStyle;
+  logoBackground: ViewStyle;
+  logoSvg: ViewStyle;
+  loadingContainer: ViewStyle;
+  dotsContainer: ViewStyle;
+  dot: ViewStyle;
+}
+
+export const splashStyles = StyleSheet.create<SplashStyles>({
   container: {
     flex: 1,
     backgroundColor: '#000000',
