@@ -24,16 +24,15 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from 'expo-haptics';
 
-import { PinInput } from "@/app/components/ui/PinInput";
-import { BiometricSetupModal } from "@/app/components/BiometricSetupModal";
-import { PinSetup } from "@/app/components/ui/PinSetup";
-import { LoadingDots } from "@/app/components/ui/LoadingDots";
 
-import QuipukLogo from "../../assets/images/Logo.svg";
+import QuipukLogo from "@/assets/images/Logo.svg";
 import { useToast } from "../providers/ToastProvider";
 import { LOGIN_MUTATION } from "../graphql/mutations.graphql";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import { useAuth } from "@/app/hooks/useAuth";
+import { PinSetup } from "../components/ui/PinSetup";
+import { PinInput } from "../components/ui/PinInput";
+import { useAuth } from "../hooks/useAuth";
+import { BiometricSetupModal } from "../components/BiometricSetupModal";
 
 const { width, height } = Dimensions.get("window");
 
@@ -51,7 +50,6 @@ type AuthStep =
   | "biometric"
   | "pin"
   | "setup"
-  | "post_setup"
   | "blocked"
   | "traditional"
   | "registration";
@@ -94,26 +92,28 @@ UserProfileHeader.displayName = 'UserProfileHeader';
 
 // Extraer el formulario tradicional como componente separado
 const TraditionalLoginForm = React.memo(({
+  email,
+  password,
+  showPassword,
   loginLoading,
   isLinkedDevice,
+  onEmailChange,
+  onPasswordChange,
+  onTogglePassword,
   onSubmit,
-  onRegister,
-  initialEmail = '' // Aceptamos un email inicial
+  onRegister
 }: {
+  email: string;
+  password: string;
+  showPassword: boolean;
   loginLoading: boolean;
   isLinkedDevice: boolean;
-  onSubmit: (email: string, password: string) => void;
+  onEmailChange: (text: string) => void;
+  onPasswordChange: (text: string) => void;
+  onTogglePassword: () => void;
+  onSubmit: () => void;
   onRegister: () => void;
-  initialEmail?: string;
 }) => {
-  const [email, setEmail] = useState(initialEmail);
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-
-  const handleSubmit = () => {
-    onSubmit(email, password);
-  };
-  
   return (
     <View style={styles.formContainer}>
       <Text style={styles.welcomeTitle}>
@@ -149,7 +149,7 @@ const TraditionalLoginForm = React.memo(({
             autoCapitalize="none"
             autoCorrect={false}
             value={email}
-            onChangeText={setEmail}
+            onChangeText={onEmailChange}
             editable={!loginLoading}
             autoComplete="email"
             textContentType="emailAddress"
@@ -172,14 +172,14 @@ const TraditionalLoginForm = React.memo(({
             placeholderTextColor="#999"
             secureTextEntry={!showPassword}
             value={password}
-            onChangeText={setPassword}
+            onChangeText={onPasswordChange}
             editable={!loginLoading}
             autoComplete="password"
             textContentType="password"
           />
           <TouchableOpacity
             style={styles.passwordToggle}
-            onPress={() => setShowPassword(prev => !prev)}
+            onPress={onTogglePassword}
             disabled={loginLoading}
           >
             <Ionicons
@@ -193,7 +193,7 @@ const TraditionalLoginForm = React.memo(({
 
       <TouchableOpacity
         style={[styles.loginButton, loginLoading && styles.loginButtonDisabled]}
-        onPress={handleSubmit}
+        onPress={onSubmit}
         disabled={loginLoading}
         activeOpacity={0.8}
       >
@@ -201,7 +201,14 @@ const TraditionalLoginForm = React.memo(({
           colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
           style={styles.loginGradient}
         >
-          <Text style={styles.loginButtonText}>Ingresar</Text>
+          {loginLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color="#FFF" size="small" />
+              <Text style={styles.loginButtonText}>Ingresando...</Text>
+            </View>
+          ) : (
+            <Text style={styles.loginButtonText}>Ingresar</Text>
+          )}
         </LinearGradient>
       </TouchableOpacity>
 
@@ -224,11 +231,15 @@ const TraditionalLoginForm = React.memo(({
 TraditionalLoginForm.displayName = 'TraditionalLoginForm';
 
 export default function LoginScreen() {
+  console.log('[LoginScreen] Component rendered'); // Solo un log al inicio
+  
   const router = useRouter();
   const { showToast } = useToast();
 
   // Estados del formulario tradicional
-  const [lastUsedEmail, setLastUsedEmail] = useState(""); // Solo para recordar el último email
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   // Estado principal de autenticación
   const [authState, setAuthState] = useState<AuthState>({
@@ -242,7 +253,6 @@ export default function LoginScreen() {
   const [showBiometricSetup, setShowBiometricSetup] = useState(false);
   const [showPinSetup, setShowPinSetup] = useState(false);
   const [localAuthCompleted, setLocalAuthCompleted] = useState(false);
-  const [pinSetupJustCompleted, setPinSetupJustCompleted] = useState(false);
 
   // Hook de autenticación
   const {
@@ -250,46 +260,44 @@ export default function LoginScreen() {
     isLinkedDevice,
     linkedUserId,
     canUseBiometric,
-    isHardwareBiometricAvailable,
-    hasBiometric,
     hasPin,
     pinConfig,
-    loadAuthState,
-    setupBiometric,
-    authenticateWithBiometric,
-    createPin,
-    verifyPin,
     linkDevice,
-    canUserAccessDevice
+    authenticateWithBiometric,
+    verifyPin,
+    canUserAccessDevice,
+    loadAuthState
   } = useAuth();
 
   // Callbacks memorizados
   const navigateToApp = useCallback(() => {
+    console.log("[LoginScreen] Navigating to app");
     setLocalAuthCompleted(true);
     router.replace("/(tabs)");
   }, [router]);
 
   const forceTraditionalLogin = useCallback(async (reason?: string) => {
+    console.log(`[LoginScreen] Forcing traditional login: ${reason}`);
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("userId");
-    const pinService = require("@/app/services/pinService").pinService;
-    await pinService.clearPinData();
-    setAuthState({
+    setAuthState(prev => ({
+      ...prev,
       step: "traditional",
       userProfile: null,
-      error: null,
-      attempts: 0,
-    });
+      error: reason || "Se requiere inicio de sesión manual."
+    }));
     if (loadAuthState) {
       await loadAuthState(); 
     }
   }, [loadAuthState]);
 
   const handleTokenExpired = useCallback(() => {
+    console.log("[LoginScreen] Token expired");
     forceTraditionalLogin("Tu sesión ha expirado. Por favor, inicia sesión de nuevo.");
   }, [forceTraditionalLogin]);
 
   const handleBiometricAuth = useCallback(async () => {
+    console.log("[LoginScreen] Biometric auth attempt");
     try {
       if (Platform.OS === 'ios') {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -303,7 +311,7 @@ export default function LoginScreen() {
           setAuthState(prev => ({ ...prev, step: "pin" }));
           showToast("info", "Face ID falló", "Usa tu PIN para acceder");
         } else {
-          forceTraditionalLogin("La autenticación biométrica falló. Por favor, inicia sesión con tu contraseña.");
+          forceTraditionalLogin("Falló Face ID y no hay PIN configurado.");
         }
       } else {
         Alert.alert(
@@ -325,6 +333,7 @@ export default function LoginScreen() {
         );
       }
     } catch (error) {
+      console.error("[LoginScreen] Biometric auth error:", error);
       if (hasPin) {
         setAuthState(prev => ({ ...prev, step: "pin", error: "Error en autenticación biométrica." }));
       } else {
@@ -355,6 +364,7 @@ export default function LoginScreen() {
         }
       },
       onError: (error) => {
+        console.warn("Error loading user profile:", error);
         if (error.message.includes("token") || error.message.includes("unauthorized")) {
           handleTokenExpired();
         }
@@ -373,27 +383,18 @@ export default function LoginScreen() {
           await AsyncStorage.setItem("token", token);
           await AsyncStorage.setItem("userId", user.id.toString());
 
-          const pinService = require("@/app/services/pinService").pinService;
-          await pinService.clearPinData();
-
-          if (!isLinkedDevice) {
-            const linkSuccess = await linkDevice(user.id);
-            if (!linkSuccess) {
-              showToast("error", "Error", "No se pudo vincular el dispositivo");
-              return;
-            }
-          }
-
-          setAuthState(prev => ({ ...prev, userProfile: {
+          const profile: UserProfile = {
             id: user.id,
             email: user.email,
             username: user.username,
             fullName: user.fullName || user.username,
             profilePictureUrl: user.profilePictureUrl
-          }, step: "setup", error: null, attempts: 0 }));
-          setShowPinSetup(true);
-          return;
+          };
+
+          setAuthState(prev => ({ ...prev, userProfile: profile }));
+          await handleSuccessfulLogin(profile);
         } catch (error) {
+          console.error("Error storing auth data:", error);
           showToast("error", "Error", "No se pudieron guardar los datos de sesión");
         }
       }
@@ -405,7 +406,7 @@ export default function LoginScreen() {
 
   // Determinar paso de autenticación
   const determineAuthStep = useCallback(async () => {
-    if (localAuthCompleted || authState.step === 'post_setup') return;
+    if (localAuthCompleted) return;
     
     try {
       if (authLoading || profileLoading) {
@@ -434,27 +435,6 @@ export default function LoginScreen() {
         setAuthState(prev => ({ ...prev, userProfile }));
       }
 
-      // 🚨 Si no hay perfil de usuario, forzar login tradicional
-      if (!userProfile) {
-        setAuthState(prev => ({
-          ...prev,
-          step: "traditional",
-          userProfile: null
-        }));
-        return;
-      }
-
-      // --- FIX: Si el backend dice que hay PIN pero localmente no existe, forzar setup de PIN ---
-      // pinConfig.hasPin puede ser true, pero localmente puede no haber PIN (por ejemplo, tras clearPinData)
-      // Si pinConfig.hasPin es true pero await pinService.getPinConfig() da hasPin false, forzar setup
-      const pinService = require("@/app/services/pinService").pinService;
-      const localPinConfig = await pinService.getPinConfig();
-      if (pinConfig.hasPin && !localPinConfig.hasPin) {
-        setAuthState(prev => ({ ...prev, step: "setup" }));
-        setShowPinSetup(true);
-        return;
-      }
-
       if (pinConfig.isLocked) {
         setAuthState(prev => ({ ...prev, step: "blocked" }));
         return;
@@ -475,6 +455,7 @@ export default function LoginScreen() {
       setShowPinSetup(true);
 
     } catch (error) {
+      console.error("[LoginScreen] determineAuthStep error:", error);
       setAuthState(prev => ({ 
         ...prev, 
         step: "traditional",
@@ -483,7 +464,6 @@ export default function LoginScreen() {
     }
   }, [
     localAuthCompleted, 
-    authState.step,
     authLoading, 
     profileLoading, 
     isLinkedDevice, 
@@ -493,8 +473,7 @@ export default function LoginScreen() {
     pinConfig.isLocked, 
     canUseBiometric, 
     hasPin, 
-    handleBiometricAuth,
-    pinConfig.hasPin // importante para el fix
+    handleBiometricAuth
   ]);
 
   useEffect(() => {
@@ -552,6 +531,7 @@ export default function LoginScreen() {
         }
       }
     } catch (error) {
+      console.error("PIN verification error:", error);
       setAuthState(prev => ({ 
         ...prev, 
         error: "Error al verificar PIN" 
@@ -559,7 +539,7 @@ export default function LoginScreen() {
     }
   }, [verifyPin, loadAuthState, navigateToApp]);
 
-  const handleTraditionalLogin = useCallback((email: string, password: string) => {
+  const handleTraditionalLogin = useCallback(() => {
     if (!email || !password) {
       showToast("error", "Error", "Todos los campos son obligatorios");
       return;
@@ -570,10 +550,9 @@ export default function LoginScreen() {
       showToast("error", "Error", "Ingresa un email válido");
       return;
     }
-    
-    setLastUsedEmail(email); // Guardar el email en caso de error de verificación
+
     login({ variables: { email: email.toLowerCase().trim(), password } });
-  }, [login, showToast]);
+  }, [email, password, login, showToast]);
 
   const handleSuccessfulLogin = useCallback(async (profile: UserProfile) => {
     try {
@@ -601,11 +580,14 @@ export default function LoginScreen() {
       navigateToApp();
       
     } catch (error) {
+      console.error("Error handling successful login:", error);
       showToast("error", "Error", "Hubo un problema procesando el login");
     }
   }, [isLinkedDevice, linkDevice, canUserAccessDevice, navigateToApp, showToast]);
 
   const handleLoginError = useCallback((errorMessage: string) => {
+    setPassword("");
+    
     if (errorMessage.includes("EMAIL_NOT_VERIFIED")) {
       try {
         const errorData = JSON.parse(errorMessage);
@@ -614,7 +596,7 @@ export default function LoginScreen() {
         router.push({
           pathname: "/EmailVerificationScreen",
           params: {
-            email: lastUsedEmail,
+            email: email,
             userId: errorData.userId?.toString(),
             fromRegistration: "false",
           },
@@ -627,43 +609,32 @@ export default function LoginScreen() {
     } else {
       showToast("error", "Error de login", errorMessage);
     }
-  }, [lastUsedEmail, router, showToast]);
+  }, [email, router, showToast]);
 
   const handlePinSetupComplete = useCallback(async (success: boolean) => {
     setShowPinSetup(false);
 
     if (success) {
-      setPinSetupJustCompleted(true);
-      setAuthState(prev => ({ ...prev, step: 'post_setup' }));
-    } else {
-      navigateToApp();
-    }
-  }, [navigateToApp]);
-
-  useEffect(() => {
-    if (authState.step === 'post_setup') {
-      if (isHardwareBiometricAvailable) {
+      if (canUseBiometric) {
         setShowBiometricSetup(true);
-        // Timeout de seguridad: navegar a la app después de 8 segundos si el modal no avanza
-        const timeout = setTimeout(() => {
-          setShowBiometricSetup(false);
-          navigateToApp();
-        }, 8000);
-        return () => clearTimeout(timeout);
       } else {
         navigateToApp();
       }
+    } else {
+      navigateToApp();
     }
-  }, [
-    authState.step,
-    isHardwareBiometricAvailable,
-    navigateToApp,
-  ]);
+  }, [canUseBiometric, navigateToApp]);
 
   const handleBiometricSetupComplete = useCallback((enabled: boolean) => {
     setShowBiometricSetup(false);
-    navigateToApp();
-  }, [navigateToApp]);
+
+    if (enabled) {
+      setAuthState(prev => ({ ...prev, step: "biometric" }));
+      setTimeout(() => handleBiometricAuth(), 500);
+    } else {
+      navigateToApp();
+    }
+  }, [handleBiometricAuth, navigateToApp]);
 
   // Memoizar el contenido renderizado
   const renderContent = useMemo(() => {
@@ -700,11 +671,13 @@ export default function LoginScreen() {
         );
 
       case "setup":
-      case "post_setup":
         return (
           <View style={styles.centeredContainer}>
-            <ActivityIndicator size="large" color="#00c450" />
-            <Text style={styles.loadingText}>Finalizando configuración...</Text>
+            <Ionicons name="settings-outline" size={64} color="#00c450" />
+            <Text style={styles.setupTitle}>Configuración Inicial</Text>
+            <Text style={styles.setupMessage}>
+              Configura un PIN para acceder rápidamente a tu cuenta en este dispositivo.
+            </Text>
           </View>
         );
 
@@ -780,9 +753,14 @@ export default function LoginScreen() {
       case "traditional":
         return (
           <TraditionalLoginForm
-            initialEmail={lastUsedEmail}
+            email={email}
+            password={password}
+            showPassword={showPassword}
             loginLoading={loginLoading}
             isLinkedDevice={isLinkedDevice}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            onTogglePassword={() => setShowPassword(!showPassword)}
             onSubmit={handleTraditionalLogin}
             onRegister={() => router.push("/RegisterScreen")}
           />
@@ -791,9 +769,14 @@ export default function LoginScreen() {
       default:
         return (
           <TraditionalLoginForm
-            initialEmail={lastUsedEmail}
+            email={email}
+            password={password}
+            showPassword={showPassword}
             loginLoading={loginLoading}
             isLinkedDevice={isLinkedDevice}
+            onEmailChange={setEmail}
+            onPasswordChange={setPassword}
+            onTogglePassword={() => setShowPassword(!showPassword)}
             onSubmit={handleTraditionalLogin}
             onRegister={() => router.push("/RegisterScreen")}
           />
@@ -803,7 +786,9 @@ export default function LoginScreen() {
     authState,
     authLoading,
     pinConfig.lockedUntil,
-    lastUsedEmail,
+    email,
+    password,
+    showPassword,
     loginLoading,
     isLinkedDevice,
     handlePinAuth,
@@ -813,16 +798,6 @@ export default function LoginScreen() {
     hasPin,
     router
   ]);
-
-  // ⬇️ RETURN TEMPRANO SI YA SE COMPLETÓ LA AUTENTICACIÓN LOCAL
-  if (localAuthCompleted) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#00c450" />
-        <Text style={styles.loadingText}>Redirigiendo...</Text>
-      </View>
-    );
-  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -842,7 +817,7 @@ export default function LoginScreen() {
               colors={["#000000", "#1a1a1a"]}
               style={styles.logoContainer}
             >
-              <QuipukLogo  height={130} />
+              <QuipukLogo width={120} height={60} />
             </LinearGradient>
 
             <View style={styles.contentContainer}>
@@ -855,26 +830,18 @@ export default function LoginScreen() {
       {authState.userProfile && (
         <>
           <PinSetup
-            visible={showPinSetup}
+            userId={authState.userProfile.id}
             onComplete={handlePinSetupComplete}
             onSkip={() => handlePinSetupComplete(false)}
+            visible={showPinSetup}
           />
 
-          {isHardwareBiometricAvailable && authState.userProfile && (
-            <BiometricSetupModal
-              visible={showBiometricSetup}
-              user={authState.userProfile}
-              onComplete={handleBiometricSetupComplete}
-            />
-          )}
+          <BiometricSetupModal
+            visible={showBiometricSetup}
+            user={authState.userProfile}
+            onComplete={handleBiometricSetupComplete}
+          />
         </>
-      )}
-
-      {loginLoading && (
-        <View style={styles.loadingOverlay}>
-          <LoadingDots />
-          <Text style={styles.loadingOverlayText}>Ingresando...</Text>
-        </View>
       )}
     </SafeAreaView>
   );
@@ -1198,18 +1165,5 @@ const styles = StyleSheet.create({
   },
   disabledText: {
     opacity: 0.5,
-  },
-  loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(248, 249, 250, 0.85)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  loadingOverlayText: {
-    marginTop: 20,
-    fontSize: 18,
-    fontFamily: "Outfit_600SemiBold",
-    color: '#333',
   },
 });

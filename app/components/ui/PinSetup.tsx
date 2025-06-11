@@ -13,17 +13,19 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useAuth } from '@/app/hooks/useAuth';
+import { usePinAuth } from '@/app/hooks/usePinAuth';
 
 const { width, height } = Dimensions.get('window');
 
 interface PinSetupProps {
+  userId: number;
   visible: boolean;
   onComplete: (success: boolean) => void;
   onSkip: () => void;
 }
 
 export const PinSetup: React.FC<PinSetupProps> = ({
+  userId,
   visible,
   onComplete,
   onSkip,
@@ -33,7 +35,7 @@ export const PinSetup: React.FC<PinSetupProps> = ({
   const [step, setStep] = useState<'create' | 'confirm'>('create');
   const [error, setError] = useState('');
   
-  const { createPin, isLoading, linkedUserId } = useAuth();
+  const { createPin, isLoading } = usePinAuth(userId);
 
   const handleNumberPress = useCallback((number: string) => {
     if (step === 'create') {
@@ -72,12 +74,7 @@ export const PinSetup: React.FC<PinSetupProps> = ({
       }
       
       try {
-        if (!linkedUserId) {
-          setError('No se pudo identificar al usuario.');
-          return;
-        }
-
-        const result = await createPin(linkedUserId, pin);
+        const result = await createPin(pin);
         if (result.success) {
           onComplete(true);
         } else {
@@ -87,7 +84,7 @@ export const PinSetup: React.FC<PinSetupProps> = ({
         setError('Error inesperado al crear PIN');
       }
     }
-  }, [step, pin, confirmPin, createPin, onComplete, linkedUserId]);
+  }, [step, pin, confirmPin, createPin, onComplete]);
 
   const handleBack = useCallback(() => {
     if (step === 'confirm') {
@@ -100,10 +97,9 @@ export const PinSetup: React.FC<PinSetupProps> = ({
   const currentPin = step === 'create' ? pin : confirmPin;
 
   // Auto-advance cuando se complete el PIN
-React.useEffect(() => {
+  React.useEffect(() => {
     if (currentPin.length === 6) {
-     const timer = setTimeout(handleStepComplete, 300);
-     return () => clearTimeout(timer);
+      setTimeout(handleStepComplete, 300);
     }
   }, [currentPin.length, handleStepComplete]);
 
@@ -191,15 +187,13 @@ React.useEffect(() => {
               <View style={styles.keypadGrid}>
                 <View style={styles.keypadRow}>
                   {[1, 2, 3].map(number => (
-<TouchableOpacity
-    key={number}
-    style={styles.keypadButton}
-    onPress={() => handleNumberPress(number.toString())}
-    activeOpacity={0.7}
-    disabled={isLoading}
-   accessibilityRole="button"
-   accessibilityLabel={`Enter digit ${number}`}
-  >
+                    <TouchableOpacity
+                      key={number}
+                      style={styles.keypadButton}
+                      onPress={() => handleNumberPress(number.toString())}
+                      activeOpacity={0.7}
+                      disabled={isLoading}
+                    >
                       <Text style={styles.keypadButtonText}>{number}</Text>
                     </TouchableOpacity>
                   ))}
@@ -450,4 +444,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 14,
   },
-})
+});
