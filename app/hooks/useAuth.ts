@@ -75,7 +75,7 @@ export const useAuth = () => {
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const supportedTypes = await LocalAuthentication.supportedAuthenticationTypesAsync();
       const isHardwareAvailable = hasHardware && supportedTypes.length > 0;
-
+      //pinService.clearPinData()
       console.log('[useAuth] loadAuthState: Calling Promise.all for device/auth services...');
       const [
         linkedUserId,

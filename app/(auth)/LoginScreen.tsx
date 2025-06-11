@@ -272,12 +272,14 @@ export default function LoginScreen() {
   const forceTraditionalLogin = useCallback(async (reason?: string) => {
     await AsyncStorage.removeItem("token");
     await AsyncStorage.removeItem("userId");
-    setAuthState(prev => ({
-      ...prev,
+    const pinService = require("@/app/services/pinService").pinService;
+    await pinService.clearPinData();
+    setAuthState({
       step: "traditional",
       userProfile: null,
-      error: reason || "Se requiere inicio de sesión manual."
-    }));
+      error: null,
+      attempts: 0,
+    });
     if (loadAuthState) {
       await loadAuthState(); 
     }
@@ -371,16 +373,26 @@ export default function LoginScreen() {
           await AsyncStorage.setItem("token", token);
           await AsyncStorage.setItem("userId", user.id.toString());
 
-          const profile: UserProfile = {
+          const pinService = require("@/app/services/pinService").pinService;
+          await pinService.clearPinData();
+
+          if (!isLinkedDevice) {
+            const linkSuccess = await linkDevice(user.id);
+            if (!linkSuccess) {
+              showToast("error", "Error", "No se pudo vincular el dispositivo");
+              return;
+            }
+          }
+
+          setAuthState(prev => ({ ...prev, userProfile: {
             id: user.id,
             email: user.email,
             username: user.username,
             fullName: user.fullName || user.username,
             profilePictureUrl: user.profilePictureUrl
-          };
-
-          setAuthState(prev => ({ ...prev, userProfile: profile }));
-          await handleSuccessfulLogin(profile);
+          }, step: "setup", error: null, attempts: 0 }));
+          setShowPinSetup(true);
+          return;
         } catch (error) {
           showToast("error", "Error", "No se pudieron guardar los datos de sesión");
         }
@@ -422,6 +434,27 @@ export default function LoginScreen() {
         setAuthState(prev => ({ ...prev, userProfile }));
       }
 
+      // 🚨 Si no hay perfil de usuario, forzar login tradicional
+      if (!userProfile) {
+        setAuthState(prev => ({
+          ...prev,
+          step: "traditional",
+          userProfile: null
+        }));
+        return;
+      }
+
+      // --- FIX: Si el backend dice que hay PIN pero localmente no existe, forzar setup de PIN ---
+      // pinConfig.hasPin puede ser true, pero localmente puede no haber PIN (por ejemplo, tras clearPinData)
+      // Si pinConfig.hasPin es true pero await pinService.getPinConfig() da hasPin false, forzar setup
+      const pinService = require("@/app/services/pinService").pinService;
+      const localPinConfig = await pinService.getPinConfig();
+      if (pinConfig.hasPin && !localPinConfig.hasPin) {
+        setAuthState(prev => ({ ...prev, step: "setup" }));
+        setShowPinSetup(true);
+        return;
+      }
+
       if (pinConfig.isLocked) {
         setAuthState(prev => ({ ...prev, step: "blocked" }));
         return;
@@ -460,7 +493,8 @@ export default function LoginScreen() {
     pinConfig.isLocked, 
     canUseBiometric, 
     hasPin, 
-    handleBiometricAuth
+    handleBiometricAuth,
+    pinConfig.hasPin // importante para el fix
   ]);
 
   useEffect(() => {
@@ -607,18 +641,21 @@ export default function LoginScreen() {
   }, [navigateToApp]);
 
   useEffect(() => {
-    if (authState.step === 'post_setup' && pinSetupJustCompleted) {
-      setPinSetupJustCompleted(false);
-
+    if (authState.step === 'post_setup') {
       if (isHardwareBiometricAvailable) {
         setShowBiometricSetup(true);
+        // Timeout de seguridad: navegar a la app después de 8 segundos si el modal no avanza
+        const timeout = setTimeout(() => {
+          setShowBiometricSetup(false);
+          navigateToApp();
+        }, 8000);
+        return () => clearTimeout(timeout);
       } else {
         navigateToApp();
       }
     }
   }, [
     authState.step,
-    pinSetupJustCompleted,
     isHardwareBiometricAvailable,
     navigateToApp,
   ]);
@@ -776,6 +813,16 @@ export default function LoginScreen() {
     hasPin,
     router
   ]);
+
+  // ⬇️ RETURN TEMPRANO SI YA SE COMPLETÓ LA AUTENTICACIÓN LOCAL
+  if (localAuthCompleted) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#00c450" />
+        <Text style={styles.loadingText}>Redirigiendo...</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
