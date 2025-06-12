@@ -1,7 +1,6 @@
 // app/(tabs)/board.tsx - ACTUALIZADO CON EXPO STATUS BAR
 import React, { useCallback, useState, useRef } from 'react';
 import { View, StyleSheet, ScrollView, RefreshControl } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
 import { useQuery } from '@apollo/client';
 import { ThemedView } from "@/app/components/ThemedView";
 import QuipuBoardLogo from '../../assets/images/QuipuBoard.svg';
@@ -49,7 +48,7 @@ export default function Board() {
       {/* 🎯 NUEVA IMPLEMENTACIÓN: StatusBar usando expo-status-bar */}
       <StatusBarManager {...StatusBarPresets.tabs} />
       
-      <SafeAreaView style={{ backgroundColor: "#FFF" }} edges={["top"]}>
+      <SafeAreaView style={{ backgroundColor: "#000" }} edges={["top"]}>
         <View style={globalStyles.header}>
           <QuipuBoardLogo width={400} height={60} />
         </View>

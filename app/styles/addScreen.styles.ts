@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 20,
     borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomRightRadius: 24
   },
   title: {
     fontSize: 32,
@@ -27,6 +27,7 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     textAlign: "center",
     marginBottom: 16,
+    lineHeight: 50,
   },
   sliderContainer: {
     marginBottom: 16,
@@ -39,12 +40,12 @@ const styles = StyleSheet.create({
   scanButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.15)",
+    backgroundColor: "#00DC5A",
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 30,
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.2)",
+    borderColor: "#00DC5A",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,

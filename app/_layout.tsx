@@ -297,7 +297,6 @@ function AuthHandler() {
       <View style={styles.fullScreenLoader}>
         <StatusBar style="light" />
         <ActivityIndicator size="large" color="#00DC5A" />
-        <Text style={styles.loadingText}>Cargando...</Text>
       </View>
     );
   }

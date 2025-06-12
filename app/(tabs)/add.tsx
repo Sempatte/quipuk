@@ -55,7 +55,7 @@ import { RootStackParamList } from "../interfaces/navigation.type";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ExtractedReceiptData } from "../services/integratedOCRService";
 import { useToast } from "../providers/ToastProvider";
-import { StatusBarManager } from "@/app/components/ui/StatusBarManager";
+import { StatusBarManager, StatusBarPresets } from "@/app/components/ui/StatusBarManager";
 import styles from "../styles/addScreen.styles";
 
 // 🎯 INTERFACES
@@ -287,11 +287,7 @@ export default function AddTransactionWithHook() {
   // 🎯 RENDER PRINCIPAL
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <StatusBarManager 
-        style="light" 
-        backgroundColor={TRANSACTION_COLORS[formState.selectedOption]}
-        translucent={false}
-      />
+      <StatusBarManager {...StatusBarPresets.tabs} />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.keyboardAvoid}
@@ -315,22 +311,7 @@ export default function AddTransactionWithHook() {
                 />
               </View>
 
-              <View style={styles.scanButtonContainer}>
-                <TouchableOpacity
-                  style={styles.scanButton}
-                  onPress={handleOpenScanner}
-                  activeOpacity={0.8}
-                >
-                  <Ionicons name="scan" size={24} color="#FFF" />
-                  <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
-                </TouchableOpacity>
-                
-                {__DEV__ && (
-                  <View style={styles.ocrStatusContainer}>
-                    <OCRStatusIndicator showDetails={false} />
-                  </View>
-                )}
-              </View>
+              
 
               {/* ✅ CAROUSEL CON HANDLER SIMPLIFICADO */}
               <View style={styles.carouselContainer}>
@@ -346,7 +327,22 @@ export default function AddTransactionWithHook() {
 
             {/* 🎯 FORMULARIO PRINCIPAL */}
             <View style={styles.formContainer}>
-              
+            <View style={styles.scanButtonContainer}>
+                <TouchableOpacity
+                  style={styles.scanButton}
+                  onPress={handleOpenScanner}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="scan" size={24} color="#FFF" />
+                  <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
+                </TouchableOpacity>
+                
+                {__DEV__ && (
+                  <View style={styles.ocrStatusContainer}>
+                    <OCRStatusIndicator showDetails={false} />
+                  </View>
+                )}
+              </View>
               <View style={styles.inputSection}>
                 <AmountInput
                   value={formState.amount}
