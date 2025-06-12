@@ -54,7 +54,7 @@ const LoadingDot: React.FC<LoadingDotProps> = ({ delay }) => {
     elevation: splashStyles.dot.elevation,
     transform: [{ scale: dotScale.value }],
     opacity: dotOpacity.value,
-  }));
+  } as any));
 
   return <Animated.View style={dotAnimatedStyle} />;
 };

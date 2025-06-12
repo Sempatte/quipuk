@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  ViewStyle,
 } from "react-native";
 import Animated, {
   useSharedValue,
@@ -97,10 +98,10 @@ export default function AddTransactionWithHook() {
   const { showToast } = useToast();
   const navigation = useNavigation<AddTransactionNavigationProp>();
   const route = useRoute<RouteProp<Record<string, AddTransactionRouteParams>, string>>();
-  
+
   // 🎯 PARÁMETROS DE RUTA
   const { forcePaymentStatus, statusReadOnly, preselectedTab } = route.params || {};
-  
+
   // 🎯 HOOK PERSONALIZADO PARA EL FORMULARIO
   const {
     formState,
@@ -117,16 +118,16 @@ export default function AddTransactionWithHook() {
     preselectedTab,
     forcePaymentStatus,
   });
-  
+
   // 🎯 REFS Y ESTADO LOCAL
   const scrollRef = useRef<ScrollView>(null);
   const amountInputRef = useRef<any>(null);
   const [showScanner, setShowScanner] = useState(false);
-  
+
   // 🎯 VALORES ANIMADOS
   const colorValue = useSharedValue(COLOR_INDEX_MAP[formState.selectedOption]);
   const buttonScale = useSharedValue(1);
-  
+
   // 🎯 CONSULTA DE TRANSACCIONES FRECUENTES
   const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
     GET_FREQUENT_TRANSACTIONS,
@@ -151,11 +152,11 @@ export default function AddTransactionWithHook() {
     ],
     onCompleted: () => {
       resetForm(true);
-      
+
       if (Platform.OS === 'ios') {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
-      
+
       navigation.navigate("movements", { shouldRefresh: true });
       showToast("success", "¡Éxito!", "Transacción agregada correctamente");
     },
@@ -187,7 +188,7 @@ export default function AddTransactionWithHook() {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-    
+
     handleSliderChange(value);
     colorValue.value = withSpring(COLOR_INDEX_MAP[value], {
       damping: 15,
@@ -205,16 +206,23 @@ export default function AddTransactionWithHook() {
     return { backgroundColor };
   });
 
-  const animatedButtonStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: buttonScale.value }],
-  }));
+  // ✅ CORRECTO - Solución 2: Usar el tipo correcto de Reanimated
+  const animatedButtonStyle = useAnimatedStyle(() => {
+    return {
+      transform: [
+        { scale: buttonScale.value }
+      ]
+    } as any; // Para Reanimated 2.17.0
+  });
+
+
 
   // 🎯 CREACIÓN DE TRANSACCIÓN SIMPLIFICADA
   const handleCreateTransaction = useCallback(async () => {
     if (!validation.isValid) {
       const errorMessage = validation.errors.join(", ");
       showToast("error", "Formulario incompleto", errorMessage);
-      
+
       scrollRef.current?.scrollTo({ y: 0, animated: true });
       if (!validation.fieldValidation.amount) {
         setTimeout(() => amountInputRef.current?.focus(), 300);
@@ -234,7 +242,7 @@ export default function AddTransactionWithHook() {
       const transactionInput = prepareTransactionData(userId);
 
       await createTransaction({ variables: { input: transactionInput } });
-      
+
     } catch (error: any) {
       console.error("❌ Error al crear transacción:", error);
       showToast("error", "Error", error.message || "Hubo un problema al agregar la transacción");
@@ -246,9 +254,9 @@ export default function AddTransactionWithHook() {
   // 🎯 MANEJO OPTIMIZADO DE DATOS OCR
   const handleReceiptDataExtracted = useCallback((data: ExtractedReceiptData) => {
     setShowScanner(false);
-    
+
     const fieldsUpdated = applyOCRData(data);
-    
+
     if (fieldsUpdated > 0) {
       showToast(
         "success",
@@ -272,9 +280,9 @@ export default function AddTransactionWithHook() {
       description: item.description || "",
       title: item.title,
     };
-    
+
     handleFrequentSelection(frequentItem);
-    
+
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
@@ -303,7 +311,7 @@ export default function AddTransactionWithHook() {
             {/* 🎯 HEADER ANIMADO */}
             <Animated.View style={[styles.headerContainer, animatedHeaderStyle]}>
               <Text style={styles.title}>Agregar</Text>
-              
+
               <View style={styles.sliderContainer}>
                 <AgregarSlides
                   colors={TRANSACTION_COLORS}
@@ -311,7 +319,7 @@ export default function AddTransactionWithHook() {
                 />
               </View>
 
-              
+
 
               {/* ✅ CAROUSEL CON HANDLER SIMPLIFICADO */}
               <View style={styles.carouselContainer}>
@@ -327,7 +335,7 @@ export default function AddTransactionWithHook() {
 
             {/* 🎯 FORMULARIO PRINCIPAL */}
             <View style={styles.formContainer}>
-            <View style={styles.scanButtonContainer}>
+              <View style={styles.scanButtonContainer}>
                 <TouchableOpacity
                   style={styles.scanButton}
                   onPress={handleOpenScanner}
@@ -336,7 +344,7 @@ export default function AddTransactionWithHook() {
                   <Ionicons name="scan" size={24} color="#FFF" />
                   <Text style={styles.scanButtonText}>Escanear Comprobante</Text>
                 </TouchableOpacity>
-                
+
                 {__DEV__ && (
                   <View style={styles.ocrStatusContainer}>
                     <OCRStatusIndicator showDetails={false} />
@@ -411,10 +419,10 @@ export default function AddTransactionWithHook() {
                 >
                   <View style={styles.addButtonContent}>
                     <View style={styles.addIconContainer}>
-                      <Ionicons 
-                        name={creating ? "hourglass" : "add"} 
-                        size={20} 
-                        color="#FFF" 
+                      <Ionicons
+                        name={creating ? "hourglass" : "add"}
+                        size={20}
+                        color="#FFF"
                       />
                     </View>
                     <Text style={styles.addButtonText}>

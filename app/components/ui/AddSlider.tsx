@@ -49,7 +49,7 @@ const AddSlider: React.FC<AgregarSlidesProps> = ({ colors, onChange }) => {
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: translateX.value }],
-  }));
+  } as any));
 
   return (
     <View style={styles.container}>

@@ -7,7 +7,7 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: "#000",
-    paddingBottom: 30,
+    paddingBottom: 40,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
@@ -23,7 +23,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20
   },
   logoContainer: {
-    flex: 1,
   },
   iconContainer: {
     flexDirection: "row",

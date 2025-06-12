@@ -22,7 +22,7 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
   const animatedIconStyle = useAnimatedStyle(() => {
     return {
       transform: [{ rotate: `${rotateValue.value}deg` }],
-    };
+    } as any;
   });
 
   return (

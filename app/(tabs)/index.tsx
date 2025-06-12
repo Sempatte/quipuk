@@ -2,7 +2,6 @@ import React, { useCallback } from "react";
 import {
   View,
   Text,
-  StyleSheet,
   KeyboardAvoidingView,
   ScrollView,
 } from "react-native";
@@ -10,7 +9,7 @@ import { useQuery } from "@apollo/client";
 import BellIcon from "../../assets/images/icons/mdi_bell.svg";
 import SettingsIcon from "../../assets/images/icons/settings.svg";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import QuipukLogo from "../../assets/images/LogoV2.svg";
+import QuipukLogo from "../../assets/images/Logo.svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,7 +19,6 @@ import RecentTransactions from "@/app/components/ui/RecentTransactions"; // Impo
 import UpcomingPayments from "@/app/components/ui/UpcomingPayments";
 import QuipuTip from "@/app/components/ui/QuipuTip";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { StatusBar } from "react-native";
 import styles from "../styles/indexScreen.styles";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<

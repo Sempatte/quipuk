@@ -68,7 +68,7 @@ const PieChart: React.FC<PieChartProps> = ({
   // Estilo animado para el SVG principal
   const chartAnimatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: chartScale.value }]
-  }));
+  } as any));
   
   // Estilo animado para el texto central
   const textAnimatedStyle = useAnimatedStyle(() => ({
