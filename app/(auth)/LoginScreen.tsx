@@ -201,14 +201,7 @@ const TraditionalLoginForm = React.memo(({
           colors={loginLoading ? ["#CCC", "#AAA"] : ["#00c450", "#00a040"]}
           style={styles.loginGradient}
         >
-          {loginLoading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator color="#FFF" size="small" />
-              <Text style={styles.loginButtonText}>Ingresando...</Text>
-            </View>
-          ) : (
-            <Text style={styles.loginButtonText}>Ingresar</Text>
-          )}
+          <Text style={styles.loginButtonText}>Ingresar</Text>
         </LinearGradient>
       </TouchableOpacity>
 

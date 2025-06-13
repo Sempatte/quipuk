@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import {
   StyleSheet,
   View,
@@ -64,6 +64,8 @@ interface AddTransactionRouteParams {
   forcePaymentStatus?: "pending" | "completed";
   statusReadOnly?: boolean;
   preselectedTab?: TransactionOption;
+  openScanner?: boolean; // Nuevo
+  timestamp?: number; // Nuevo
 }
 
 // ✅ Interfaz para los datos que usamos internamente
@@ -127,6 +129,15 @@ export default function AddTransactionWithHook() {
   // 🎯 VALORES ANIMADOS
   const colorValue = useSharedValue(COLOR_INDEX_MAP[formState.selectedOption]);
   const buttonScale = useSharedValue(1);
+
+  // Efecto para abrir el scanner cuando se navega con el parámetro openScanner
+  useEffect(() => {
+    if (route.params?.openScanner && route.params?.timestamp) {
+      setShowScanner(true);
+      // Limpiar los parámetros para que no se vuelva a activar
+      navigation.setParams({ openScanner: undefined, timestamp: undefined } as any);
+    }
+  }, [route.params?.openScanner, route.params?.timestamp, navigation]);
 
   // 🎯 CONSULTA DE TRANSACCIONES FRECUENTES
   const { data: frequentData, loading: loadingFrequent } = useQuery<FrequentTransactionsData>(
@@ -335,7 +346,7 @@ export default function AddTransactionWithHook() {
 
             {/* 🎯 FORMULARIO PRINCIPAL */}
             <View style={styles.formContainer}>
-              <View style={styles.scanButtonContainer}>
+              {/* <View style={styles.scanButtonContainer}>
                 <TouchableOpacity
                   style={styles.scanButton}
                   onPress={handleOpenScanner}
@@ -350,7 +361,7 @@ export default function AddTransactionWithHook() {
                     <OCRStatusIndicator showDetails={false} />
                   </View>
                 )}
-              </View>
+              </View> */}
               <View style={styles.inputSection}>
                 <AmountInput
                   value={formState.amount}

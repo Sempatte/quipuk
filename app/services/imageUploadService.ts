@@ -6,6 +6,7 @@ import env from '@/app/config/env';
 
 export interface ImageUploadResult {
   success: boolean;
+
   profilePictureUrl?: string;
   error?: string;
 }
@@ -28,7 +29,7 @@ class ImageUploadService {
   async requestGalleryPermissions(): Promise<boolean> {
     try {
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
+
       if (status !== 'granted') {
         return false;
       }
@@ -80,11 +81,11 @@ class ImageUploadService {
       }
 
       const MAX_SIZE = 800; // Tamaño máximo para fotos de perfil
-      
+
       let processedImage = await ImageManipulator.manipulateAsync(
         imageUri,
         [{ resize: { width: MAX_SIZE, height: MAX_SIZE } }],
-        { 
+        {
           compress: 0.8,
           format: ImageManipulator.SaveFormat.JPEG,
           base64: true // Solicitar base64 directamente
@@ -104,7 +105,7 @@ class ImageUploadService {
         processedImage = await ImageManipulator.manipulateAsync(
           imageUri,
           [{ resize: { width: 600, height: 600 } }],
-          { 
+          {
             compress: 0.6,
             format: ImageManipulator.SaveFormat.JPEG,
             base64: true
@@ -116,13 +117,13 @@ class ImageUploadService {
         }
 
         const newSize = (processedImage.base64.length * 3) / 4;
-        
+
         // Verificación final
         if (newSize > this.MAX_IMAGE_SIZE) {
           processedImage = await ImageManipulator.manipulateAsync(
             imageUri,
             [{ resize: { width: 400, height: 400 } }],
-            { 
+            {
               compress: 0.4,
               format: ImageManipulator.SaveFormat.JPEG,
               base64: true
@@ -162,7 +163,7 @@ class ImageUploadService {
       if (!this.UPLOAD_BASE64_ENDPOINT.includes('http')) {
         throw new Error('Endpoint de upload inválido');
       }
-      
+
       const token = await AsyncStorage.getItem('token');
       if (!token) {
         throw new Error('Token de autenticación no encontrado');
@@ -188,9 +189,9 @@ class ImageUploadService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        
+
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        
+
         switch (response.status) {
           case 413:
             errorMessage = 'La imagen es demasiado grande. Intenta con una imagen más pequeña.';
@@ -214,12 +215,12 @@ class ImageUploadService {
               // Mantener el mensaje por defecto
             }
         }
-        
+
         throw new Error(errorMessage);
       }
 
       const responseData = await response.json();
-      
+
       return {
         success: responseData.success,
         profilePictureUrl: responseData.data?.profilePictureUrl,
@@ -230,7 +231,7 @@ class ImageUploadService {
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -245,14 +246,14 @@ class ImageUploadService {
     try {
       // 1. Seleccionar imagen
       const imageUri = await this.pickImageFromGallery();
-      
+
       if (!imageUri) {
         return { success: false, error: 'No se seleccionó ninguna imagen' };
       }
 
       // 2. Procesar imagen
       const processedImage = await this.processImage(imageUri);
-      
+
       // 3. Subir imagen
       const result = await this.uploadProfilePictureBase64(processedImage);
 
@@ -262,7 +263,7 @@ class ImageUploadService {
       if (error instanceof Error) {
         errorMessage = error.message;
       }
-      
+
       return {
         success: false,
         error: errorMessage,
@@ -292,7 +293,7 @@ class ImageUploadService {
   async testService(): Promise<{ success: boolean; message: string; details?: any }> {
     try {
       const info = this.getServiceInfo();
-      
+
       // Verificar configuración básica
       if (!env.API_URL) {
         return {
@@ -301,7 +302,7 @@ class ImageUploadService {
           details: info
         };
       }
-      
+
       if (!this.UPLOAD_BASE64_ENDPOINT.includes('http')) {
         return {
           success: false,
@@ -332,8 +333,8 @@ class ImageUploadService {
         return {
           success: true,
           message: 'Servicio configurado correctamente',
-          details: { 
-            ...info, 
+          details: {
+            ...info,
             hasToken: true,
             connectivityTest: {
               status: testResponse.status,
@@ -345,14 +346,14 @@ class ImageUploadService {
         return {
           success: false,
           message: 'Error de conectividad con el servidor',
-          details: { 
-            ...info, 
+          details: {
+            ...info,
             hasToken: true,
             connectivityError: connectivityError instanceof Error ? connectivityError.message : 'Error desconocido'
           }
         };
       }
-      
+
     } catch (error) {
       return {
         success: false,

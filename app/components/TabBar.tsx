@@ -1,30 +1,10 @@
 import { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { TouchableOpacity, View, StyleSheet } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useEffect } from "react";
-import Icon from "react-native-vector-icons/MaterialIcons";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
+import Icon from "react-native-vector-icons/Ionicons"; // Cambiado a Ionicons
+import Animated from "react-native-reanimated";
 
 export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-  const rotateValue = useSharedValue(0);
-  const isAddScreenActive = state.routes[state.index].name === "add";
-
-  useEffect(() => {
-    rotateValue.value = withTiming(isAddScreenActive ? 45 : 0, {
-      duration: 300,
-    });
-  }, [isAddScreenActive]);
-
-  const animatedIconStyle = useAnimatedStyle(() => {
-    return {
-      transform: [{ rotate: `${rotateValue.value}deg` }],
-    } as any;
-  });
-
   return (
     <SafeAreaView edges={["bottom"]} style={{ backgroundColor: "#000" }}>
       <View style={styles.tabBar}>
@@ -39,8 +19,19 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               canPreventDefault: true,
             });
 
-            if (!isFocused && !event.defaultPrevented) {
-              navigation.navigate(route.name);
+            if (route.name === "add" && isFocused) {
+              // Si es la pestaña 'add' y ya está activa, intenta abrir el escáner
+              if (!event.defaultPrevented) {
+                navigation.navigate(
+                  "add",
+                  { openScanner: true, timestamp: Date.now() } as any
+                );
+              }
+            } else {
+              // Comportamiento de navegación estándar para otras pestañas o para activar 'add'
+              if (!isFocused && !event.defaultPrevented) {
+                navigation.navigate(route.name);
+              }
             }
           };
 
@@ -52,18 +43,20 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
                 accessibilityState={isFocused ? { selected: true } : {}}
                 accessibilityLabel={options.tabBarAccessibilityLabel}
                 onPress={onPress}
-                activeOpacity={1} // ✅ Evita la opacidad en iOS
+                activeOpacity={1}
                 style={styles.centralButtonContainer}
               >
                 <Animated.View
                   style={[
                     styles.centralButton,
-                    isAddScreenActive ? styles.centralButtonActive : null,
+                    isFocused ? styles.centralButtonActive : null,
                   ]}
                 >
-                  <Animated.View style={animatedIconStyle}>
-                    <Icon name="add" size={30} color="#FFF" />
-                  </Animated.View>
+                  <Icon
+                    name={isFocused ? "camera-outline" : "add"}
+                    size={30}
+                    color="#FFF"
+                  />
                 </Animated.View>
               </TouchableOpacity>
             );
@@ -82,12 +75,12 @@ export function TabBar({ state, descriptors, navigation }: BottomTabBarProps) {
               <Icon
                 name={
                   route.name === "movements"
-                    ? "swap-horiz"
+                    ? "swap-horizontal" // Cambiado
                     : route.name === "board"
-                    ? "bar-chart"
+                    ? "stats-chart" // Cambiado
                     : route.name === "profile"
-                    ? "person"
-                    : "home"
+                    ? "person" // Cambiado
+                    : "home" // Cambiado
                 }
                 size={30}
                 color={isFocused ? "#00DC5A" : "#FFF"}
@@ -134,6 +127,6 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   centralButtonActive: {
-    backgroundColor: "#EF674A",
+    backgroundColor: "#00DC5A", // Cambiado a un verde más apagado
   },
 });

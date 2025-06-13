@@ -1,5 +1,5 @@
 // components/ui/CategorySelector.tsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,17 @@ import {
   StyleSheet,
   ScrollView,
   Dimensions,
-} from 'react-native';
-import { gastosIcons, ingresosIcons } from '@/app/constants/categoryIcons';
-import { useCategories, Category } from '@/app/hooks/useCategories';
-import { TransactionType } from '@/app/interfaces/transaction.interface';
+} from "react-native";
+import { gastosIcons, ingresosIcons } from "@/app/constants/categoryIcons";
+import { useCategories, Category } from "@/app/hooks/useCategories";
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth } = Dimensions.get("window");
 
 // 🎨 COLORES DINÁMICOS POR TIPO DE TRANSACCIÓN
 const SELECTION_COLORS = {
-  gasto: '#FF5252',    // Rojo para gastos
-  ingreso: '#00DC5A',  // Verde para ingresos  
-  ahorro: '#2196F3',   // Azul para ahorros
+  gasto: "#FF5252", // Rojo para gastos
+  ingreso: "#00DC5A", // Verde para ingresos
+  ahorro: "#2196F3", // Azul para ahorros
 } as const;
 
 interface CategorySelectorProps {
@@ -35,36 +34,20 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   initialCategory,
 }) => {
   const [selected, setSelected] = useState<string>(
-    selectedCategory || initialCategory || ''
+    selectedCategory || initialCategory || ""
   );
+  const [currentPage, setCurrentPage] = useState(0); // Estado para la página actual
+  const scrollViewRef = useRef<ScrollView>(null); // Ref para el ScrollView
 
   const { getCategoriesByType, getCategoryColor } = useCategories();
 
-  // 🔄 ACTUALIZAR SELECCIÓN CUANDO CAMBIE LA PROP
-  useEffect(() => {
-    if (selectedCategory !== undefined) {
-      setSelected(selectedCategory);
-    }
-  }, [selectedCategory]);
-
-  // 🎯 OBTENER COLOR DINÁMICO SEGÚN EL TIPO
-  const selectionColor = SELECTION_COLORS[type];
-
   // 🎯 OBTENER CATEGORÍAS E ICONOS SEGÚN EL TIPO
   const categories = getCategoriesByType(type);
-  const icons = type === 'gasto' ? gastosIcons : ingresosIcons;
-
-  // 🎯 MANEJAR SELECCIÓN
-  const handleSelect = (category: string) => {
-    const newSelection = selected === category ? '' : category;
-    setSelected(newSelection);
-    onSelect(newSelection);
-  };
+  const icons = type === "gasto" ? gastosIcons : ingresosIcons;
 
   // 🎯 AGRUPAR CATEGORÍAS EN PÁGINAS DE 3x2 (6 items por página)
   const itemsPerPage = 6;
   const pages: Category[][] = [];
-  
   for (let i = 0; i < categories.length; i += itemsPerPage) {
     pages.push(categories.slice(i, i + itemsPerPage));
   }
@@ -77,8 +60,67 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
   const itemWidth = (pageWidth - totalSpacingPerRow) / 3; // 3 columnas
   const itemHeight = 100; // altura fija para mantener diseño
 
-  const renderCategoryItem = (category: Category, pageIndex: number, itemIndex: number) => {
-    const icon = icons[category.name] || icons['Otros'] || icons['Otros Ingresos'];
+  // 🔄 ACTUALIZAR SELECCIÓN Y SCROLL CUANDO CAMBIEN LAS PROPS
+  useEffect(() => {
+    const categoryToFocus = selectedCategory || initialCategory;
+    if (categoryToFocus) {
+      setSelected(categoryToFocus);
+
+      // Encontrar la página de la categoría seleccionada/inicial
+      let pageIndexToFocus = 0;
+      for (let i = 0; i < pages.length; i++) {
+        if (pages[i].some((cat) => cat.name === categoryToFocus)) {
+          pageIndexToFocus = i;
+          break;
+        }
+      }
+
+      // Scroll a la página y actualizar currentPage
+      if (scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({
+          x: pageIndexToFocus * pageWidth,
+          animated: true,
+        });
+      }
+      // Es importante actualizar currentPage aquí también si el scroll es programático
+      // y no queremos depender únicamente del evento onScroll para la UI del indicador.
+      // Sin embargo, si onScroll se dispara de forma fiable con scrollTo,
+      // podría ser redundante. Por seguridad y respuesta inmediata de la UI:
+      if (pageIndexToFocus !== currentPage) {
+        setCurrentPage(pageIndexToFocus);
+      }
+    } else if (selectedCategory === "") {
+      // Si se deselecciona explícitamente
+      setSelected("");
+    }
+  }, [selectedCategory, initialCategory, pages, pageWidth]); // pages y pageWidth como dependencias
+
+  // 🎯 OBTENER COLOR DINÁMICO SEGÚN EL TIPO
+  const selectionColor = SELECTION_COLORS[type];
+
+  // 🎯 MANEJAR SELECCIÓN
+  const handleSelect = (category: string) => {
+    const newSelection = selected === category ? "" : category;
+    setSelected(newSelection);
+    onSelect(newSelection);
+  };
+
+  // 🎯 MANEJAR CAMBIO DE PÁGINA EN SCROLL
+  const handlePageChange = (event: any) => {
+    const contentOffsetX = event.nativeEvent.contentOffset.x;
+    const newPageIndex = Math.round(contentOffsetX / pageWidth);
+    if (newPageIndex !== currentPage) {
+      setCurrentPage(newPageIndex);
+    }
+  };
+
+  const renderCategoryItem = (
+    category: Category,
+    pageIndex: number,
+    itemIndex: number
+  ) => {
+    const icon =
+      icons[category.name] || icons["Otros"] || icons["Otros Ingresos"];
     const isSelected = selected === category.name;
     const key = `${pageIndex}-${itemIndex}-${category.name}`;
 
@@ -94,10 +136,10 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
           },
           isSelected && [
             styles.categoryItemSelected,
-            { 
+            {
               backgroundColor: selectionColor,
               borderColor: selectionColor,
-            }
+            },
           ],
         ]}
         onPress={() => handleSelect(category.name)}
@@ -105,14 +147,11 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
       >
         {/* Ícono */}
         <View style={styles.iconContainer}>
-          {React.cloneElement(icon, {
-            width: 40,
-            height: 40,
-          })}
+          {React.cloneElement(icon)}
         </View>
 
         {/* Texto */}
-        <Text 
+        <Text
           style={[
             styles.categoryText,
             isSelected && styles.categoryTextSelected,
@@ -132,28 +171,24 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
     const secondRow = pageCategories.slice(3, 6);
 
     return (
-      <View 
-        key={pageIndex}
-        style={[styles.page, { width: pageWidth }]}
-      >
+      <View key={pageIndex} style={[styles.page, { width: pageWidth }]}>
         {/* Primera fila */}
         <View style={styles.row}>
-          {firstRow.map((category, index) => 
+          {firstRow.map((category, index) =>
             renderCategoryItem(category, pageIndex, index)
           )}
           {/* Rellenar espacios vacíos para mantener layout */}
-          {firstRow.length < 3 && 
+          {firstRow.length < 3 &&
             Array.from({ length: 3 - firstRow.length }).map((_, index) => (
-              <View 
-                key={`empty-first-${index}`} 
-                style={{ 
-                  width: itemWidth, 
+              <View
+                key={`empty-first-${index}`}
+                style={{
+                  width: itemWidth,
                   height: itemHeight,
                   marginHorizontal: itemSpacing / 2,
-                }} 
+                }}
               />
-            ))
-          }
+            ))}
         </View>
 
         {/* Separación entre filas */}
@@ -161,22 +196,21 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
 
         {/* Segunda fila */}
         <View style={styles.row}>
-          {secondRow.map((category, index) => 
+          {secondRow.map((category, index) =>
             renderCategoryItem(category, pageIndex, index + 3)
           )}
           {/* Rellenar espacios vacíos para mantener layout */}
-          {secondRow.length < 3 && 
+          {secondRow.length < 3 &&
             Array.from({ length: 3 - secondRow.length }).map((_, index) => (
-              <View 
-                key={`empty-second-${index}`} 
-                style={{ 
-                  width: itemWidth, 
+              <View
+                key={`empty-second-${index}`}
+                style={{
+                  width: itemWidth,
                   height: itemHeight,
                   marginHorizontal: itemSpacing / 2,
-                }} 
+                }}
               />
-            ))
-          }
+            ))}
         </View>
       </View>
     );
@@ -195,8 +229,11 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
         contentContainerStyle={styles.scrollContent}
         style={styles.scrollView}
         decelerationRate="fast"
+        onScroll={handlePageChange} // 🎯 AGREGAR EVENTO ON SCROLL
+        scrollEventThrottle={16} // Para un seguimiento más suave del scroll
+        ref={scrollViewRef} // Asignar la ref
       >
-        {pages.map((pageCategories, pageIndex) => 
+        {pages.map((pageCategories, pageIndex) =>
           renderPage(pageCategories, pageIndex)
         )}
       </ScrollView>
@@ -207,7 +244,10 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
           {pages.map((_, index) => (
             <View
               key={index}
-              style={styles.pageIndicator}
+              style={[
+                styles.pageIndicator,
+                currentPage === index && styles.pageIndicatorActive, // 🎯 ESTILO ACTIVO
+              ]}
             />
           ))}
         </View>
@@ -218,47 +258,47 @@ export const CategorySelector: React.FC<CategorySelectorProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    width: "100%",
   },
-  
+
   title: {
     fontSize: 18,
-    fontFamily: 'Outfit_600SemiBold',
-    color: '#000',
+    fontFamily: "Outfit_600SemiBold",
+    color: "#000",
     marginBottom: 16,
   },
-  
+
   scrollView: {
     flexGrow: 0,
   },
-  
+
   scrollContent: {
-    alignItems: 'flex-start',
+    alignItems: "flex-start",
   },
-  
+
   page: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingVertical: 10,
   },
-  
+
   row: {
-    flexDirection: 'row',
-    justifyContent: 'center', // 🎯 CENTRADO PERFECTO
-    alignItems: 'center',
-    width: '100%',
+    flexDirection: "row",
+    justifyContent: "center", // 🎯 CENTRADO PERFECTO
+    alignItems: "center",
+    width: "100%",
   },
-  
+
   categoryItem: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#F8F9FA",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E5E8EB',
+    borderColor: "#E5E8EB",
     padding: 8,
     // 🎯 SOMBRA SUTIL
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: {
       width: 0,
       height: 1,
@@ -267,7 +307,7 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  
+
   categoryItemSelected: {
     // 🎯 ESTILOS BASE PARA SELECCIÓN (el color se aplica dinámicamente)
     // 🎯 SOMBRA MÁS PRONUNCIADA CUANDO ESTÁ SELECCIONADO
@@ -275,37 +315,45 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  
+
   iconContainer: {
-    marginBottom: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+    marginBottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    width: 60,
+    height: 60,
   },
-  
+
   categoryText: {
     fontSize: 12,
-    fontFamily: 'Outfit_500Medium',
-    color: '#2C3E50',
-    textAlign: 'center',
+    fontFamily: "Outfit_500Medium",
+    color: "#2C3E50",
+    textAlign: "center",
   },
-  
+
   categoryTextSelected: {
-    color: '#FFFFFF',
+    color: "#FFFFFF",
   },
-  
+
   pageIndicators: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     marginTop: 12,
     gap: 6,
   },
-  
+
   pageIndicator: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#E5E8EB',
+    backgroundColor: "#E5E8EB",
+  },
+  pageIndicatorActive: { // 🎯 ESTILO PARA EL INDICADOR ACTIVO
+    backgroundColor: "#000", // Color negro para el activo
+    width: 8, // Ligeramente más grande
+    height: 8,
+    borderRadius: 4,
   },
 });
 

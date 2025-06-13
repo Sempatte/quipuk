@@ -7,17 +7,20 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
-  ScrollView
+  ScrollView,
 } from "react-native";
 import { useQuery } from "@apollo/client";
-import { Ionicons } from '@expo/vector-icons';
-import { useRouter } from 'expo-router';
+import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
 import { useProfilePicture } from "@/app/hooks/useProfilePicture";
 import Avatar from "@/app/components/ui/Avatar";
-import {  useDeviceUnlink } from "@/app/components/DeviceUnlinkModal";
-import { StatusBarManager, StatusBarPresets } from "@/app/components/ui/StatusBarManager";
+import { useDeviceUnlink } from "@/app/components/DeviceUnlinkModal";
+import {
+  StatusBarManager,
+  StatusBarPresets,
+} from "@/app/components/ui/StatusBarManager";
 import styles from "../styles/profileScreen.styles";
 
 interface UserProfile {
@@ -34,8 +37,8 @@ export default function EnhancedProfile() {
   const { loading, error, data } = useQuery<{ getUserProfile: UserProfile }>(
     GET_USER_PROFILE,
     {
-      fetchPolicy: 'cache-first',
-      errorPolicy: 'all',
+      fetchPolicy: "cache-first",
+      errorPolicy: "all",
       notifyOnNetworkStatusChange: true,
     }
   );
@@ -44,42 +47,35 @@ export default function EnhancedProfile() {
   const {
     state: profilePictureState,
     selectAndUploadImage,
-    deleteProfilePicture
+    deleteProfilePicture,
   } = useProfilePicture();
 
-
-
   // Hook de desvinculación
-  const {
-    quickUnlink
-  } = useDeviceUnlink();
+  const { quickUnlink } = useDeviceUnlink();
 
   // Manejar acciones del avatar
   const handleAvatarPress = useCallback(() => {
     if (profilePictureState.profilePictureUrl) {
-      Alert.alert(
-        'Foto de perfil',
-        'Selecciona una acción',
-        [
-          { text: 'Cancelar', style: 'cancel' },
-          {
-            text: 'Cambiar foto',
-            onPress: selectAndUploadImage
-          },
-          {
-            text: 'Eliminar foto',
-            onPress: deleteProfilePicture,
-            style: 'destructive'
-          },
-        ]
-      );
+      Alert.alert("Foto de perfil", "Selecciona una acción", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Cambiar foto",
+          onPress: selectAndUploadImage,
+        },
+        {
+          text: "Eliminar foto",
+          onPress: deleteProfilePicture,
+          style: "destructive",
+        },
+      ]);
     } else {
       selectAndUploadImage();
     }
-  }, [profilePictureState.profilePictureUrl, selectAndUploadImage, deleteProfilePicture]);
-
-
-  
+  }, [
+    profilePictureState.profilePictureUrl,
+    selectAndUploadImage,
+    deleteProfilePicture,
+  ]);
 
   // Determinar estados de loading
   const shouldShowAvatarLoading = useCallback(() => {
@@ -97,7 +93,17 @@ export default function EnhancedProfile() {
           <Ionicons name="alert-circle" size={50} color="#E86F51" />
           <Text style={styles.errorText}>Error al cargar el perfil</Text>
           <Text style={styles.errorSubtext}>{error.message}</Text>
-
+          {__DEV__ && (
+            <TouchableOpacity
+              style={styles.logoutButton}
+              onPress={quickUnlink}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.logoutText}>
+                Desvincular dispositivo [DEV]
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
     );
@@ -110,7 +116,10 @@ export default function EnhancedProfile() {
         <Text style={styles.headerTitle}>Mi Perfil</Text>
       </View>
 
-      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollContainer}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Avatar Section */}
         <View style={styles.avatarContainer}>
           <Avatar
@@ -126,7 +135,8 @@ export default function EnhancedProfile() {
 
           {profilePictureState.isUploading && (
             <Text style={styles.uploadingText}>
-              Subiendo imagen... {Math.round(profilePictureState.uploadProgress)}%
+              Subiendo imagen...{" "}
+              {Math.round(profilePictureState.uploadProgress)}%
             </Text>
           )}
           {profilePictureState.isDeleting && (
@@ -143,7 +153,9 @@ export default function EnhancedProfile() {
           ) : (
             data?.getUserProfile && (
               <>
-                <Text style={styles.userName}>{data.getUserProfile.fullName}</Text>
+                <Text style={styles.userName}>
+                  {data.getUserProfile.fullName}
+                </Text>
 
                 {/* Información de contacto */}
                 <View style={styles.infoCard}>
@@ -153,7 +165,9 @@ export default function EnhancedProfile() {
                     </View>
                     <View>
                       <Text style={styles.infoLabel}>Teléfono</Text>
-                      <Text style={styles.infoValue}>{data.getUserProfile.phoneNumber || 'No especificado'}</Text>
+                      <Text style={styles.infoValue}>
+                        {data.getUserProfile.phoneNumber || "No especificado"}
+                      </Text>
                     </View>
                   </View>
 
@@ -165,17 +179,26 @@ export default function EnhancedProfile() {
                     </View>
                     <View>
                       <Text style={styles.infoLabel}>Correo</Text>
-                      <Text style={styles.infoValue}>{data.getUserProfile.email}</Text>
+                      <Text style={styles.infoValue}>
+                        {data.getUserProfile.email}
+                      </Text>
                     </View>
                   </View>
                 </View>
 
-
                 {/* Opciones generales */}
                 <View style={styles.optionsCard}>
-                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7} onPress={() => router.push('/settings')}>
+                  <TouchableOpacity
+                    style={styles.optionItem}
+                    activeOpacity={0.7}
+                    onPress={() => router.push("/settings")}
+                  >
                     <View style={styles.optionIconContainer}>
-                      <Ionicons name="settings-outline" size={22} color="#333" />
+                      <Ionicons
+                        name="settings-outline"
+                        size={22}
+                        color="#333"
+                      />
                     </View>
                     <Text style={styles.optionText}>Configuraciones</Text>
                     <Ionicons name="chevron-forward" size={20} color="#999" />
@@ -183,13 +206,18 @@ export default function EnhancedProfile() {
 
                   <View style={styles.optionDivider} />
 
-
-
                   <View style={styles.optionDivider} />
 
-                  <TouchableOpacity style={styles.optionItem} activeOpacity={0.7}>
+                  <TouchableOpacity
+                    style={styles.optionItem}
+                    activeOpacity={0.7}
+                  >
                     <View style={styles.optionIconContainer}>
-                      <Ionicons name="help-circle-outline" size={22} color="#333" />
+                      <Ionicons
+                        name="help-circle-outline"
+                        size={22}
+                        color="#333"
+                      />
                     </View>
                     <Text style={styles.optionText}>Ayuda y Soporte</Text>
                     <Ionicons name="chevron-forward" size={20} color="#999" />
@@ -199,19 +227,20 @@ export default function EnhancedProfile() {
                 {/* Botón de cierre de sesión */}
                 {__DEV__ && (
                   <TouchableOpacity
-                  style={styles.logoutButton}
-                  onPress={quickUnlink}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.logoutText}>Desvincular dispositivo [DEV]</Text>
-                </TouchableOpacity>
-                )} 
+                    style={styles.logoutButton}
+                    onPress={quickUnlink}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.logoutText}>
+                      Desvincular dispositivo [DEV]
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </>
             )
           )}
         </View>
       </ScrollView>
-
     </View>
   );
 }

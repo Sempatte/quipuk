@@ -4,12 +4,13 @@ import {
   Text,
   KeyboardAvoidingView,
   ScrollView,
+  TouchableOpacity,
 } from "react-native";
 import { useQuery } from "@apollo/client";
 import BellIcon from "../../assets/images/icons/mdi_bell.svg";
 import SettingsIcon from "../../assets/images/icons/settings.svg";
 import { GET_USER_PROFILE } from "../graphql/users.graphql";
-import QuipukLogo from "../../assets/images/Logo.svg";
+import QuipukLogo from "../../assets/images/LogoFull.svg";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
@@ -20,6 +21,7 @@ import UpcomingPayments from "@/app/components/ui/UpcomingPayments";
 import QuipuTip from "@/app/components/ui/QuipuTip";
 import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "../styles/indexScreen.styles";
+import { useRouter } from "expo-router";
 
 type LoginScreenNavigationProp = NativeStackNavigationProp<
   RootStackParamList,
@@ -29,9 +31,10 @@ type LoginScreenNavigationProp = NativeStackNavigationProp<
 
 export default function Index() {
   const { data, loading, error } = useQuery(GET_USER_PROFILE, {
-    fetchPolicy: 'cache-first',
+    fetchPolicy: "cache-first",
   });
   const navigation = useNavigation<LoginScreenNavigationProp>();
+  const router = useRouter();
 
   useFocusEffect(
     useCallback(() => {
@@ -43,7 +46,9 @@ export default function Index() {
   );
 
   if (loading) {
-    return <Loader visible={true} fullScreen text="Cargando datos del usuario..." />;
+    return (
+      <Loader visible={true} fullScreen text="Cargando datos del usuario..." />
+    );
   }
 
   return (
@@ -53,15 +58,18 @@ export default function Index() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <QuipukLogo width={70} height={70} />
+              <QuipukLogo width={180} height={70} />
             </View>
             <View style={styles.iconContainer}>
               <View style={styles.iconButton}>
                 <BellIcon width={24} height={24} fill="#00c450" />
               </View>
-              <View style={styles.iconButton}>
+              <TouchableOpacity
+                style={styles.iconButton}
+                onPress={() => router.push("/settings")}
+              >
                 <SettingsIcon width={24} height={24} fill="#00c450" />
-              </View>
+              </TouchableOpacity>
             </View>
           </View>
           {/* Welcome Message */}
@@ -80,7 +88,7 @@ export default function Index() {
           {/* Componente de Últimos Movimientos */}
           <RecentTransactions />
           <UpcomingPayments />
-          <QuipuTip/>
+          <QuipuTip />
           {/* Aquí puedes añadir más componentes */}
         </View>
       </ScrollView>

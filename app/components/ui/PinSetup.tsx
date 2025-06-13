@@ -229,14 +229,7 @@ export const PinSetup: React.FC<PinSetupProps> = ({
 
                 {/* Bottom row: Skip, 0, Delete */}
                 <View style={styles.keypadRow}>
-                  <TouchableOpacity
-                    style={styles.keypadButtonEmpty}
-                    onPress={onSkip}
-                    activeOpacity={0.7}
-                    disabled={isLoading}
-                  >
-                    <Text style={styles.skipButtonText}>Configurar después</Text>
-                  </TouchableOpacity>
+                  
 
                   <TouchableOpacity
                     style={styles.keypadButton}

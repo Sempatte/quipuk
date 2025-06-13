@@ -26,16 +26,16 @@ const styles = StyleSheet.create({
   
   listContainer: {
     flex: 1,
-    backgroundColor: "#F5F5F5"
+    backgroundColor: "transparent" // Cambiado
   },
   
   flatList: {
     flex: 1,
-    backgroundColor: "#F5F5F5"
+    backgroundColor: "transparent" // Cambiado
   },
   
   flatListContent: {
-    backgroundColor: "#F5F5F5",
+    backgroundColor: "transparent", // Cambiado
     paddingBottom: 20
   },
   
@@ -210,8 +210,9 @@ const styles = StyleSheet.create({
   
   group: { 
     marginBottom: 20, 
-    paddingHorizontal: 15,
-    backgroundColor: "#F5F5F5"
+    paddingHorizontal: 16, // Añadido padding horizontal
+    paddingVertical: 10, // Añadido padding vertical
+    backgroundColor: "transparent"
   },
   
   groupDate: { 
@@ -307,4 +308,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default styles; 
+export default styles;
