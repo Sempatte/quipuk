@@ -94,6 +94,7 @@ class GoogleVisionOCR {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
+          'User-Agent': 'QuipukApp/1.0'
         },
         body: JSON.stringify(requestBody),
       });
