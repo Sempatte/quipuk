@@ -140,7 +140,11 @@ export default function EmailVerificationScreen() {
 
     try {
       console.log('📧 Verifying code:', verificationCode);
-      const result = await emailVerificationService.verifyCode(verificationCode);
+      console.log('📧 Email:', email);
+      console.log('📧 User ID:', userId);
+      console.log('📧 From registration:', fromRegistration);
+      console.log('📧 Verification code:', verificationCode);
+      const result = await emailVerificationService.verifyCodeForRegistration(verificationCode, email, userId);
 
       if (result.success) {
         showToast('success', '¡Email verificado!', result.message);

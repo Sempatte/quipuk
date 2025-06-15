@@ -17,7 +17,7 @@ export interface VerificationStatus {
 
 class EmailVerificationService {
   private readonly API_URL = env.API_URL;
-
+  
   /**
    * 📧 Enviar código de verificación
    */
@@ -60,24 +60,21 @@ class EmailVerificationService {
   /**
    * ✅ Verificar código - CON TOKEN (para usuarios ya logueados)
    */
-  async verifyCode(code: string): Promise<VerificationResult> {
+  async verifyCode(code: string, userId: number | undefined): Promise<VerificationResult> {
     try {
       const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        throw new Error('No authentication token found');
-      }
-
+      console.log('📧 Token:', token);
       const response = await fetch(`${this.API_URL}/email/verify-code`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ code }),
+        body: JSON.stringify({ code, userId }),
       });
 
       const result = await response.json();
-      
+      console.log('📧 Verification result:', result);
       return {
         success: result.success,
         message: result.message,
@@ -95,7 +92,7 @@ class EmailVerificationService {
   /**
    * ✅ Verificar código durante el registro - SIN TOKEN
    */
-  async verifyCodeForRegistration(code: string, email: string, userId: number): Promise<VerificationResult> {
+  async verifyCodeForRegistration(code: string, email: string, userId: number | undefined): Promise<VerificationResult> {
     try {
       console.log('📧 Verifying code for registration:', { code, email, userId });
 
